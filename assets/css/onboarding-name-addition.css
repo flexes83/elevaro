@@ -1,0 +1,35 @@
+/* Name step */
+.name-step-card {
+  background: #fff;
+  border: 1px solid rgba(90,79,243,.12);
+  border-radius: 1.4rem;
+  padding: 1.2rem;
+  box-shadow: 0 .75rem 2rem rgba(23,32,51,.06);
+}
+
+.name-input-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: .75rem;
+}
+
+.name-input-row .form-control {
+  border-radius: 999px;
+  border-color: rgba(90,79,243,.25);
+  padding-left: 1.15rem;
+}
+
+.name-input-row .form-control:focus {
+  border-color: var(--elevaro-primary);
+  box-shadow: 0 0 0 .25rem rgba(90,79,243,.12);
+}
+
+@media (max-width: 576px) {
+  .name-input-row {
+    grid-template-columns: 1fr;
+  }
+
+  .name-input-row .btn {
+    width: 100%;
+  }
+}
