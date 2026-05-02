@@ -7,7 +7,7 @@ function elevaro_openai_chat_json(array $messages, array $schema, float $tempera
     $config = elevaro_config('openai');
 
     if (empty($config['api_key'])) {
-        throw new RuntimeException('OpenAI API key missing.');
+        throw new RuntimeException('OpenAI API key missing. Create /config/openai.php.');
     }
 
     $payload = [
@@ -17,7 +17,7 @@ function elevaro_openai_chat_json(array $messages, array $schema, float $tempera
         'response_format' => [
             'type' => 'json_schema',
             'json_schema' => [
-                'name' => 'elevaro_quiz_questions',
+                'name' => 'elevaro_admin_generation',
                 'strict' => true,
                 'schema' => $schema
             ]
@@ -29,7 +29,7 @@ function elevaro_openai_chat_json(array $messages, array $schema, float $tempera
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST => true,
-        CURLOPT_TIMEOUT => 90,
+        CURLOPT_TIMEOUT => 120,
         CURLOPT_HTTPHEADER => [
             'Authorization: Bearer ' . $config['api_key'],
             'Content-Type: application/json',
