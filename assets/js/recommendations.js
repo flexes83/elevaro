@@ -80,13 +80,7 @@ function renderRecommendations(items) {
     els.list.appendChild(card);
   });
 }
-
 function quizLink(quizKey) {
-  // Current PHP quiz route still uses slug. This maps first known DB key to current JSON slug.
-  if (quizKey === 'mathe_klasse5_bruchrechnen') {
-    return 'quiz.php?quiz=mathe/klasse-5/bruchrechnen';
-  }
-
   return 'quiz.php?key=' + encodeURIComponent(quizKey);
 }
 
