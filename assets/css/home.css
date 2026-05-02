@@ -22,6 +22,10 @@ body {
   letter-spacing: -0.055em;
 }
 
+.navbar {
+  backdrop-filter: blur(12px);
+}
+
 .navbar-brand {
   color: var(--elevaro-primary) !important;
   letter-spacing: -0.035em;
@@ -69,7 +73,7 @@ body {
 
 .lead {
   color: var(--elevaro-muted);
-  max-width: 680px;
+  max-width: 720px;
 }
 
 .trust-row {
@@ -84,7 +88,7 @@ body {
   gap: .35rem;
   border-radius: 999px;
   padding: .45rem .75rem;
-  background: rgba(255,255,255,.72);
+  background: rgba(255,255,255,.76);
   border: 1px solid rgba(23,32,51,.06);
   font-size: .9rem;
   font-weight: 650;
@@ -100,7 +104,8 @@ body {
 .returning-box,
 .step-card,
 .quiz-card,
-.teacher-card {
+.quality-card,
+.cta-card {
   background: rgba(255,255,255,.94);
   box-shadow: 0 1.2rem 3.5rem rgba(23,32,51,.09);
   border: 1px solid rgba(23,32,51,.045);
@@ -110,6 +115,15 @@ body {
   border-radius: 2rem;
   padding: 2rem;
   text-align: center;
+  position: relative;
+}
+
+.hero-orbit {
+  position: relative;
+  min-height: 230px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .hero-panda {
@@ -121,8 +135,33 @@ body {
   border-radius: 50%;
   background: var(--elevaro-soft);
   font-size: 5.2rem;
-  margin-bottom: 1.25rem;
   animation: floaty 3s ease-in-out infinite;
+}
+
+.orbit-pill {
+  position: absolute;
+  border-radius: 999px;
+  padding: .45rem .8rem;
+  background: #fff;
+  box-shadow: 0 .75rem 2rem rgba(23,32,51,.1);
+  font-weight: 800;
+  font-size: .88rem;
+}
+
+.pill-one {
+  left: 1rem;
+  top: 2.2rem;
+}
+
+.pill-two {
+  right: .8rem;
+  top: 4.2rem;
+}
+
+.pill-three {
+  bottom: 1.8rem;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .mini-flow {
@@ -157,6 +196,11 @@ body {
   padding: 1rem 1.25rem;
 }
 
+.returning-box strong {
+  display: block;
+  font-size: 1.2rem;
+}
+
 .section-padding {
   padding: 5rem 0;
 }
@@ -166,7 +210,7 @@ body {
 }
 
 .section-head p {
-  max-width: 680px;
+  max-width: 700px;
   margin-inline: auto;
 }
 
@@ -189,28 +233,46 @@ body {
 
 .step-card p,
 .quiz-card p,
-.teacher-card p {
+.quality-card p,
+.cta-card p {
   color: var(--elevaro-muted);
 }
 
 .quiz-grid {
   display: grid;
-  grid-template-columns: 1.25fr 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
 }
 
 .quiz-card {
+  overflow: hidden;
   border-radius: 1.5rem;
-  padding: 1.45rem;
-  display: flex;
-  flex-direction: column;
-  min-height: 270px;
 }
 
-.quiz-card.featured {
+.quiz-visual {
+  min-height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background:
-    radial-gradient(circle at top right, rgba(90,79,243,.18), transparent 18rem),
-    #fff;
+    radial-gradient(circle at top right, rgba(255,255,255,.36), transparent 12rem),
+    linear-gradient(135deg, var(--card-c1), var(--card-c2));
+}
+
+.quiz-visual span {
+  width: 96px;
+  height: 96px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1.6rem;
+  background: rgba(255,255,255,.24);
+  backdrop-filter: blur(10px);
+  font-size: 3.5rem;
+}
+
+.quiz-content {
+  padding: 1.35rem;
 }
 
 .quiz-badge {
@@ -245,11 +307,8 @@ body {
   font-weight: 650;
 }
 
-.disabled-card {
-  opacity: .82;
-}
-
-.teacher-card {
+.quality-card,
+.cta-card {
   border-radius: 2rem;
   padding: 2rem;
   display: flex;
@@ -258,8 +317,21 @@ body {
   justify-content: space-between;
 }
 
-.teacher-card > div {
-  max-width: 740px;
+.quality-icon {
+  width: 76px;
+  height: 76px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1.5rem;
+  background: var(--elevaro-soft);
+  font-size: 2.4rem;
+}
+
+.quality-card > div:last-child,
+.cta-card > div {
+  max-width: 760px;
 }
 
 @keyframes floaty {
@@ -276,12 +348,17 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .teacher-card,
+  .quality-card,
+  .cta-card,
   .returning-box {
     display: block;
   }
 
-  .teacher-card .btn,
+  .quality-icon {
+    margin-bottom: 1rem;
+  }
+
+  .cta-card .btn,
   .returning-box .btn {
     margin-top: 1rem;
   }
@@ -304,6 +381,17 @@ body {
     width: 140px;
     height: 140px;
     font-size: 4rem;
+  }
+
+  .hero-orbit {
+    min-height: 190px;
+  }
+
+  .orbit-pill {
+    position: static;
+    display: inline-flex;
+    margin: .25rem;
+    transform: none;
   }
 
   .mini-flow {
