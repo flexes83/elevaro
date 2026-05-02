@@ -1,0 +1,100 @@
+{
+  "order": 1,
+  "slug": "mathe-klasse-5-bruchrechnen",
+  "title": "Bruchrechnen – Klasse 5",
+  "shortTitle": "Bruchrechnen",
+  "category": "Mathe Klasse 5",
+  "subject": "Mathe",
+  "grade": 5,
+  "states": [
+    "BW"
+  ],
+  "schoolTypes": [
+    "Gymnasium",
+    "Realschule",
+    "Gemeinschaftsschule"
+  ],
+  "curriculumTags": [
+    "Brüche",
+    "Anteile",
+    "Kürzen",
+    "Erweitern"
+  ],
+  "icon": "➗",
+  "color": "#5a4ff3",
+  "softColor": "#f1efff",
+  "accent": "#ffe08a",
+  "permalink": "mathe-klasse-5-bruchrechnen",
+  "coverImage": "assets/quizzes/mathe-klasse-5-bruchrechnen/img/cover.svg",
+  "cardImages": [
+    "assets/quizzes/mathe-klasse-5-bruchrechnen/img/cover.svg"
+  ],
+  "description": "Übe Brüche, Anteile, Zähler, Nenner und einfache Aufgaben passend für Klasse 5.",
+  "longDescription": "Ein kurzes Mathe-Quiz für Klasse 5: Brüche verstehen, Anteile berechnen, Zähler und Nenner unterscheiden und typische Grundlagen sicher wiederholen.",
+  "seoTitle": "Bruchrechnen Quiz Klasse 5 – Mathe spielerisch üben",
+  "seoDescription": "Bruchrechnen für Klasse 5 spielerisch üben: Zähler, Nenner, Anteile und einfache Brüche mit direktem Feedback und Wiederholung.",
+  "imageBase": "assets/quizzes/mathe-klasse-5-bruchrechnen/img/",
+  "roundLength": 10,
+  "questionCounts": [
+    5,
+    10,
+    15,
+    20
+  ],
+  "mailReports": false,
+  "avatars": [
+    "🐼",
+    "➗",
+    "⭐",
+    "🧠",
+    "🎯",
+    "🚀"
+  ],
+  "tags": [
+    "Brüche",
+    "Anteile",
+    "Grundlagen"
+  ],
+  "learningGoals": [
+    "Zähler und Nenner sicher unterscheiden",
+    "Brüche als Anteile verstehen",
+    "einfache Anteile berechnen",
+    "Wackelkandidaten gezielt wiederholen"
+  ],
+  "modes": [
+    {
+      "id": "normal",
+      "label": "Prüfungsrunde",
+      "icon": "🎯",
+      "description": "Alles gemischt"
+    },
+    {
+      "id": "begriffe",
+      "label": "Begriffe",
+      "icon": "🧠",
+      "description": "Zähler, Nenner und Bruchbegriffe",
+      "categoryFilter": [
+        "Begriffe"
+      ]
+    },
+    {
+      "id": "anteile",
+      "label": "Anteile",
+      "icon": "➗",
+      "description": "Hälfte, Viertel und einfache Anteile",
+      "categoryFilter": [
+        "Anteile"
+      ]
+    },
+    {
+      "id": "weak",
+      "label": "Wackelkandidaten",
+      "icon": "🔁",
+      "description": "Fragen, die noch nicht sicher sitzen"
+    }
+  ],
+  "imageSearchPrompts": [
+    "fractions math worksheet colorful no text no logo",
+    "school math fractions concept no text no logo"
+  ]
+}

@@ -1,0 +1,833 @@
+[
+  {
+    "id": "s_feldberg",
+    "type": "mc",
+    "category": "Berge",
+    "question": "Wie heißt der höchste Berg im Schwarzwald?",
+    "options": [
+      "Feldberg",
+      "Belchen",
+      "Kandel",
+      "Hornisgrinde"
+    ],
+    "answer": "Feldberg",
+    "fact": "Der Feldberg ist mit 1493 m der höchste Berg im Schwarzwald."
+  },
+  {
+    "id": "s_hoehe_feldberg",
+    "type": "mc",
+    "category": "Berge",
+    "question": "Wie hoch ist der Feldberg ungefähr?",
+    "options": [
+      "1493 m",
+      "800 m",
+      "1164 m",
+      "2200 m"
+    ],
+    "answer": "1493 m",
+    "fact": "Der Feldberg ist 1493 m hoch."
+  },
+  {
+    "id": "s_hornisgrinde",
+    "type": "mc",
+    "category": "Nord/Süd",
+    "question": "Welcher Berg liegt im Nordschwarzwald?",
+    "options": [
+      "Hornisgrinde",
+      "Feldberg",
+      "Belchen",
+      "Schauinsland"
+    ],
+    "answer": "Hornisgrinde",
+    "fact": "Die Hornisgrinde ist der höchste Berg im Nordschwarzwald."
+  },
+  {
+    "id": "s_nord_berg",
+    "type": "mc",
+    "category": "Berge",
+    "question": "Welcher Berg ist der höchste im Nordschwarzwald?",
+    "options": [
+      "Hornisgrinde",
+      "Feldberg",
+      "Belchen",
+      "Kandel"
+    ],
+    "answer": "Hornisgrinde",
+    "fact": "Die Hornisgrinde ist der höchste Berg im Nordschwarzwald."
+  },
+  {
+    "id": "s_sued_berg",
+    "type": "mc",
+    "category": "Nord/Süd",
+    "question": "Welcher Berg gehört zum Südschwarzwald?",
+    "options": [
+      "Feldberg",
+      "Hornisgrinde",
+      "Hohloh",
+      "Mummelsee"
+    ],
+    "answer": "Feldberg",
+    "fact": "Der Feldberg liegt im Südschwarzwald."
+  },
+  {
+    "id": "s_nord_sued_feldberg",
+    "type": "mc",
+    "category": "Nord/Süd",
+    "question": "Wohin gehört der Feldberg?",
+    "options": [
+      "Südschwarzwald",
+      "Nordschwarzwald",
+      "Schwäbische Alb",
+      "Bodenseegebiet"
+    ],
+    "answer": "Südschwarzwald",
+    "fact": "Der Feldberg liegt im Südschwarzwald."
+  },
+  {
+    "id": "s_nord_sued_hornisgrinde",
+    "type": "mc",
+    "category": "Nord/Süd",
+    "question": "Wohin gehört die Hornisgrinde?",
+    "options": [
+      "Nordschwarzwald",
+      "Südschwarzwald",
+      "Alpen",
+      "Odenwald"
+    ],
+    "answer": "Nordschwarzwald",
+    "fact": "Die Hornisgrinde liegt im Nordschwarzwald."
+  },
+  {
+    "id": "s_gestein_nord",
+    "type": "mc",
+    "category": "Gesteine",
+    "question": "Welches Gestein ist typisch für den Nordschwarzwald?",
+    "options": [
+      "Buntsandstein",
+      "Granit",
+      "Gneis",
+      "Basalt"
+    ],
+    "answer": "Buntsandstein",
+    "fact": "Im Nordschwarzwald ist Buntsandstein typisch."
+  },
+  {
+    "id": "s_gestein_sued",
+    "type": "mc",
+    "category": "Gesteine",
+    "question": "Welche Gesteine sind typisch für den Südschwarzwald?",
+    "options": [
+      "Granit und Gneis",
+      "Buntsandstein",
+      "Kalkstein und Ton",
+      "Kreide und Basalt"
+    ],
+    "answer": "Granit und Gneis",
+    "fact": "Im Südschwarzwald kommen vor allem Granit und Gneis vor."
+  },
+  {
+    "id": "s_gestein_buntsandstein",
+    "type": "mc",
+    "category": "Gesteine",
+    "question": "Buntsandstein passt eher zu welchem Teil des Schwarzwalds?",
+    "options": [
+      "Nordschwarzwald",
+      "Südschwarzwald",
+      "Alpen",
+      "Bodensee"
+    ],
+    "answer": "Nordschwarzwald",
+    "fact": "Buntsandstein ist typisch für den Nordschwarzwald."
+  },
+  {
+    "id": "s_gestein_granit_gneis",
+    "type": "mc",
+    "category": "Gesteine",
+    "question": "Granit und Gneis passen eher zu welchem Teil des Schwarzwalds?",
+    "options": [
+      "Südschwarzwald",
+      "Nordschwarzwald",
+      "Oberrheingraben",
+      "Schwäbische Alb"
+    ],
+    "answer": "Südschwarzwald",
+    "fact": "Granit und Gneis sind typisch für den Südschwarzwald."
+  },
+  {
+    "id": "s_landschaft_nord",
+    "type": "mc",
+    "category": "Landschaft",
+    "question": "Was passt eher zum Nordschwarzwald?",
+    "options": [
+      "Kerbtäler und enge Täler",
+      "Einzeltäler und höchste Berge",
+      "Küste und Dünen",
+      "Vulkane und Lavafelder"
+    ],
+    "answer": "Kerbtäler und enge Täler",
+    "fact": "Beim Nordschwarzwald werden enge Täler beziehungsweise Kerbtäler genannt."
+  },
+  {
+    "id": "s_landschaft_sued",
+    "type": "mc",
+    "category": "Landschaft",
+    "question": "Was passt eher zum Südschwarzwald?",
+    "options": [
+      "Einzeltäler und hohe Berge",
+      "Buntsandstein-Hochflächen",
+      "Küste",
+      "flache Marschlandschaft"
+    ],
+    "answer": "Einzeltäler und hohe Berge",
+    "fact": "Der Südschwarzwald ist durch höhere Berge und Einzeltäler geprägt."
+  },
+  {
+    "id": "s_landschaft_zuordnung_1",
+    "type": "mc",
+    "category": "Nord/Süd",
+    "question": "Was passt zusammen?",
+    "options": [
+      "Nordschwarzwald – Buntsandstein",
+      "Südschwarzwald – Buntsandstein",
+      "Nordschwarzwald – Feldberg",
+      "Südschwarzwald – Hornisgrinde"
+    ],
+    "answer": "Nordschwarzwald – Buntsandstein",
+    "fact": "Buntsandstein gehört typischerweise zum Nordschwarzwald."
+  },
+  {
+    "id": "s_landschaft_zuordnung_2",
+    "type": "mc",
+    "category": "Nord/Süd",
+    "question": "Was passt zusammen?",
+    "options": [
+      "Südschwarzwald – Granit und Gneis",
+      "Nordschwarzwald – Granit und Gneis",
+      "Südschwarzwald – Hornisgrinde",
+      "Nordschwarzwald – Feldberg"
+    ],
+    "answer": "Südschwarzwald – Granit und Gneis",
+    "fact": "Granit und Gneis gehören typischerweise zum Südschwarzwald."
+  },
+  {
+    "id": "s_wald_nutzung",
+    "type": "mc",
+    "category": "Funktionen des Waldes",
+    "question": "Was gehört zur Nutzungsfunktion des Waldes?",
+    "options": [
+      "Holz liefern",
+      "Lawinenschutz",
+      "Urlaub und Erholung",
+      "Sauerstoffproduktion"
+    ],
+    "answer": "Holz liefern",
+    "fact": "Holz liefern gehört zur Nutzungsfunktion des Waldes."
+  },
+  {
+    "id": "s_wald_erholung",
+    "type": "mc",
+    "category": "Funktionen des Waldes",
+    "question": "Was gehört zur Erholungsfunktion des Waldes?",
+    "options": [
+      "Urlaub und Fremdenverkehr",
+      "Möbel herstellen",
+      "Bäume fällen",
+      "Papier produzieren"
+    ],
+    "answer": "Urlaub und Fremdenverkehr",
+    "fact": "Wälder werden auch zur Erholung und für Fremdenverkehr genutzt."
+  },
+  {
+    "id": "s_wald_schutz",
+    "type": "mc",
+    "category": "Funktionen des Waldes",
+    "question": "Was gehört zur Schutzfunktion des Waldes?",
+    "options": [
+      "Lawinen- und Windschutz",
+      "Sägewerk",
+      "Möbelbau",
+      "Holzverkauf"
+    ],
+    "answer": "Lawinen- und Windschutz",
+    "fact": "Der Wald kann vor Wind, Lawinen und Bodenabtragung schützen."
+  },
+  {
+    "id": "s_wald_lebensraum",
+    "type": "mc",
+    "category": "Funktionen des Waldes",
+    "question": "Welche Aufgabe hat der Wald für Tiere und Pflanzen?",
+    "options": [
+      "Lebensraum bieten",
+      "Metall herstellen",
+      "Benzin erzeugen",
+      "Straßen bauen"
+    ],
+    "answer": "Lebensraum bieten",
+    "fact": "Der Wald ist Lebensraum für viele Tiere und Pflanzen."
+  },
+  {
+    "id": "s_wald_sauerstoff",
+    "type": "mc",
+    "category": "Funktionen des Waldes",
+    "question": "Was produziert der Wald?",
+    "options": [
+      "Sauerstoff",
+      "Plastik",
+      "Metall",
+      "Benzin"
+    ],
+    "answer": "Sauerstoff",
+    "fact": "Bäume produzieren Sauerstoff."
+  },
+  {
+    "id": "s_wald_wasser",
+    "type": "mc",
+    "category": "Funktionen des Waldes",
+    "question": "Welche Aufgabe hat der Wald beim Wasser?",
+    "options": [
+      "Er speichert Wasser",
+      "Er macht Wasser salzig",
+      "Er verhindert jeden Regen",
+      "Er trocknet alle Quellen aus"
+    ],
+    "answer": "Er speichert Wasser",
+    "fact": "Der Wald kann Wasser speichern."
+  },
+  {
+    "id": "s_wald_boden",
+    "type": "mc",
+    "category": "Funktionen des Waldes",
+    "question": "Wovor kann der Wald den Boden schützen?",
+    "options": [
+      "Abtragung",
+      "Ampeln",
+      "Autolärm",
+      "Frost im Kühlschrank"
+    ],
+    "answer": "Abtragung",
+    "fact": "Wald kann den Boden vor Abtragung schützen."
+  },
+  {
+    "id": "s_wald_nicht_funktion",
+    "type": "mc",
+    "category": "Funktionen des Waldes",
+    "question": "Was passt NICHT zu den Aufgaben des Waldes?",
+    "options": [
+      "Autos herstellen",
+      "Holz liefern",
+      "Lebensraum bieten",
+      "Erholung ermöglichen"
+    ],
+    "answer": "Autos herstellen",
+    "fact": "Autos herzustellen ist keine Aufgabe des Waldes."
+  },
+  {
+    "id": "s_mono_definition",
+    "type": "mc",
+    "category": "Wald",
+    "question": "Was bedeutet Monokultur?",
+    "options": [
+      "Eine Baumart auf großer Fläche",
+      "Viele Baumarten gemischt",
+      "Wald ohne Tiere",
+      "Wald im Gebirge"
+    ],
+    "answer": "Eine Baumart auf großer Fläche",
+    "fact": "Bei Monokultur wächst überwiegend eine Art auf großer Fläche."
+  },
+  {
+    "id": "s_mono_fichte",
+    "type": "mc",
+    "category": "Wald",
+    "question": "Welche Baumart wurde oft in Monokulturen gepflanzt?",
+    "options": [
+      "Fichte",
+      "Apfelbaum",
+      "Palme",
+      "Kastanie"
+    ],
+    "answer": "Fichte",
+    "fact": "Fichtenmonokulturen sind im Schwarzwald ein wichtiges Thema."
+  },
+  {
+    "id": "s_mono_vorteil_ertrag",
+    "type": "mc",
+    "category": "Wald",
+    "question": "Was ist ein Vorteil einer Fichtenmonokultur?",
+    "options": [
+      "schneller Ertrag",
+      "besonders artenreich",
+      "sehr sturmsicher",
+      "kaum anfällig für Schädlinge"
+    ],
+    "answer": "schneller Ertrag",
+    "fact": "Ein Vorteil von Monokulturen ist der schnelle Ertrag."
+  },
+  {
+    "id": "s_mono_vorteil_verarbeitung",
+    "type": "mc",
+    "category": "Wald",
+    "question": "Welcher Vorteil passt zu Monokulturen?",
+    "options": [
+      "leichte Verarbeitung des Holzes",
+      "besonders viele Tierarten",
+      "große Sicherheit gegen Krankheiten",
+      "sehr naturnaher Wald"
+    ],
+    "answer": "leichte Verarbeitung des Holzes",
+    "fact": "Gerades, ähnliches Holz lässt sich leichter verarbeiten."
+  },
+  {
+    "id": "s_mono_vorteil_arbeit",
+    "type": "mc",
+    "category": "Wald",
+    "question": "Warum sind Monokulturen für die Forstwirtschaft oft praktisch?",
+    "options": [
+      "Sie sind arbeitsparender",
+      "Sie haben immer viele Baumarten",
+      "Sie brauchen nie Pflege",
+      "Sie sind nie krank"
+    ],
+    "answer": "Sie sind arbeitsparender",
+    "fact": "Monokulturen können einfacher und arbeitsparender bewirtschaftet werden."
+  },
+  {
+    "id": "s_mono_nachteil_artenarm",
+    "type": "mc",
+    "category": "Wald",
+    "question": "Was ist ein Nachteil einer Monokultur?",
+    "options": [
+      "Artenarmut",
+      "zu viele Baumarten",
+      "zu viele verschiedene Tiere",
+      "zu viel natürlicher Schutz"
+    ],
+    "answer": "Artenarmut",
+    "fact": "Monokulturen sind oft artenarm."
+  },
+  {
+    "id": "s_mono_nachteil_schaedlinge",
+    "type": "mc",
+    "category": "Wald",
+    "question": "Warum können sich Schädlinge in Monokulturen leicht ausbreiten?",
+    "options": [
+      "Weil viele gleiche Pflanzen nebeneinander stehen",
+      "Weil dort keine Bäume wachsen",
+      "Weil es dort immer schneit",
+      "Weil der Boden aus Glas ist"
+    ],
+    "answer": "Weil viele gleiche Pflanzen nebeneinander stehen",
+    "fact": "Wenn viele gleiche Bäume dort stehen, können Schädlinge sich leichter ausbreiten."
+  },
+  {
+    "id": "s_mono_nachteil_sturm",
+    "type": "mc",
+    "category": "Wald",
+    "question": "Was passiert bei Sturm eher in einer Fichtenmonokultur?",
+    "options": [
+      "Sie ist sturmgefährdet",
+      "Sie wird automatisch artenreicher",
+      "Sie wird zu Granit",
+      "Sie wächst sofort nach"
+    ],
+    "answer": "Sie ist sturmgefährdet",
+    "fact": "Fichtenmonokulturen können sturmgefährdet sein."
+  },
+  {
+    "id": "s_mono_tf_artenreich",
+    "type": "mc",
+    "category": "Wald",
+    "question": "Welche Aussage über Monokultur stimmt?",
+    "options": [
+      "Sie ist oft artenarm",
+      "Sie ist besonders artenreich",
+      "Sie besteht immer aus Laubbäumen",
+      "Sie hat nie Schädlinge"
+    ],
+    "answer": "Sie ist oft artenarm",
+    "fact": "Monokulturen bestehen häufig aus nur einer Art und sind deshalb artenärmer."
+  },
+  {
+    "id": "s_mono_tf_ertrag",
+    "type": "mc",
+    "category": "Wald",
+    "question": "Welche Aussage über Monokulturen stimmt?",
+    "options": [
+      "Sie können große Erträge liefern",
+      "Sie enthalten immer viele Baumarten",
+      "Sie sind immer die natürlichste Waldform",
+      "Sie sind nie anfällig"
+    ],
+    "answer": "Sie können große Erträge liefern",
+    "fact": "Monokulturen können arbeitsparend sein und große Erträge liefern."
+  },
+  {
+    "id": "s_naturnah_vorteil",
+    "type": "mc",
+    "category": "Wald",
+    "question": "Was ist ein Vorteil naturnaher Forstwirtschaft?",
+    "options": [
+      "vielfältiger Lebensraum",
+      "Artenarmut",
+      "nur eine Baumart",
+      "leichte Ausbreitung von Schädlingen"
+    ],
+    "answer": "vielfältiger Lebensraum",
+    "fact": "Naturnahe Wälder bieten mehr Lebensräume."
+  },
+  {
+    "id": "s_naturnah_stabil",
+    "type": "mc",
+    "category": "Wald",
+    "question": "Was macht naturnahe Wälder oft stabiler?",
+    "options": [
+      "mehrere Baumarten und mehr Vielfalt",
+      "nur eine Baumart",
+      "keine Tiere",
+      "keine Sträucher"
+    ],
+    "answer": "mehrere Baumarten und mehr Vielfalt",
+    "fact": "Vielfalt macht Wälder oft stabiler gegen Krankheiten und Schädlinge."
+  },
+  {
+    "id": "s_naturnah_merkmal",
+    "type": "mc",
+    "category": "Wald",
+    "question": "Was passt eher zur naturnahen Forstwirtschaft?",
+    "options": [
+      "artenreich",
+      "artenarm",
+      "eintönig",
+      "immer eine Fichtenmonokultur"
+    ],
+    "answer": "artenreich",
+    "fact": "Naturnahe Forstwirtschaft ist eher artenreich."
+  },
+  {
+    "id": "s_mischwald_besser",
+    "type": "mc",
+    "category": "Wald",
+    "question": "Warum sind Mischwälder oft robuster als Monokulturen?",
+    "options": [
+      "Schädlinge breiten sich nicht so leicht über eine einzige Baumart aus",
+      "Sie bestehen nur aus Fichten",
+      "Sie haben gar keine Pflanzen",
+      "Sie wachsen ohne Wasser"
+    ],
+    "answer": "Schädlinge breiten sich nicht so leicht über eine einzige Baumart aus",
+    "fact": "In Mischwäldern stehen unterschiedliche Baumarten, dadurch ist das Risiko besser verteilt."
+  },
+  {
+    "id": "s_luv",
+    "type": "mc",
+    "category": "Klima",
+    "question": "Wie heißt die dem Wind zugewandte Seite eines Gebirges?",
+    "options": [
+      "Luv",
+      "Lee",
+      "Föhn",
+      "Tal"
+    ],
+    "answer": "Luv",
+    "fact": "Luv ist die Windseite."
+  },
+  {
+    "id": "s_lee",
+    "type": "mc",
+    "category": "Klima",
+    "question": "Wie heißt die dem Wind abgewandte Seite eines Gebirges?",
+    "options": [
+      "Lee",
+      "Luv",
+      "Gipfel",
+      "Wolke"
+    ],
+    "answer": "Lee",
+    "fact": "Lee ist die windabgewandte Seite."
+  },
+  {
+    "id": "s_regenschatten",
+    "type": "mc",
+    "category": "Klima",
+    "question": "Auf welcher Seite liegt der Regenschatten?",
+    "options": [
+      "Lee",
+      "Luv",
+      "Gipfel",
+      "Quelle"
+    ],
+    "answer": "Lee",
+    "fact": "Auf der Lee-Seite liegt oft der Regenschatten."
+  },
+  {
+    "id": "s_foehn",
+    "type": "mc",
+    "category": "Klima",
+    "question": "Wie heißen warme, trockene Fallwinde?",
+    "options": [
+      "Föhn",
+      "Monsun",
+      "Passat",
+      "Nebel"
+    ],
+    "answer": "Föhn",
+    "fact": "Föhn ist ein warmer, trockener Fallwind."
+  },
+  {
+    "id": "s_steigungsregen_wo",
+    "type": "mc",
+    "category": "Klima",
+    "question": "Auf welcher Seite fällt beim Steigungsregen mehr Niederschlag?",
+    "options": [
+      "Luv-Seite",
+      "Lee-Seite",
+      "auf keiner Seite",
+      "nur im Tal"
+    ],
+    "answer": "Luv-Seite",
+    "fact": "Auf der Luv-Seite steigt feuchte Luft auf, kühlt ab und es regnet."
+  },
+  {
+    "id": "s_steigungsregen_luft",
+    "type": "mc",
+    "category": "Klima",
+    "question": "Warum kühlt Luft beim Aufsteigen ab?",
+    "options": [
+      "Sie dehnt sich aus und kühlt ab",
+      "Sie wird schwerer",
+      "Sie bekommt mehr Sonne",
+      "Sie wird zu Stein"
+    ],
+    "answer": "Sie dehnt sich aus und kühlt ab",
+    "fact": "Beim Aufsteigen dehnt sich Luft aus und wird kälter."
+  },
+  {
+    "id": "s_absinkende_luft",
+    "type": "mc",
+    "category": "Klima",
+    "question": "Was passiert mit Luft, wenn sie auf der Lee-Seite absinkt?",
+    "options": [
+      "Sie erwärmt sich",
+      "Sie wird immer kälter",
+      "Sie verschwindet",
+      "Sie wird zu Schnee"
+    ],
+    "answer": "Sie erwärmt sich",
+    "fact": "Absinkende Luft erwärmt sich und wird trockener."
+  },
+  {
+    "id": "s_lee_trocken",
+    "type": "mc",
+    "category": "Klima",
+    "question": "Was ist typisch für die Lee-Seite nach dem Überqueren des Gebirges?",
+    "options": [
+      "trockenere Luft",
+      "mehr Regen als auf der Luv-Seite",
+      "immer Schnee",
+      "Meeresklima"
+    ],
+    "answer": "trockenere Luft",
+    "fact": "Auf der Lee-Seite ist die Luft oft trockener."
+  },
+  {
+    "id": "s_img_luv",
+    "type": "image_choice",
+    "category": "Luv und Lee",
+    "question": "Welche Zahl zeigt die Luv-Seite?",
+    "image": "luv_lee_schema_clean.svg",
+    "options": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "answer": "1",
+    "fact": "Die Luv-Seite ist die Seite, auf der der Wind gegen den Berg trifft und aufsteigt."
+  },
+  {
+    "id": "s_img_lee",
+    "type": "image_choice",
+    "category": "Luv und Lee",
+    "question": "Welche Zahl zeigt die Lee-Seite?",
+    "image": "luv_lee_schema_clean.svg",
+    "options": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "answer": "2",
+    "fact": "Die Lee-Seite ist die windabgewandte Seite des Berges."
+  },
+  {
+    "id": "s_img_wolken_regen",
+    "type": "image_choice",
+    "category": "Luv und Lee",
+    "question": "Welche Zahl zeigt Wolken und Niederschlag?",
+    "image": "luv_lee_schema_clean.svg",
+    "options": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "answer": "3",
+    "fact": "Bei Zahl 3 sieht man Wolken und Regen auf der Luv-Seite."
+  },
+  {
+    "id": "s_img_regenschatten",
+    "type": "image_choice",
+    "category": "Luv und Lee",
+    "question": "Welche Zahl zeigt den Bereich mit trockenerer Luft / Regenschatten?",
+    "image": "luv_lee_schema_clean.svg",
+    "options": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "answer": "4",
+    "fact": "Auf der Lee-Seite sinkt Luft ab, erwärmt sich und ist trockener. Dort liegt der Regenschatten."
+  },
+  {
+    "id": "s_img_feuchte_luft",
+    "type": "image_choice",
+    "category": "Luv und Lee",
+    "question": "Bei welcher Zahl steigt feuchte Luft am Berg auf?",
+    "image": "luv_lee_schema_clean.svg",
+    "options": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "answer": "1",
+    "fact": "Bei Zahl 1 steigt feuchte Luft am Berg auf."
+  },
+  {
+    "id": "s_holz_papier",
+    "type": "mc",
+    "category": "Holznutzung",
+    "question": "Was kann aus Holz hergestellt werden?",
+    "options": [
+      "Papier",
+      "Glas",
+      "Metall",
+      "Wasser"
+    ],
+    "answer": "Papier",
+    "fact": "Aus Holz kann Papier hergestellt werden."
+  },
+  {
+    "id": "s_holz_saegewerk",
+    "type": "mc",
+    "category": "Holznutzung",
+    "question": "Was gehört zum Weg vom Baum zum Holzprodukt?",
+    "options": [
+      "Sägewerk",
+      "Bäckerei",
+      "Schwimmbad",
+      "Flughafen"
+    ],
+    "answer": "Sägewerk",
+    "fact": "Im Sägewerk wird Holz weiterverarbeitet."
+  },
+  {
+    "id": "s_holz_transport",
+    "type": "mc",
+    "category": "Holznutzung",
+    "question": "Was kommt nach dem Fällen der Bäume häufig als nächster Schritt?",
+    "options": [
+      "Transport",
+      "Backen",
+      "Melken",
+      "Angeln"
+    ],
+    "answer": "Transport",
+    "fact": "Nach dem Fällen wird Holz häufig transportiert."
+  },
+  {
+    "id": "s_holz_moebel",
+    "type": "mc",
+    "category": "Holznutzung",
+    "question": "Welches Produkt kann aus Holz entstehen?",
+    "options": [
+      "Möbel",
+      "Wolken",
+      "Schnee",
+      "Benzin"
+    ],
+    "answer": "Möbel",
+    "fact": "Holz kann zu Möbeln verarbeitet werden."
+  },
+  {
+    "id": "s_holz_reihenfolge_1",
+    "type": "mc",
+    "category": "Holznutzung",
+    "question": "Welche Reihenfolge passt am besten vom Wald zum Produkt?",
+    "options": [
+      "Baum fällen → Transport → Sägewerk → Produkt",
+      "Sägewerk → Baum pflanzen → Regen → Produkt",
+      "Produkt → Sägewerk → Baum fällen → Transport",
+      "Regen → Föhn → Holz → Möbel"
+    ],
+    "answer": "Baum fällen → Transport → Sägewerk → Produkt",
+    "fact": "Nach dem Fällen wird Holz transportiert und im Sägewerk weiterverarbeitet."
+  },
+  {
+    "id": "s_mix_fichtenmonokultur",
+    "type": "mc",
+    "category": "Wald",
+    "question": "Welche Aussage passt zur Fichtenmonokultur?",
+    "options": [
+      "Sie ist anfällig gegen Krankheiten und Schädlinge",
+      "Sie ist besonders artenreich",
+      "Sie ist sehr naturnah",
+      "Sie enthält immer viele Baumarten"
+    ],
+    "answer": "Sie ist anfällig gegen Krankheiten und Schädlinge",
+    "fact": "Fichtenmonokulturen können anfällig für Krankheiten und Schädlinge sein."
+  },
+  {
+    "id": "s_mix_naturnah",
+    "type": "mc",
+    "category": "Wald",
+    "question": "Welche Aussage passt zum naturnahen Wald?",
+    "options": [
+      "Er ist artenreich",
+      "Er besteht nur aus Fichten",
+      "Er ist immer ohne Tiere",
+      "Er ist immer eine Monokultur"
+    ],
+    "answer": "Er ist artenreich",
+    "fact": "Naturnahe Wälder sind artenreicher."
+  },
+  {
+    "id": "s_mix_wald_wahr",
+    "type": "mc",
+    "category": "Funktionen des Waldes",
+    "question": "Welche Aussage stimmt?",
+    "options": [
+      "Der Wald kann Lebensraum für Tiere sein",
+      "Der Wald stellt Autos her",
+      "Der Wald besteht immer nur aus Fichten",
+      "Der Wald verhindert jeden Regen"
+    ],
+    "answer": "Der Wald kann Lebensraum für Tiere sein",
+    "fact": "Der Wald ist Lebensraum vieler Tiere."
+  },
+  {
+    "id": "s_mix_lee_falsch",
+    "type": "mc",
+    "category": "Klima",
+    "question": "Welche Aussage ist falsch?",
+    "options": [
+      "Lee ist die dem Wind zugewandte Seite",
+      "Luv ist die dem Wind zugewandte Seite",
+      "Föhn ist ein warmer trockener Fallwind",
+      "Auf der Lee-Seite kann Regenschatten entstehen"
+    ],
+    "answer": "Lee ist die dem Wind zugewandte Seite",
+    "fact": "Falsch ist: Lee ist die dem Wind zugewandte Seite. Die Windseite heißt Luv."
+  }
+]

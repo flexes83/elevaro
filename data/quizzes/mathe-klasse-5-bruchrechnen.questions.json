@@ -1,0 +1,142 @@
+[
+  {
+    "id": "m5_bruch_01",
+    "type": "mc",
+    "category": "Anteile",
+    "question": "Was ist die Hälfte von 10?",
+    "options": [
+      "2",
+      "5",
+      "10",
+      "20"
+    ],
+    "answer": "5",
+    "fact": "Die Hälfte bedeutet: in zwei gleich große Teile teilen. 10 geteilt durch 2 ergibt 5."
+  },
+  {
+    "id": "m5_bruch_02",
+    "type": "mc",
+    "category": "Begriffe",
+    "question": "Wie nennt man die Zahl oberhalb des Bruchstrichs?",
+    "options": [
+      "Nenner",
+      "Zähler",
+      "Teiler",
+      "Summe"
+    ],
+    "answer": "Zähler",
+    "fact": "Der Zähler steht oben und zählt, wie viele Teile gemeint sind."
+  },
+  {
+    "id": "m5_bruch_03",
+    "type": "mc",
+    "category": "Begriffe",
+    "question": "Wie nennt man die Zahl unterhalb des Bruchstrichs?",
+    "options": [
+      "Zähler",
+      "Nenner",
+      "Produkt",
+      "Rest"
+    ],
+    "answer": "Nenner",
+    "fact": "Der Nenner steht unten und zeigt, in wie viele gleich große Teile das Ganze geteilt wurde."
+  },
+  {
+    "id": "m5_bruch_04",
+    "type": "mc",
+    "category": "Anteile",
+    "question": "Was ist ein Viertel von 20?",
+    "options": [
+      "4",
+      "5",
+      "10",
+      "15"
+    ],
+    "answer": "5",
+    "fact": "Ein Viertel bedeutet: durch 4 teilen. 20 geteilt durch 4 ergibt 5."
+  },
+  {
+    "id": "m5_bruch_05",
+    "type": "mc",
+    "category": "Kürzen",
+    "question": "Welcher Bruch ist genauso groß wie 1/2?",
+    "options": [
+      "2/4",
+      "1/3",
+      "3/5",
+      "1/4"
+    ],
+    "answer": "2/4",
+    "fact": "2/4 lässt sich durch 2 kürzen. Daraus wird 1/2."
+  },
+  {
+    "id": "m5_bruch_06",
+    "type": "mc",
+    "category": "Erweitern",
+    "question": "Wenn du 1/3 mit 2 erweiterst, welcher Bruch entsteht?",
+    "options": [
+      "2/6",
+      "1/6",
+      "3/2",
+      "2/3"
+    ],
+    "answer": "2/6",
+    "fact": "Beim Erweitern werden Zähler und Nenner mit derselben Zahl multipliziert."
+  },
+  {
+    "id": "m5_bruch_07",
+    "type": "mc",
+    "category": "Anteile",
+    "question": "Welche Aussage passt zu 3/4?",
+    "options": [
+      "3 von 4 gleich großen Teilen",
+      "4 von 3 Teilen",
+      "3 plus 4",
+      "4 minus 3"
+    ],
+    "answer": "3 von 4 gleich großen Teilen",
+    "fact": "Der Nenner 4 zeigt die Gesamtzahl der gleich großen Teile. Der Zähler 3 sagt, wie viele davon gemeint sind."
+  },
+  {
+    "id": "m5_bruch_08",
+    "type": "mc",
+    "category": "Vergleichen",
+    "question": "Welcher Bruch ist größer?",
+    "options": [
+      "1/2",
+      "1/4",
+      "beide gleich",
+      "nicht vergleichbar"
+    ],
+    "answer": "1/2",
+    "fact": "Wenn der Zähler gleich ist, ist der Bruch mit kleinerem Nenner größer. Ein halbes Stück ist größer als ein Viertel."
+  },
+  {
+    "id": "m5_bruch_09",
+    "type": "mc",
+    "category": "Anteile",
+    "question": "Was ist 1/10 von 100?",
+    "options": [
+      "1",
+      "5",
+      "10",
+      "20"
+    ],
+    "answer": "10",
+    "fact": "Ein Zehntel bedeutet: durch 10 teilen. 100 geteilt durch 10 ergibt 10."
+  },
+  {
+    "id": "m5_bruch_10",
+    "type": "mc",
+    "category": "Kürzen",
+    "question": "Wodurch kann man 4/8 kürzen?",
+    "options": [
+      "durch 4",
+      "durch 3",
+      "durch 5",
+      "gar nicht"
+    ],
+    "answer": "durch 4",
+    "fact": "4 und 8 sind beide durch 4 teilbar. 4/8 wird dadurch zu 1/2."
+  }
+]

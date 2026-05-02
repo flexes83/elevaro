@@ -1,0 +1,9 @@
+.DS_Store
+__MACOSX/
+/tmp/
+/cache/
+*.log
+# Put real credentials into server-only config files, never into public git.
+.env
+mail_config.local.php
+config/freepik.local.php

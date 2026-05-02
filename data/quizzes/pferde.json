@@ -1,0 +1,113 @@
+{
+  "order": 2,
+  "slug": "pferde",
+  "title": "Pferde-Profi Quiz",
+  "shortTitle": "Pferde",
+  "category": "Tiere & Reiten",
+  "icon": "🐴",
+  "color": "#a469e8",
+  "softColor": "#f4ebff",
+  "accent": "#ffe08a",
+  "permalink": "pferde",
+  "coverImage": "assets/quizzes/pferde/img/cover.svg",
+  "cardImages": [
+    "assets/quizzes/pferde/img/cover.svg"
+  ],
+  "description": "Ein Quiz für pferdebegeisterte Kinder mit Rassen, Fellfarben, Pflege, Zubehör und Reitwissen.",
+  "longDescription": "Für Kinder, die schon etwas über Pferde wissen: Rassen, Gangarten, Fellfarben, Pflege, Zubehör und kleine Expertenfragen – mit Punkten, Modi und Wiederholungen.",
+  "seoTitle": "Pferdequiz für Kinder – Rassen, Pflege und Reitwissen",
+  "seoDescription": "Mobiles Pferdequiz für Kinder: Pferderassen, Fellfarben, Gangarten, Pflege und Reitwissen spielerisch üben.",
+  "imageBase": "assets/quizzes/pferde/img/",
+  "roundLength": 10,
+  "questionCounts": [
+    5,
+    10,
+    15,
+    20
+  ],
+  "mailReports": true,
+  "avatars": [
+    "🐴",
+    "🦄",
+    "🏇",
+    "👑",
+    "⭐",
+    "🧲"
+  ],
+  "tags": [
+    "Rassen",
+    "Pflege",
+    "Gangarten"
+  ],
+  "learningGoals": [
+    "Pferderassen und typische Merkmale lernen",
+    "Fellfarben und Begriffe üben",
+    "Pflege und Zubehör erkennen",
+    "Gangarten und Reitwissen festigen"
+  ],
+  "modes": [
+    {
+      "id": "normal",
+      "label": "Pferde-Profi Runde",
+      "icon": "🎯",
+      "description": "Alles gemischt"
+    },
+    {
+      "id": "rassen",
+      "label": "Rassen & Merkmale",
+      "icon": "🐎",
+      "description": "Haflinger, Friese, Isländer und mehr",
+      "categoryFilter": [
+        "Pferderassen",
+        "Fellfarben"
+      ]
+    },
+    {
+      "id": "pflege",
+      "label": "Pflege & Zubehör",
+      "icon": "🧽",
+      "description": "Hufkratzer, Sattel, Trense und Stallwissen",
+      "categoryFilter": [
+        "Pflege",
+        "Zubehör",
+        "Pferdewissen"
+      ]
+    },
+    {
+      "id": "gangarten",
+      "label": "Gangarten",
+      "icon": "🏇",
+      "description": "Schritt, Trab, Galopp und Tölt",
+      "categoryFilter": [
+        "Gangarten"
+      ]
+    },
+    {
+      "id": "weak",
+      "label": "Wackelkandidaten",
+      "icon": "🔁",
+      "description": "Fragen, die noch nicht sicher sitzen"
+    }
+  ],
+  "imageSearchPrompts": [
+    "Haflinger horse photo side view meadow no text no logo no watermark",
+    "Friesian horse black photo side view no text no logo no watermark",
+    "Icelandic horse tölt photo no text no logo no watermark",
+    "horse saddle close up photo no text no logo no watermark"
+  ],
+  "subject": "Sachwissen",
+  "grade": 5,
+  "states": [
+    "BW"
+  ],
+  "schoolTypes": [
+    "Gymnasium",
+    "Realschule",
+    "Gemeinschaftsschule"
+  ],
+  "curriculumTags": [
+    "Tiere",
+    "Reiten",
+    "Sachwissen"
+  ]
+}

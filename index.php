@@ -1,125 +1,156 @@
 <?php
-$quizPath = __DIR__ . '/data/quizzes/mathe/klasse-5/bruchrechnen.json';
-$quiz = json_decode(file_get_contents($quizPath), true);
+require __DIR__.'/lib/functions.php';
+$quizzes=quiz_configs();
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+$subjects=[]; $grades=[]; $states=[]; $schoolTypes=[];
+foreach($quizzes as $quiz){
+  if(!empty($quiz['subject'])) $subjects[$quiz['subject']]=$quiz['subject'];
+  if(!empty($quiz['grade'])) $grades[(string)$quiz['grade']]=$quiz['grade'];
+  foreach(($quiz['states'] ?? []) as $s) $states[$s]=$s;
+  foreach(($quiz['schoolTypes'] ?? []) as $s) $schoolTypes[$s]=$s;
+}
+sort($subjects); sort($grades); sort($states); sort($schoolTypes);
 ?>
-<!DOCTYPE html>
+<!doctype html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Elevaro – Spielerisch zu guten Noten</title>
-  <meta name="description" content="Elevaro hilft Schülern, Schulstoff spielerisch zu üben und besser zu verstehen.">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Elevaro – Spielerisch zu guten Noten</title>
+<meta name="description" content="Elevaro hilft Schülern, Schulstoff spielerisch zu üben und besser zu verstehen – nach Klasse, Fach und Thema.">
+<link rel="stylesheet" href="<?=asset_url('assets/css/portal.css')?>?v=<?=filemtime(__DIR__.'/assets/css/portal.css') ?>">
 </head>
 <body>
-
-<nav class="navbar navbar-expand-lg bg-white border-bottom sticky-top">
-  <div class="container">
-    <a class="navbar-brand fw-bold" href="/">Elevaro</a>
-    <div class="ms-auto d-flex gap-2">
-      <a href="#quizze" class="btn btn-sm btn-outline-primary">Quizze entdecken</a>
-      <a href="quiz.php?quiz=mathe/klasse-5/bruchrechnen" class="btn btn-sm btn-primary">Jetzt starten</a>
+<header class="main-hero elevaro-hero">
+  <nav class="site nav-main">
+    <a class="brand" href="<?=asset_url('index.php')?>"><span class="brand-mark">E</span><span>Elevaro</span></a>
+    <div class="nav-actions">
+      <a href="#quiz-finder">Quiz-Finder</a>
+      <a href="#quizzes" class="nav-pill">Quiz starten</a>
     </div>
-  </div>
-</nav>
-
-<header class="hero-section">
-  <div class="container">
-    <div class="row align-items-center g-5">
-      <div class="col-lg-7">
-        <div class="badge rounded-pill text-bg-light mb-3">Schulstoff • Quiz • Motivation</div>
-        <h1 class="display-4 fw-bold mb-3">Spielerisch zu guten Noten.</h1>
-        <p class="lead mb-4">
-          Elevaro macht aus trockenem Schulstoff kurze, motivierende Quizrunden.
-          Übe gezielt nach Fach, Klasse und Thema – mit direktem Feedback und Fragen, die hängen bleiben.
-        </p>
-        <div class="d-flex flex-wrap gap-3">
-          <a href="quiz.php?quiz=mathe/klasse-5/bruchrechnen" class="btn btn-primary btn-lg">Erstes Quiz spielen</a>
-          <a href="#so-funktionierts" class="btn btn-light btn-lg">So funktioniert’s</a>
-        </div>
+  </nav>
+  <div class="site hero-grid">
+    <div>
+      <p class="eyebrow">Schulstoff, der hängen bleibt</p>
+      <h1>Spielerisch zu guten Noten.</h1>
+      <p class="lead">Elevaro macht aus trockenem Schulstoff kurze, motivierende Quizrunden. Übe gezielt nach Fach, Klasse und Thema – mit direktem Feedback und Wackelkandidaten, die du später wiederholen kannst.</p>
+      <div class="hero-actions">
+        <a class="btn" href="#quiz-finder">Passendes Quiz finden</a>
+        <?php if($quizzes): ?><a class="btn secondary" href="<?=quiz_url($quizzes[0])?>">Direkt loslegen</a><?php endif; ?>
       </div>
-      <div class="col-lg-5">
-        <div class="panda-card">
-          <div class="panda-face">🐼</div>
-          <h2 class="h4 fw-bold">Bereit?</h2>
-          <p>Starte mit Bruchrechnen und finde heraus, welche Fragen du schon sicher kannst – und welche du nochmal üben solltest.</p>
-        </div>
+      <div class="trust-row">
+        <span>🎯 Nah am Schulstoff</span>
+        <span>⚡ Sofort Feedback</span>
+        <span>🔁 Gezielt wiederholen</span>
       </div>
+    </div>
+    <div class="panda-stage" aria-hidden="true">
+      <div class="panda-bubble">🐼</div>
+      <div class="panda-note"><b>Bereit?</b><br>Such dir Fach, Klasse und Thema aus.</div>
     </div>
   </div>
 </header>
-
-<main>
-  <section id="so-funktionierts" class="py-5">
-    <div class="container">
-      <div class="text-center mb-5">
-        <h2 class="fw-bold">Lernen, das sich nach Fortschritt anfühlt.</h2>
-        <p class="text-muted">Kurze Einheiten, direktes Feedback und Wiederholung genau dort, wo sie hilft.</p>
-      </div>
-      <div class="row g-4">
-        <div class="col-md-4">
-          <div class="feature-card h-100">
-            <div class="feature-icon">🎯</div>
-            <h3 class="h5">Nah am Schulstoff</h3>
-            <p>Quizze sind nach Fach, Klasse und Thema aufgebaut – damit du genau das übst, was gerade wichtig ist.</p>
-          </div>
-        </div>
-        <div class="col-md-4">
-          <div class="feature-card h-100">
-            <div class="feature-icon">⚡</div>
-            <h3 class="h5">Sofort verstehen</h3>
-            <p>Nach jeder Antwort bekommst du direkt Rückmeldung. So merkst du sofort, was sitzt und was noch wackelt.</p>
-          </div>
-        </div>
-        <div class="col-md-4">
-          <div class="feature-card h-100">
-            <div class="feature-icon">🔁</div>
-            <h3 class="h5">Gezielt wiederholen</h3>
-            <p>Falsche Antworten werden zu Wackelkandidaten – perfekt, um genau diese Fragen später erneut zu trainieren.</p>
-          </div>
-        </div>
-      </div>
+<main class="site">
+  <section id="quiz-finder" class="finder-card">
+    <div class="finder-copy">
+      <p class="eyebrow">Quiz-Finder</p>
+      <h2>Was möchtest du üben?</h2>
+      <p>Wähle ein paar Eckdaten aus. Elevaro zeigt dir passende Quizze zu deinem Schulstoff.</p>
+    </div>
+    <div class="finder-form" id="finderForm">
+      <label>Bundesland
+        <select id="filterState">
+          <option value="">Alle Bundesländer</option>
+          <?php foreach($states as $s): ?><option value="<?=h($s)?>"><?=h($s)?></option><?php endforeach; ?>
+        </select>
+      </label>
+      <label>Schulart
+        <select id="filterSchoolType">
+          <option value="">Alle Schularten</option>
+          <?php foreach($schoolTypes as $s): ?><option value="<?=h($s)?>"><?=h($s)?></option><?php endforeach; ?>
+        </select>
+      </label>
+      <label>Klasse
+        <select id="filterGrade">
+          <option value="">Alle Klassen</option>
+          <?php foreach($grades as $g): ?><option value="<?=h($g)?>">Klasse <?=h($g)?></option><?php endforeach; ?>
+        </select>
+      </label>
+      <label>Fach
+        <select id="filterSubject">
+          <option value="">Alle Fächer</option>
+          <?php foreach($subjects as $s): ?><option value="<?=h($s)?>"><?=h($s)?></option><?php endforeach; ?>
+        </select>
+      </label>
     </div>
   </section>
 
-  <section id="quizze" class="py-5 bg-light">
-    <div class="container">
-      <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
-        <div>
-          <h2 class="fw-bold mb-1">Starte dein erstes Quiz</h2>
-          <p class="text-muted mb-0">Weitere Fächer und Klassen folgen Schritt für Schritt.</p>
-        </div>
-      </div>
-
-      <div class="quiz-tile">
-        <div>
-          <span class="badge text-bg-primary mb-2">Mathe • Klasse 5</span>
-          <h3 class="h4 fw-bold mb-2"><?= htmlspecialchars($quiz['title']) ?></h3>
-          <p class="mb-0 text-muted"><?= htmlspecialchars($quiz['description']) ?></p>
-        </div>
-        <a href="quiz.php?quiz=mathe/klasse-5/bruchrechnen" class="btn btn-primary">Quiz starten</a>
-      </div>
-    </div>
+  <section id="quizzes" class="section-head">
+    <p class="eyebrow">Aktuelle Quizze</p>
+    <h2>Starte mit einem Thema</h2>
+    <p>Der Fokus liegt auf konkretem Schulstoff. Weitere Klassen, Fächer und Bundesländer lassen sich später sauber ergänzen.</p>
   </section>
 
-  <section class="py-5">
-    <div class="container text-center">
-      <h2 class="fw-bold">Für Schüler gemacht. Für Schule gedacht.</h2>
-      <p class="lead text-muted mx-auto" style="max-width: 760px;">
-        Elevaro verbindet spielerisches Üben mit echtem Lernnutzen.
-        Ziel ist nicht Rätselraten, sondern besseres Verstehen – Thema für Thema.
-      </p>
+  <div class="quiz-grid rich" id="quizGrid">
+    <?php foreach($quizzes as $q):
+      $cover=img_url($q['coverImage'] ?? 'assets/img/placeholder.svg');
+      $stateData=implode(',', $q['states'] ?? []);
+      $schoolData=implode(',', $q['schoolTypes'] ?? []);
+    ?>
+    <a class="quiz-card rich-card" style="--quiz-color:<?=h($q['color'])?>;--quiz-soft:<?=h($q['softColor'] ?? '#f5eefc')?>" href="<?=quiz_url($q)?>" data-subject="<?=h($q['subject'] ?? '')?>" data-grade="<?=h($q['grade'] ?? '')?>" data-states="<?=h($stateData)?>" data-school-types="<?=h($schoolData)?>">
+      <div class="card-image"><img src="<?=h($cover)?>" alt="<?=h($q['title'])?>"></div>
+      <div class="card-body">
+        <div class="card-meta"><span class="icon"><?=h($q['icon'])?></span><span class="cat"><?=h($q['category'])?></span></div>
+        <h3><?=h($q['title'])?></h3>
+        <p><?=h($q['description'])?></p>
+        <div class="mini-tags">
+          <?php if(!empty($q['grade'])): ?><span>Klasse <?=h($q['grade'])?></span><?php endif; ?>
+          <?php if(!empty($q['subject'])): ?><span><?=h($q['subject'])?></span><?php endif; ?>
+          <?php foreach(array_slice(($q['tags'] ?? []),0,3) as $tag): ?><span><?=h($tag)?></span><?php endforeach; ?>
+        </div>
+        <span class="btn card-btn">Quiz ansehen</span>
+      </div>
+    </a>
+    <?php endforeach; ?>
+  </div>
+  <div class="empty-state" id="emptyState" hidden>
+    <b>Hier ist noch nichts Passendes dabei.</b><br>
+    Wähle weniger Filter oder starte mit einem vorhandenen Quiz.
+  </div>
+
+  <section class="teacher-teaser">
+    <div>
+      <p class="eyebrow">Für später vorbereitet</p>
+      <h2>Für Schüler gemacht. Für Schule gedacht.</h2>
+      <p>Später können Profile Schulart, Bundesland und Klasse speichern. So schlägt Elevaro automatisch Quizze vor, die zum Lehrplan passen. Lehrer können Klassen anlegen, Quizze freigeben und eigene Varianten erstellen.</p>
+    </div>
+    <div class="teacher-points">
+      <span>🏫 Klassen</span>
+      <span>🧩 eigene Quiz-Varianten</span>
+      <span>📈 Fortschritt</span>
     </div>
   </section>
 </main>
-
-<footer class="py-4 border-top bg-white">
-  <div class="container d-flex flex-wrap justify-content-between gap-2 text-muted small">
-    <span>© <?= date('Y') ?> Elevaro</span>
-    <span>Spielerisch zu guten Noten.</span>
-  </div>
-</footer>
-
-</body>
-</html>
+<footer class="site footer">© <?=date('Y')?> Elevaro · Spielerisch zu guten Noten.</footer>
+<script>
+(function(){
+  const filters=['filterState','filterSchoolType','filterGrade','filterSubject'].map(id=>document.getElementById(id));
+  const cards=[...document.querySelectorAll('.quiz-card')];
+  const empty=document.getElementById('emptyState');
+  function includesCSV(csv, value){ if(!value) return true; return String(csv||'').split(',').map(s=>s.trim()).includes(value); }
+  function apply(){
+    const state=document.getElementById('filterState').value;
+    const school=document.getElementById('filterSchoolType').value;
+    const grade=document.getElementById('filterGrade').value;
+    const subject=document.getElementById('filterSubject').value;
+    let visible=0;
+    cards.forEach(card=>{
+      const ok = includesCSV(card.dataset.states,state) && includesCSV(card.dataset.schoolTypes,school) && (!grade || card.dataset.grade===grade) && (!subject || card.dataset.subject===subject);
+      card.hidden=!ok; if(ok) visible++;
+    });
+    empty.hidden = visible>0;
+  }
+  filters.forEach(f=>f.addEventListener('change', apply));
+})();
+</script>
+</body></html>
