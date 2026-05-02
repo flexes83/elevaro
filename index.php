@@ -1,4 +1,17 @@
-<?php require __DIR__.'/lib/functions.php'; $quizzes=quiz_configs(); header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0'); ?>
-<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Elevaro – Spielerisch zu guten Noten</title><meta name="description" content="Elevaro ist die spielerische Lernplattform für schulnahe Quizze nach Fach, Klasse und Thema."><link rel="stylesheet" href="<?=asset_url('assets/css/portal.css')?>?v=<?=filemtime(__DIR__.'/assets/css/portal.css') ?>"></head><body>
-<header class="main-hero elevaro-hero"><div class="site hero-grid"><div><p class="eyebrow">Elevaro</p><h1>Spielerisch zu guten Noten.</h1><p class="lead">Schulstoff üben wie ein kleines Spiel: mit direktem Feedback, Punkten, Wackelkandidaten und Quizzen nach Fach, Klasse und Thema.</p><div class="hero-actions"><a class="btn" href="#quizzes">Quiz auswählen</a><a class="btn secondary" href="<?=asset_url('admin/')?>">Admin öffnen</a></div></div><div class="hero-visual panda-visual" aria-label="Elevaro Lern-Buddy"><span>🐼</span><span>⭐</span><span>🧠</span><span>🎯</span></div></div></header>
-<main class="site"><section id="quizzes" class="section-head"><p class="eyebrow">Schulstoff</p><h2>Wähle dein Quiz</h2><p>Der MVP startet mit bestehenden Quizzen. Die Struktur ist bereits für Fächer, Klassen und Unterrichtsthemen vorbereitet.</p></section><div class="quiz-grid rich"><?php foreach($quizzes as $q): $cover=img_url($q['coverImage'] ?? 'assets/img/placeholder.svg'); ?><a class="quiz-card rich-card" style="--quiz-color:<?=h($q['color'])?>;--quiz-soft:<?=h($q['softColor'] ?? '#f5eefc')?>" href="<?=quiz_url($q)?>"><div class="card-image"><img src="<?=h($cover)?>" alt="<?=h($q['title'])?>"></div><div class="card-body"><div class="card-meta"><span class="icon"><?=h($q['icon'])?></span><span class="cat"><?=h($q['category'])?></span></div><h3><?=h($q['title'])?></h3><p><?=h($q['description'])?></p><div class="mini-tags"><?php foreach(($q['tags'] ?? []) as $tag): ?><span><?=h($tag)?></span><?php endforeach; ?></div><span class="btn card-btn">Quiz ansehen</span></div></a><?php endforeach; ?></div></main><footer class="site footer">Elevaro MVP · <a href="<?=asset_url('docs/concept.md')?>">Konzept</a> · <a href="<?=asset_url('admin/')?>">Admin</a></footer></body></html>
+<?php ?>
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Elevaro</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="bg-light">
+<div class="container text-center mt-5">
+    <h1 class="display-4 fw-bold">Elevaro</h1>
+    <p class="lead">Spielerisch zu guten Noten.</p>
+    <a href="quiz.php" class="btn btn-primary btn-lg mt-4">Quiz starten</a>
+</div>
+</body>
+</html>

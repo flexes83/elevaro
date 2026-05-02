@@ -1,2 +1,45 @@
-<?php require __DIR__.'/lib/functions.php'; $slug=$_GET['quiz'] ?? ''; $q=quiz_config($slug); if(!$q){http_response_code(404); exit('Quiz nicht gefunden');} header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0'); $cover=img_url($q['coverImage'] ?? 'assets/img/placeholder.svg'); ?>
-<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title><?=h($q['seoTitle'])?></title><meta name="description" content="<?=h($q['seoDescription'])?>"><link rel="canonical" href="<?=h(quiz_url($q))?>"><link rel="stylesheet" href="<?=asset_url('assets/css/portal.css')?>?v=<?=filemtime(__DIR__.'/assets/css/portal.css') ?>"></head><body style="--quiz-color:<?=h($q['color'])?>;--quiz-soft:<?=h($q['softColor'] ?? '#f5eefc')?>"><main class="site"><nav class="topbar"><a href="<?=asset_url('index.php')?>">← Alle Quizze</a><a href="<?=asset_url('admin/quiz.php?quiz='.rawurlencode($q['slug']))?>">Admin</a></nav><section class="quiz-landing"><div class="landing-copy"><p class="eyebrow"><?=h($q['category'])?></p><h1><span><?=h($q['icon'])?></span> <?=h($q['title'])?></h1><p class="lead"><?=h($q['longDescription'] ?? $q['description'])?></p><div class="hero-actions"><a class="btn" href="<?=play_url($q)?>">Quiz starten</a><a class="btn secondary" href="<?=play_url($q)?>?mode=weak">Wackelkandidaten üben</a></div></div><div class="landing-image"><img src="<?=h($cover)?>" alt="<?=h($q['title'])?>"></div></section><section class="card"><h2>Was übst du?</h2><div class="feature-grid"><?php foreach(($q['learningGoals'] ?? ['Multiple Choice','Bildfragen','Wiederholungen']) as $goal): ?><div><b><?=h($goal)?></b></div><?php endforeach; ?></div></section><section class="card"><h2>Spielmodi</h2><div class="mode-preview"><?php foreach(($q['modes'] ?? []) as $m): ?><a href="<?=play_url($q)?>?mode=<?=h($m['id'])?>"><span><?=h($m['icon'] ?? '▶️')?></span><b><?=h($m['label'])?></b><small><?=h($m['description'] ?? '')?></small></a><?php endforeach; ?></div></section></main></body></html>
+<?php
+$questions = json_decode(file_get_contents("data/questions.json"), true);
+?>
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Quiz</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container mt-5">
+    <h2 id="question"></h2>
+    <div id="answers" class="mt-4"></div>
+</div>
+<script>
+let questions = <?php echo json_encode($questions); ?>;
+let index = 0;
+function loadQuestion(){
+    let q = questions[index];
+    document.getElementById("question").innerText = q.question;
+    let answers = "";
+    q.options.forEach(opt => {
+        answers += `<button class="btn btn-outline-primary m-2" onclick="check('${opt}')">${opt}</button>`;
+    });
+    document.getElementById("answers").innerHTML = answers;
+}
+function check(answer){
+    let correct = questions[index].answer;
+    if(answer === correct){
+        alert("Nice! Weiter so 👀");
+    } else {
+        alert("Falsch 😅");
+    }
+    index++;
+    if(index < questions.length){
+        loadQuestion();
+    } else {
+        window.location = "index.php";
+    }
+}
+loadQuestion();
+</script>
+</body>
+</html>

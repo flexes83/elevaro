@@ -1,0 +1,20 @@
+[
+  {
+    "question": "Was ist 1/2 von 10?",
+    "options": [
+      "2",
+      "5",
+      "10"
+    ],
+    "answer": "5"
+  },
+  {
+    "question": "Was ist 1/4 von 8?",
+    "options": [
+      "2",
+      "4",
+      "6"
+    ],
+    "answer": "2"
+  }
+]
