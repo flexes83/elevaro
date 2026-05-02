@@ -25,6 +25,8 @@ if (empty($quiz['questions'])) {
   <meta name="description" content="<?= htmlspecialchars($quiz['description'] ?? '') ?>">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/quiz.css">
+
+<link rel="stylesheet" href="assets/css/design-system.css">
 </head>
 <body class="quiz-page">
 

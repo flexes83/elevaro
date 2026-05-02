@@ -1,0 +1,57 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@700;800&display=swap');
+
+:root {
+  --ev-primary: #5a4ff3;
+  --ev-primary-dark: #3429c7;
+  --ev-ink: #172033;
+  --ev-muted: #6c7482;
+  --ev-soft: #f4f2ff;
+  --ev-border: rgba(23,32,51,.08);
+
+  --ev-font-body: "Inter", system-ui, sans-serif;
+  --ev-font-display: "Plus Jakarta Sans", "Inter", sans-serif;
+}
+
+body {
+  font-family: var(--ev-font-body);
+  letter-spacing: -0.015em;
+  color: var(--ev-ink);
+}
+
+h1, h2, h3, h4, h5 {
+  font-family: var(--ev-font-display);
+  letter-spacing: -0.05em;
+  font-weight: 800;
+}
+
+.btn {
+  border-radius: 999px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.card, .quiz-card, .recommendation-card {
+  border-radius: 1.5rem;
+  border: 1px solid var(--ev-border);
+}
+
+.answer-btn {
+  border-radius: 1rem !important;
+  font-weight: 800 !important;
+  transition: all .2s ease;
+}
+
+.answer-btn:hover {
+  transform: translateY(-2px);
+}
+
+.answer-btn.correct {
+  background: #ddf8ec !important;
+  border-color: #00b894 !important;
+}
+
+.answer-btn.wrong {
+  background: #ffe8e8 !important;
+  border-color: #ff7675 !important;
+}

@@ -659,6 +659,8 @@ function h($value): string
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="assets/ai_wizard.css" rel="stylesheet">
+
+<link rel="stylesheet" href="../assets/css/design-system.css">
 </head>
 <body class="p-4">
   <div class="container admin-shell">

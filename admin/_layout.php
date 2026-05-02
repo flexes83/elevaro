@@ -10,6 +10,8 @@ function admin_header(string $title, string $subtitle = ''): void {
   <title><?= admin_h($title) ?> – Elevaro Admin</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="assets/admin.css" rel="stylesheet">
+
+<link rel="stylesheet" href="../assets/css/design-system.css">
 </head>
 <body>
 <div class="admin-layout">

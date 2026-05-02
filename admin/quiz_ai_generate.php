@@ -248,6 +248,8 @@ function slugify(string $text): string
   <title>KI-Fragen generieren – Elevaro</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<link rel="stylesheet" href="../assets/css/design-system.css">
 </head>
 <body class="bg-light p-4">
   <div class="container" style="max-width: 920px;">

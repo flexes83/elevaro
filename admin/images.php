@@ -42,7 +42,9 @@ $promptJson = json_encode($targets, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHE
 ?>
 <!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bilder</title><link rel="stylesheet" href="<?=asset_url('assets/css/portal.css')?>?v=<?=filemtime(__DIR__.'/../assets/css/portal.css')?>"><style>
 .current-preview{display:flex;gap:18px;align-items:center;flex-wrap:wrap}.current-preview img{width:160px;height:120px;object-fit:cover;border-radius:18px;background:#f2f2f2}.muted{opacity:.65}.prompt-tools{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}.prompt-tools button{width:auto}.asset small{opacity:.7;display:block;margin-top:4px}.query-source{font-size:.9rem;opacity:.72;margin-top:6px}
-</style></head><body><main class="site"><div class="topbar"><h1><?=h($q['icon'].' Bilder: '.$q['title'])?></h1><a href="index.php">Backend</a></div>
+</style>
+<link rel="stylesheet" href="../assets/css/design-system.css">
+</head><body><main class="site"><div class="topbar"><h1><?=h($q['icon'].' Bilder: '.$q['title'])?></h1><a href="index.php">Backend</a></div>
 <div class="notice"><b>Moderierter Bildimport:</b> Zuerst lokalen Ziel-Dateinamen wählen. Die Suchanfrage wird jetzt pro Quiz und pro Datei vorausgefüllt. Danach Vorschau prüfen und lokal importieren. Wichtig für Quizbilder: keine Schrift, kein Logo, kein Wasserzeichen, eindeutiges Motiv.</div>
 <section class="card">
   <div class="form-row">
