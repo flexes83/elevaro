@@ -7,3 +7,5 @@ __MACOSX/
 .env
 mail_config.local.php
 config/freepik.local.php
+/config/
+/config/*
