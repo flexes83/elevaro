@@ -368,18 +368,26 @@ Allgemeine Regeln:
 - falsche Antworten sollen typische Missverständnisse abbilden.
 
 Medien-/Bild-Regeln:
-- Verwende Bilder NICHT standardmäßig.
-- media_recommendation muss meistens 'none' sein.
-- Empfiehl Bilder nur, wenn sie den Lernzweck klar verbessern.
-- Bildfragen sind sinnvoll bei: Tiere/Pflanzen erkennen, Karten, Diagramme, Geometrie, Kunst/Bilder beschreiben, Gegenstände/Orte/Phänomene visuell unterscheiden.
-- Bei abstrakten Themen, Grammatik, reinen Rechenaufgaben oder Begriffsabfragen soll media_recommendation 'none' sein.
-- Wenn ein Bild zur Frage sinnvoll ist: media_recommendation = 'question_image'.
-- Wenn die Antwortoptionen sinnvollerweise Bilder sind: media_recommendation = 'answer_images'.
-- media_prompt enthält bei question_image einen konkreten Bildprompt.
-- media_search_terms enthält passende Suchbegriffe, z. B. für Freepik oder Bilddatenbanken.
-- Bei answer_images enthält jede Option eigene media_prompt und media_search_terms.
-- Bei media_recommendation = 'none' bleiben media_prompt und media_search_terms leer.
-- Die eigentlichen Bilder werden später im Admin reviewt und ausgewählt.
+- Entscheide anhand des Themas, ob visuelles Lernen zentral ist.
+- Wenn das Thema visuelles Erkennen, Bestimmen oder Unterscheiden beinhaltet
+  (z. B. Vogelarten, Tiere, Pflanzen, Karten, Diagramme, Formen, Kunstwerke),
+  dann ist der Einsatz von Bildern verpflichtend.
+- In solchen Fällen:
+  → mindestens 40–70 % der Fragen sollen Bilder enthalten
+- Für Bestimmungsaufgaben (z. B. „Vogelarten bestimmen“):
+  → verwende hauptsächlich media_recommendation = "question_image"
+  → typische Frageform:
+     "Welcher Vogel ist hier abgebildet?"
+  → Antwortoptionen sind Text (Artnamen)
+  → media_prompt beschreibt das Bild konkret
+  → media_search_terms enthält klare Suchbegriffe
+- Wenn mehrere visuell ähnliche Optionen unterschieden werden sollen:
+  → verwende media_recommendation = "answer_images"
+- Bei abstrakten Themen (Grammatik, Rechnen, Definitionen):
+  → KEINE Bilder → media_recommendation = "none"
+- Wenn Bilder verwendet werden:
+  → müssen media_prompt und media_search_terms sinnvoll ausgefüllt sein
+- Bilder werden nicht automatisch verwendet, sondern im Admin überprüft.
 ");
 }
 
