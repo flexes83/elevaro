@@ -1,231 +1,213 @@
 <?php
-// Elevaro refreshed homepage
+// Elevaro animated hero homepage
 ?>
 <!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Elevaro – Spielerisch zu guten Noten</title>
-  <meta name="description" content="Elevaro findet passende Lernquizze nach Bundesland, Schulart, Klasse und Fach. Spielerisch üben, besser verstehen und sicherer werden.">
+  <title>Elevaro – Lernquizze passend zu deinem Schulstoff</title>
+  <meta name="description" content="Elevaro schlägt dir Lernquizze vor, die zu Bundesland, Schulart, Klasse und Fach passen. Kurze Quiz-Sessions mit direktem Feedback.">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/home.css">
 </head>
 <body>
 
-<nav class="navbar navbar-expand-lg bg-white border-bottom sticky-top">
+<nav class="navbar navbar-expand-lg nav-glass fixed-top">
   <div class="container">
     <a class="navbar-brand fw-bold" href="/">Elevaro</a>
 
     <div class="ms-auto d-flex align-items-center gap-2">
-      <a href="#quizbeispiele" class="btn btn-sm btn-outline-primary d-none d-md-inline-flex">Quiz testen</a>
-      <a href="onboarding.php" class="btn btn-sm btn-primary">Los geht’s</a>
+      <a href="#showcase" class="btn btn-sm btn-ghost d-none d-md-inline-flex">Beispiele</a>
+      <a href="onboarding.php" class="btn btn-sm btn-light">Quizze finden</a>
     </div>
   </div>
 </nav>
 
-<header class="home-hero">
-  <div class="container">
+<header class="hero">
+  <div class="hero-gradient"></div>
+  <div class="hero-noise"></div>
+  <div class="hero-blob blob-one"></div>
+  <div class="hero-blob blob-two"></div>
+  <div class="hero-blob blob-three"></div>
 
+  <div class="container hero-inner">
     <div id="returningBox" class="returning-box d-none mb-4">
       <div>
-        <span class="small-label">Willkommen zurück</span>
+        <span class="eyebrow">Willkommen zurück</span>
         <strong id="returningTitle">Weiterlernen?</strong>
-        <p id="returningText" class="mb-0 text-muted">Wir haben deine letzte Auswahl gespeichert.</p>
+        <p id="returningText" class="mb-0">Wir haben deine letzte Auswahl gespeichert.</p>
       </div>
-      <a href="recommendations.php" class="btn btn-primary">Weiterlernen</a>
+      <a href="recommendations.php" class="btn btn-light">Weiterlernen</a>
     </div>
 
     <div class="row align-items-center g-5">
-      <div class="col-lg-7">
-        <span class="hero-badge">Lernquizze nach Klasse, Fach und Schulstoff</span>
-        <h1 class="display-3 fw-black mt-3 mb-3">Spielerisch üben. Sicherer werden.</h1>
-        <p class="lead mb-4">
-          Elevaro schlägt dir Quizze vor, die zu deiner Klasse, Schulart und deinem Bundesland passen.
-          So startest du nicht irgendwo, sondern dort, wo dein Lernstoff gerade wirklich relevant ist.
+      <div class="col-lg-6">
+        <span class="eyebrow">Lernquizze für die Schule</span>
+        <h1 class="hero-title">Quizze, die zu deinem Schulstoff passen.</h1>
+        <p class="hero-subline">
+          Wähle Bundesland, Schulart, Klasse und Fach – Elevaro findet passende Themen und macht daraus kurze Lernquizze mit direktem Feedback.
         </p>
 
-        <div class="d-flex flex-wrap gap-3 mb-4">
-          <a href="onboarding.php" class="btn btn-primary btn-lg">
-            Passende Quizze finden
-          </a>
-          <a href="#so-funktionierts" class="btn btn-light btn-lg">
-            Wie funktioniert das?
-          </a>
+        <div class="hero-actions">
+          <a href="onboarding.php" class="btn btn-light btn-lg">Quizze für mich finden</a>
+          <a href="#showcase" class="btn btn-outline-light btn-lg">Beispiele ansehen</a>
         </div>
 
-        <div class="trust-row">
-          <span>Ohne Anmeldung starten</span>
-          <span>Kurze Quiz-Sessions</span>
-          <span>Inhalte werden schrittweise geprüft</span>
+        <div class="hero-tags">
+          <span>ohne Anmeldung starten</span>
+          <span>kurze Sessions</span>
+          <span>direktes Feedback</span>
         </div>
       </div>
 
-      <div class="col-lg-5">
-        <div class="hero-card">
-          <div class="hero-orbit">
-            <div class="hero-panda">🐼</div>
-            <span class="orbit-pill pill-one">Mathe ➗</span>
-            <span class="orbit-pill pill-two">Geo 🌍</span>
-            <span class="orbit-pill pill-three">Englisch 🇬🇧</span>
+      <div class="col-lg-6">
+        <div class="demo-shell">
+          <div class="demo-top">
+            <div>
+              <span id="demoContext">Englisch · Klasse 5</span>
+              <strong id="demoTitle">this, that, these & those</strong>
+            </div>
+            <span class="demo-score">+10</span>
           </div>
 
-          <h2 class="h4 fw-bold mb-2">Dein Lernweg startet mit ein paar Fragen.</h2>
-          <p class="text-muted mb-4">
-            Wähle Bundesland, Schulart, Klasse und Fach – Elevaro zeigt dir anschließend passende Themen und Quizze.
-          </p>
+          <div class="demo-progress">
+            <span id="demoProgress"></span>
+          </div>
 
-          <div class="mini-flow">
-            <div><strong>1</strong><span>Einordnen</span></div>
-            <div><strong>2</strong><span>Quiz finden</span></div>
-            <div><strong>3</strong><span>Üben</span></div>
+          <div class="demo-card">
+            <div id="demoMedia" class="demo-media d-none"></div>
+            <h2 id="demoQuestion">Welche Antwort ist richtig?</h2>
+            <div id="demoAnswers" class="demo-answers"></div>
+            <div id="demoFeedback" class="demo-feedback d-none"></div>
+          </div>
+
+          <div id="fakeCursor" class="fake-cursor">
+            <span></span>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div class="metric-strip">
+      <div>
+        <strong class="count-up" data-target="100">0</strong>
+        <span>Themen im Aufbau</span>
+      </div>
+      <div>
+        <strong class="count-up" data-target="500">0</strong>
+        <span>Quizfragen geplant</span>
+      </div>
+      <div>
+        <strong class="count-up" data-target="16">0</strong>
+        <span>Bundesländer abbildbar</span>
       </div>
     </div>
   </div>
 </header>
 
 <main>
-
-  <section id="so-funktionierts" class="section-padding">
+  <section class="flow-section">
     <div class="container">
-      <div class="section-head text-center mb-5">
-        <span class="small-label">So funktioniert’s</span>
-        <h2 class="fw-bold">Vom Schulstoff zum passenden Quiz.</h2>
-        <p class="text-muted mb-0">
-          Elevaro verbindet kurze, motivierende Quizze mit einer klaren Einordnung nach Klasse, Fach und Lernziel.
+      <div class="flow-card">
+        <div>
+          <span>1</span>
+          <strong>Einordnen</strong>
+          <p>Bundesland, Schulart, Klasse und Fach wählen.</p>
+        </div>
+        <div>
+          <span>2</span>
+          <strong>Vorschläge bekommen</strong>
+          <p>Elevaro zeigt passende Themen und Quizze.</p>
+        </div>
+        <div>
+          <span>3</span>
+          <strong>Gezielt üben</strong>
+          <p>Antworten, Feedback bekommen, Wackelkandidaten wiederholen.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="showcase" class="showcase-section">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow dark">Vorzeigequizze</span>
+        <h2>So soll sich Lernen anfühlen.</h2>
+        <p>
+          Die Beispiele zeigen, wohin Elevaro geht: visuell, abwechslungsreich und näher am tatsächlichen Lernkontext.
         </p>
       </div>
 
-      <div class="row g-4">
-        <div class="col-md-4">
-          <article class="step-card h-100">
-            <div class="step-icon">🎒</div>
-            <h3 class="h5 fw-bold">1. Kurz einordnen</h3>
-            <p>
-              Du wählst Bundesland, Schulart, Klasse und Fach. Daraus entsteht dein persönlicher Einstieg.
-            </p>
-          </article>
-        </div>
-
-        <div class="col-md-4">
-          <article class="step-card h-100">
-            <div class="step-icon">🎯</div>
-            <h3 class="h5 fw-bold">2. Thema auswählen</h3>
-            <p>
-              Statt endloser Suche bekommst du Themen vorgeschlagen, die zu deinem aktuellen Lernstand passen.
-            </p>
-          </article>
-        </div>
-
-        <div class="col-md-4">
-          <article class="step-card h-100">
-            <div class="step-icon">⚡</div>
-            <h3 class="h5 fw-bold">3. Direkt üben</h3>
-            <p>
-              Du beantwortest kurze Fragen, bekommst direkt Feedback und kannst Wackelkandidaten gezielt wiederholen.
-            </p>
-          </article>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section id="quizbeispiele" class="section-padding bg-soft">
-    <div class="container">
-      <div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
-        <div>
-          <span class="small-label">Direkt ausprobieren</span>
-          <h2 class="fw-bold mb-1">Quiz-Beispiele</h2>
-          <p class="text-muted mb-0">
-            Noch kein Profil? Starte mit einem Beispiel – oder lass dir direkt passende Quizze vorschlagen.
-          </p>
-        </div>
-        <a href="onboarding.php" class="btn btn-outline-primary">Quizze für mich finden</a>
-      </div>
-
-      <div class="quiz-grid">
-        <article class="quiz-card" style="--card-c1:#6c5ce7;--card-c2:#a29bfe;">
-          <div class="quiz-visual"><span>➗</span></div>
-          <div class="quiz-content">
-            <span class="quiz-badge">Mathe · Klasse 5</span>
-            <h3>Brüche verstehen</h3>
-            <p>Übe Zähler, Nenner und einfache Anteile – Schritt für Schritt und mit direktem Feedback.</p>
-            <div class="quiz-actions">
-              <a href="quiz.php?key=mathe_klasse5_bruchrechnen" class="btn btn-primary">Quiz starten</a>
-              <span class="quiz-meta">kurz & motivierend</span>
+      <div class="showcase-grid">
+        <article class="showcase-card large-card">
+          <div class="showcase-visual bird-visual">
+            <div class="bird-card">
+              <span>🐦</span>
+              <small>Bildfrage</small>
             </div>
+            <div class="answer-chips">
+              <span>Elster</span>
+              <span>Amsel</span>
+              <span>Star</span>
+            </div>
+          </div>
+          <div class="showcase-body">
+            <span class="card-label">Biologie · Arten erkennen</span>
+            <h3>Vogelarten bestimmen</h3>
+            <p>Ideal für Bildfragen: sehen, unterscheiden, benennen – nicht nur auswendig lernen.</p>
           </div>
         </article>
 
-        <article class="quiz-card" style="--card-c1:#0984e3;--card-c2:#74b9ff;">
-          <div class="quiz-visual"><span>🇬🇧</span></div>
-          <div class="quiz-content">
-            <span class="quiz-badge">Englisch · Grammatik</span>
+        <article class="showcase-card">
+          <div class="showcase-visual english-visual">
+            <span class="huge">🇬🇧</span>
+            <div class="floating-words">
+              <span>this</span><span>that</span><span>these</span><span>those</span>
+            </div>
+          </div>
+          <div class="showcase-body">
+            <span class="card-label">Englisch · Grammatik</span>
             <h3>this, that, these & those</h3>
-            <p>Trainiere typische Stolperstellen in kurzen Beispielsätzen und erkenne Muster sicherer.</p>
-            <div class="quiz-actions">
-              <a href="onboarding.php" class="btn btn-light">Passend einordnen</a>
-              <span class="quiz-meta">ideal zum Wiederholen</span>
-            </div>
+            <p>Kurze Beispielsätze, klare Erklärung und typische Fehler als Antwortoptionen.</p>
           </div>
         </article>
 
-        <article class="quiz-card" style="--card-c1:#00b894;--card-c2:#55efc4;">
-          <div class="quiz-visual"><span>🌍</span></div>
-          <div class="quiz-content">
-            <span class="quiz-badge">Geo · Orientierung</span>
+        <article class="showcase-card">
+          <div class="showcase-visual geo-visual">
+            <span class="huge">🗺️</span>
+          </div>
+          <div class="showcase-body">
+            <span class="card-label">Geographie · Orientierung</span>
             <h3>Karten lesen</h3>
-            <p>Erkenne Symbole, Himmelsrichtungen und einfache Zusammenhänge auf Karten.</p>
-            <div class="quiz-actions">
-              <a href="onboarding.php" class="btn btn-light">Passendes Thema finden</a>
-              <span class="quiz-meta">mit Bildfragen möglich</span>
-            </div>
+            <p>Symbole erkennen, Richtungen verstehen und Zusammenhänge auf Karten einordnen.</p>
           </div>
         </article>
       </div>
     </div>
   </section>
 
-  <section class="section-padding">
+  <section class="teacher-note-section">
     <div class="container">
-      <div class="quality-card">
-        <div class="quality-icon">✅</div>
+      <div class="teacher-note">
         <div>
-          <span class="small-label">Qualität im Blick</span>
-          <h2 class="fw-bold">Inhalte, die nicht einfach nur zufällig entstehen.</h2>
-          <p class="text-muted mb-0">
-            Elevaro ordnet Quizze nach Lernkontexten wie Bundesland, Schulart, Klasse und Fach.
-            Zusätzlich können Inhalte redaktionell geprüft und perspektivisch mit Lehrkräften weiter geschärft werden.
+          <span class="eyebrow dark">Qualität im Blick</span>
+          <h2>KI hilft beim Erstellen. Menschen behalten den Überblick.</h2>
+          <p>
+            Quizze können nach Lehrplan-Kontext erstellt, redaktionell geprüft und perspektivisch mit Lehrkräften weiter geschärft werden.
           </p>
         </div>
+        <a href="onboarding.php" class="btn btn-primary btn-lg">Quizze finden</a>
       </div>
     </div>
   </section>
-
-  <section class="section-padding pt-0">
-    <div class="container">
-      <div class="cta-card">
-        <div>
-          <span class="small-label">Bereit?</span>
-          <h2 class="fw-bold">Finde dein nächstes Quiz.</h2>
-          <p class="text-muted mb-0">
-            Starte mit dem kurzen Onboarding und erhalte Vorschläge, die besser zu deinem Lernstoff passen.
-          </p>
-        </div>
-        <a href="onboarding.php" class="btn btn-primary btn-lg">Los geht’s</a>
-      </div>
-    </div>
-  </section>
-
 </main>
 
-<footer class="py-4 border-top bg-white">
-  <div class="container d-flex justify-content-between flex-wrap gap-2 text-muted small">
+<footer class="footer">
+  <div class="container">
     <span>© <?= date('Y') ?> Elevaro</span>
-    <span>Spielerisch üben. Sicherer werden.</span>
+    <span>Lernquizze passend zu deinem Schulstoff.</span>
   </div>
 </footer>
 
