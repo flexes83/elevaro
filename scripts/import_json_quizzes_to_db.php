@@ -6,7 +6,7 @@
  *   php scripts/import_json_quizzes_to_db.php
  *
  * It scans:
- *   data/quizzes/**/*.json
+ *   data/quizzes/**.json
  *
  * Expected quiz.json format:
  * {
