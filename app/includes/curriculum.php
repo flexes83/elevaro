@@ -147,10 +147,87 @@ function curriculum_topics(string $stateCode, string $schoolTypeCode, int $grade
 }
 
 
-function curriculum_recommendations(string $stateCode, string $schoolTypeCode, int $grade, ?string $subjectCode = null, ?string $topicCode = null): array
+function curriculum_recommendations(string $stateCode, string $schoolTypeCode, int $grade, ?string $subjectCode = null, ?string $topicCode = null, ?string $tagsCsv = null): array
 {
     $pdo = elevaro_db();
 
+    $tags = array_values(array_filter(array_map(static function ($tag) {
+        $tag = trim(mb_strtolower($tag, 'UTF-8'));
+        return preg_replace('/[^a-z0-9äöüß\-]+/iu', '', $tag);
+    }, explode(',', (string)$tagsCsv))));
+
+    /*
+     * Tag-based recommendations:
+     * Onboarding chooses a broader learning area. We therefore rank quizzes by tag overlap.
+     * Existing systems without quiz_tags still work because we fall back to topic text matching.
+     */
+    if (!empty($tags)) {
+        $params = [
+            'state' => $stateCode,
+            'school_type' => $schoolTypeCode,
+            'grade' => $grade
+        ];
+
+        $subjectWhere = '';
+        if ($subjectCode) {
+            $subjectWhere = 'AND sub.code = :subject';
+            $params['subject'] = $subjectCode;
+        }
+
+        $likeParts = [];
+        foreach ($tags as $i => $tag) {
+            $key = 'tag_' . $i;
+            $likeParts[] = "LOWER(CONCAT_WS(' ', t.code, t.title, t.description, q.title, q.description, sub.code, sub.name)) LIKE :{$key}";
+            $params[$key] = '%' . $tag . '%';
+        }
+
+        $tagWhere = $likeParts ? 'AND (' . implode(' OR ', $likeParts) . ')' : '';
+
+        $stmt = $pdo->prepare("
+            SELECT DISTINCT
+                t.code AS topic_code,
+                t.title AS topic_title,
+                t.description AS topic_description,
+                sub.code AS subject_code,
+                sub.name AS subject_name,
+                sub.icon AS subject_icon,
+                q.quiz_key,
+                q.title AS quiz_title,
+                q.description AS quiz_description,
+                q.theme_color_1,
+                q.theme_color_2,
+                q.theme_emoji,
+                q.image_path,
+                q.image_status
+            FROM curriculum_topics t
+            JOIN states s ON s.id = t.state_id
+            JOIN school_types st ON st.id = t.school_type_id
+            JOIN subjects sub ON sub.id = t.subject_id
+            JOIN quiz_topic_map qtm ON qtm.topic_id = t.id
+            JOIN quizzes q
+              ON q.id = qtm.quiz_id
+             AND q.is_active = 1
+             AND (q.status = 'published' OR q.status IS NULL OR q.status = '')
+            WHERE s.code = :state
+              AND st.code = :school_type
+              AND t.grade = :grade
+              {$subjectWhere}
+              {$tagWhere}
+            ORDER BY sub.sort_order ASC, t.sort_order ASC, q.title ASC
+            LIMIT 12
+        ");
+
+        $stmt->execute($params);
+        $items = $stmt->fetchAll();
+
+        if (!empty($items)) {
+            return $items;
+        }
+    }
+
+    /*
+     * Exact topic fallback: useful if no tag results exist.
+     */
     $params = [
         'state' => $stateCode,
         'school_type' => $schoolTypeCode,
@@ -217,17 +294,14 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
         }
     }
 
-    /*
-     * Important:
-     * If a concrete topic was selected, we first only return exact topic matches.
-     * If that topic exists but has no quiz, the UI should show empty for now.
-     * This avoids showing quizzes from sibling topics and confusing the user.
-     */
-    if ($topicCode) {
+    if ($hasUsableQuiz) {
         return $items;
     }
 
-    if (!$hasUsableQuiz && $subjectCode) {
+    /*
+     * Broad fallback: subject + grade.
+     */
+    if ($subjectCode) {
         $stmt = $pdo->prepare("
             SELECT
                 NULL AS topic_code,

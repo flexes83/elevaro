@@ -41,16 +41,16 @@
     els.subject.textContent = labels.subject || values.subject || '–';
 
     const name = localStorage.getItem('elevaro_profile_name');
-    const topic = labels.topic || values.topic;
+    const focus = labels.focus || labels.topic || values.topic;
 
-    if (name) {
+    if (name && els.heroText) {
       els.heroText.textContent = `${name}, wir haben deine Auswahl gespeichert und schlagen dir passende Quizze vor.`;
     }
 
-    if (topic) {
+    if (focus && els.topicKicker) {
       els.topicKicker.classList.remove('d-none');
-      els.topicKicker.textContent = `Thema: ${topic}`;
-      els.sectionIntro.textContent = 'Zuerst zeigen wir Quizze zu deinem gewählten Thema. Danach kannst du ähnliche Inhalte entdecken.';
+      els.topicKicker.textContent = `Lernbereich: ${focus}`;
+      els.sectionIntro.textContent = 'Wir zeigen dir Quizze, die zu deinem Lernbereich passen. Du kannst später weiter einschränken.';
     }
 
     const subjectIconMap = {
@@ -67,18 +67,26 @@
     };
 
     const subjectKey = String(values.subject || labels.subject || '').toLowerCase();
-    els.heroIcon.textContent = subjectIconMap[subjectKey] || '🎯';
+    if (els.heroIcon) {
+      els.heroIcon.textContent = subjectIconMap[subjectKey] || '🎯';
+    }
   }
 
   function loadRecommendations(profile) {
     const values = profile.values || {};
     const params = new URLSearchParams();
 
-    ['state', 'school_type', 'grade', 'subject', 'topic'].forEach(key => {
+    ['state', 'school_type', 'grade', 'subject'].forEach(key => {
       if (values[key]) {
         params.set(key, values[key]);
       }
     });
+
+    if (Array.isArray(values.focus_tags) && values.focus_tags.length) {
+      params.set('tags', values.focus_tags.join(','));
+    } else if (values.topic) {
+      params.set('topic', values.topic);
+    }
 
     fetch(`api/recommendations.php?${params.toString()}`)
       .then(response => response.json())
@@ -129,7 +137,7 @@
     card.innerHTML = `
       <div class="quiz-card-visual">
         ${visual}
-        <span class="quiz-card-badge">${escapeHtml(item.subject_name || 'Quiz')} · ${escapeHtml(item.topic_title || 'Thema')}</span>
+        <span class="quiz-card-badge">${escapeHtml(item.subject_name || 'Quiz')} · ${escapeHtml(item.topic_title || 'Lernbereich')}</span>
       </div>
       <div class="quiz-card-body">
         <h3>${escapeHtml(item.quiz_title || item.topic_title || 'Quiz')}</h3>

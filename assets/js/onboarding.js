@@ -7,7 +7,8 @@
       school_type: null,
       grade: null,
       subject: null,
-      topic: null
+      topic: null,
+      focus_tags: []
     },
     labels: {}
   };
@@ -18,14 +19,14 @@
       type: 'name',
       title: 'Wie dürfen wir dich nennen?',
       text: 'Dein Vorname reicht völlig. So fühlt sich Elevaro persönlicher an – du kannst den Schritt aber auch überspringen.',
-      hint: 'Dein Lernkompass startet.',
-      illustration: '✨'
+      hint: 'Hi! Ich begleite dich beim Lernen.',
+      illustration: '🐼'
     },
     {
       key: 'state',
       title: 'Wo gehst du zur Schule?',
       text: 'Wähle dein Bundesland. So können wir später Inhalte passend zum Lehrplan vorschlagen.',
-      hint: 'Wir richten die Inhalte auf deinen Lernort aus.',
+      hint: 'Ich suche nach deinem Lehrplan.',
       illustration: '🗺️',
       action: 'states'
     },
@@ -33,7 +34,7 @@
       key: 'school_type',
       title: 'Welche Schulart passt zu dir?',
       text: 'Je nach Bundesland gibt es unterschiedliche Schularten. Wir zeigen dir nur passende Optionen.',
-      hint: 'Damit die Vorschläge wirklich passen.',
+      hint: 'Okay, jetzt wird’s genauer.',
       illustration: '🏫',
       action: 'school_types'
     },
@@ -41,7 +42,7 @@
       key: 'grade',
       title: 'In welcher Klasse bist du?',
       text: 'Davon hängt ab, welche Fächer und Themen für dich wirklich relevant sind.',
-      hint: 'Ein Schritt näher an passenden Quizzen.',
+      hint: 'Nice. Das grenzt die Themen ein.',
       illustration: '🎒',
       action: 'grades'
     },
@@ -49,14 +50,14 @@
       key: 'subject',
       title: 'Was möchtest du üben?',
       text: 'Wir zeigen dir nur Fächer, die für deine Klasse sinnvoll sind.',
-      hint: 'Jetzt wird aus Schule ein Lernziel.',
+      hint: 'Fast geschafft.',
       illustration: '📚',
       action: 'subjects'
     },
     {
       key: 'topic',
       title: 'Womit willst du starten?',
-      text: 'Wähle ein Thema. Danach zeigen wir dir passende Quiz-Empfehlungen.',
+      text: 'Wähle einen Lernbereich. Wir nutzen ihn als weichen Filter und zeigen dir passende Quiz-Empfehlungen.',
       hint: 'Such dir den besten Einstieg aus.',
       illustration: '🎯',
       action: 'topics'
@@ -173,16 +174,50 @@
     return '';
   }
 
+  function tagsFromTopic(item) {
+    const raw = [
+      item.code,
+      item.title,
+      item.name,
+      item.description,
+      state.values.subject
+    ].filter(Boolean).join(' ').toLowerCase();
+
+    const tags = new Set();
+
+    const rules = [
+      ['karte', ['karte', 'landkarte', 'orientierung', 'himmelsrichtung', 'norden', 'süden', 'osten', 'westen']],
+      ['grundbegriffe', ['grundbegriff', 'begriff', 'kontinent', 'land', 'stadt', 'fluss', 'gebirge']],
+      ['geographie', ['geographie', 'erdkunde', 'geo']],
+      ['grammatik', ['grammatik', 'pronomen', 'demonstrativ', 'simple present', 'verb']],
+      ['englisch', ['englisch', 'english', 'this', 'that', 'these', 'those']],
+      ['arten-erkennen', ['vogel', 'tier', 'pflanze', 'bestimmen', 'erkennen', 'art']],
+      ['bilder', ['bild', 'karte', 'diagramm', 'bestimmen', 'erkennen']]
+    ];
+
+    rules.forEach(([tag, needles]) => {
+      if (needles.some(needle => raw.includes(needle))) {
+        tags.add(tag);
+      }
+    });
+
+    if (item.code) tags.add(String(item.code).toLowerCase());
+    if (state.values.subject) tags.add(String(state.values.subject).toLowerCase());
+
+    return Array.from(tags);
+  }
+
+  function labelForFocus(item, fallbackLabel) {
+    if (!item) return fallbackLabel;
+    return item.group_title || item.title || item.name || fallbackLabel;
+  }
+
+
   async function render() {
     const step = steps[state.step];
 
-    document.body.dataset.step = String(state.step);
-
     els.progress.style.width = `${((state.step + 1) / steps.length) * 100}%`;
     els.illustration.textContent = step.illustration;
-    els.illustration.classList.remove('success-pop');
-    void els.illustration.offsetWidth;
-    els.illustration.classList.add('success-pop');
     els.hint.textContent = step.hint;
     els.badge.textContent = `Schritt ${state.step + 1} von ${steps.length}`;
     els.title.textContent = step.title;
@@ -233,9 +268,19 @@
     state.values[step.key] = code;
     state.labels[step.key] = label;
 
+    if (step.key === 'topic') {
+      state.values.focus_tags = tagsFromTopic(item);
+      state.labels.focus = labelForFocus(item, label);
+    }
+
     for (let i = state.step + 1; i < steps.length; i++) {
       state.values[steps[i].key] = null;
       delete state.labels[steps[i].key];
+    }
+
+    if (step.key !== 'topic') {
+      state.values.focus_tags = [];
+      delete state.labels.focus;
     }
 
     if (state.step < steps.length - 1) {
@@ -261,8 +306,7 @@
     }
 
     els.progress.style.width = '100%';
-    document.body.dataset.step = String(steps.length);
-    els.illustration.textContent = '🏆';
+    els.illustration.textContent = '🎉';
     els.illustration.classList.add('success-pop');
     els.hint.textContent = name ? `Perfekt, ${name}. Ich habe etwas Passendes gefunden.` : 'Perfekt. Ich habe etwas Passendes gefunden.';
     els.badge.textContent = 'Bereit';
