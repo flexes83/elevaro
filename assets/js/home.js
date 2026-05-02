@@ -79,13 +79,15 @@
     const titleEl = document.getElementById('demoTitle');
     const progressEl = document.getElementById('demoProgress');
     const mediaEl = document.getElementById('demoMedia');
+    const contentEl = document.querySelector('.demo-content');
     const questionEl = document.getElementById('demoQuestion');
     const answersEl = document.getElementById('demoAnswers');
     const feedbackEl = document.getElementById('demoFeedback');
     const cursorEl = document.getElementById('fakeCursor');
-    const scoreEl = document.querySelector('.demo-score');
+    const pointsEl = document.getElementById('demoPoints');
+    const streakEl = document.getElementById('demoStreak');
 
-    if (!questionEl || !answersEl) return;
+    if (!questionEl || !answersEl || !contentEl) return;
 
     const questions = [
       {
@@ -95,7 +97,9 @@
         options: ['This are my shoes.', 'These are my shoes.', 'Those is my shoes.'],
         correct: 1,
         feedback: 'Richtig! „These“ nutzt du bei mehreren Dingen in der Nähe.',
-        media: null
+        media: null,
+        points: 120,
+        streak: 3
       },
       {
         context: 'Biologie · Arten erkennen',
@@ -104,7 +108,9 @@
         options: ['Amsel', 'Elster', 'Star'],
         correct: 1,
         feedback: 'Genau. Die Elster erkennst du oft am schwarz-weißen Gefieder.',
-        media: '🐦'
+        media: 'bird',
+        points: 130,
+        streak: 4
       },
       {
         context: 'Geographie · Orientierung',
@@ -113,7 +119,9 @@
         options: ['Süden', 'Westen', 'Norden'],
         correct: 2,
         feedback: 'Ja! Auf den meisten Karten ist Norden oben.',
-        media: '🗺️'
+        media: 'map',
+        points: 140,
+        streak: 5
       }
     ];
 
@@ -122,46 +130,54 @@
     function renderQuestion() {
       const q = questions[index];
 
-      contextEl.textContent = q.context;
-      titleEl.textContent = q.title;
-      questionEl.textContent = q.question;
-      answersEl.innerHTML = '';
-      feedbackEl.classList.add('d-none');
-      feedbackEl.textContent = '';
-      scoreEl.classList.remove('pop');
-      cursorEl.classList.remove('clicking');
+      contentEl.classList.add('is-leaving');
 
-      if (q.media) {
-        mediaEl.classList.remove('d-none');
-        mediaEl.innerHTML = `<span class="media-emoji">${q.media}</span>`;
-      } else {
-        mediaEl.classList.add('d-none');
-        mediaEl.innerHTML = '';
-      }
-
-      progressEl.style.width = '0%';
-      requestAnimationFrame(() => {
-        progressEl.style.width = '100%';
-      });
-
-      q.options.forEach((option, optionIndex) => {
-        const answer = document.createElement('div');
-        answer.className = 'demo-answer pending';
-        answer.style.animationDelay = `${optionIndex * 120}ms`;
-        answer.textContent = option;
-        answersEl.appendChild(answer);
-      });
-
-      const clickDelay = 1200;
-      const revealDelay = 1650;
-      const nextDelay = 3600;
-
-      setTimeout(() => fakeClick(q.correct), clickDelay);
-      setTimeout(() => revealAnswer(q), revealDelay);
       setTimeout(() => {
-        index = (index + 1) % questions.length;
-        renderQuestion();
-      }, nextDelay);
+        contextEl.textContent = q.context;
+        titleEl.textContent = q.title;
+        questionEl.textContent = q.question;
+        answersEl.innerHTML = '';
+        feedbackEl.classList.add('d-none');
+        feedbackEl.textContent = '';
+        pointsEl.textContent = q.points;
+        streakEl.textContent = q.streak;
+
+        if (q.media === 'bird') {
+          mediaEl.classList.remove('d-none');
+          mediaEl.innerHTML = '<div class="demo-media-inner"><span class="demo-bird"></span></div>';
+        } else if (q.media === 'map') {
+          mediaEl.classList.remove('d-none');
+          mediaEl.innerHTML = '<div class="demo-media-inner map-demo"><span class="media-emoji">🗺️</span></div>';
+        } else {
+          mediaEl.classList.add('d-none');
+          mediaEl.innerHTML = '';
+        }
+
+        progressEl.classList.remove('running');
+        void progressEl.offsetWidth;
+        progressEl.classList.add('running');
+
+        q.options.forEach((option, optionIndex) => {
+          const answer = document.createElement('div');
+          answer.className = 'demo-answer pending';
+          answer.style.animationDelay = `${optionIndex * 100}ms`;
+          answer.textContent = option;
+          answersEl.appendChild(answer);
+        });
+
+        contentEl.classList.remove('is-leaving');
+        contentEl.classList.add('is-entering');
+        requestAnimationFrame(() => {
+          contentEl.classList.remove('is-entering');
+        });
+
+        setTimeout(() => fakeClick(q.correct), 1200);
+        setTimeout(() => revealAnswer(q), 1580);
+        setTimeout(() => {
+          index = (index + 1) % questions.length;
+          renderQuestion();
+        }, 4000);
+      }, 260);
     }
 
     function fakeClick(correctIndex) {
@@ -177,7 +193,11 @@
 
       cursorEl.style.left = `${x}px`;
       cursorEl.style.top = `${y}px`;
+      cursorEl.classList.remove('clicking');
+      void cursorEl.offsetWidth;
       cursorEl.classList.add('clicking');
+
+      createPointsPop(shell, x, y);
     }
 
     function revealAnswer(q) {
@@ -187,10 +207,17 @@
 
       feedbackEl.textContent = q.feedback;
       feedbackEl.classList.remove('d-none');
+    }
 
-      scoreEl.classList.remove('pop');
-      void scoreEl.offsetWidth;
-      scoreEl.classList.add('pop');
+    function createPointsPop(shell, x, y) {
+      const pop = document.createElement('div');
+      pop.className = 'points-pop';
+      pop.textContent = '+10';
+      pop.style.left = `${x}px`;
+      pop.style.top = `${y}px`;
+      shell.appendChild(pop);
+
+      setTimeout(() => pop.remove(), 950);
     }
 
     renderQuestion();

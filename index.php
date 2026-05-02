@@ -1,5 +1,5 @@
 <?php
-// Elevaro animated hero homepage
+// Elevaro refined hero homepage
 ?>
 <!DOCTYPE html>
 <html lang="de">
@@ -9,6 +9,9 @@
   <title>Elevaro – Lernquizze passend zu deinem Schulstoff</title>
   <meta name="description" content="Elevaro schlägt dir Lernquizze vor, die zu Bundesland, Schulart, Klasse und Fach passen. Kurze Quiz-Sessions mit direktem Feedback.">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/home.css">
 </head>
@@ -69,7 +72,11 @@
               <span id="demoContext">Englisch · Klasse 5</span>
               <strong id="demoTitle">this, that, these & those</strong>
             </div>
-            <span class="demo-score">+10</span>
+
+            <div class="demo-stats">
+              <span><b id="demoStreak">3</b>er Serie</span>
+              <span><b id="demoPoints">120</b> Punkte</span>
+            </div>
           </div>
 
           <div class="demo-progress">
@@ -78,9 +85,11 @@
 
           <div class="demo-card">
             <div id="demoMedia" class="demo-media d-none"></div>
-            <h2 id="demoQuestion">Welche Antwort ist richtig?</h2>
-            <div id="demoAnswers" class="demo-answers"></div>
-            <div id="demoFeedback" class="demo-feedback d-none"></div>
+            <div class="demo-content">
+              <h2 id="demoQuestion">Welche Antwort ist richtig?</h2>
+              <div id="demoAnswers" class="demo-answers"></div>
+              <div id="demoFeedback" class="demo-feedback d-none"></div>
+            </div>
           </div>
 
           <div id="fakeCursor" class="fake-cursor">
@@ -143,10 +152,7 @@
       <div class="showcase-grid">
         <article class="showcase-card large-card">
           <div class="showcase-visual bird-visual">
-            <div class="bird-card">
-              <span>🐦</span>
-              <small>Bildfrage</small>
-            </div>
+            <div class="bird-photo-mini"></div>
             <div class="answer-chips">
               <span>Elster</span>
               <span>Amsel</span>
