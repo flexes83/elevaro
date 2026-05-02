@@ -367,27 +367,25 @@ Allgemeine Regeln:
 - ungefähr 5 leicht, 6 mittel, 4 schwer.
 - falsche Antworten sollen typische Missverständnisse abbilden.
 
-Medien-/Bild-Regeln:
-- Entscheide anhand des Themas, ob visuelles Lernen zentral ist.
-- Wenn das Thema visuelles Erkennen, Bestimmen oder Unterscheiden beinhaltet
-  (z. B. Vogelarten, Tiere, Pflanzen, Karten, Diagramme, Formen, Kunstwerke),
-  dann ist der Einsatz von Bildern verpflichtend.
-- In solchen Fällen:
-  → mindestens 40–70 % der Fragen sollen Bilder enthalten
-- Für Bestimmungsaufgaben (z. B. „Vogelarten bestimmen“):
-  → verwende hauptsächlich media_recommendation = "question_image"
-  → typische Frageform:
-     "Welcher Vogel ist hier abgebildet?"
-  → Antwortoptionen sind Text (Artnamen)
-  → media_prompt beschreibt das Bild konkret
-  → media_search_terms enthält klare Suchbegriffe
-- Wenn mehrere visuell ähnliche Optionen unterschieden werden sollen:
-  → verwende media_recommendation = "answer_images"
-- Bei abstrakten Themen (Grammatik, Rechnen, Definitionen):
-  → KEINE Bilder → media_recommendation = "none"
-- Wenn Bilder verwendet werden:
-  → müssen media_prompt und media_search_terms sinnvoll ausgefüllt sein
-- Bilder werden nicht automatisch verwendet, sondern im Admin überprüft.
+Medien-Regeln:
+
+- Prüfe, ob das Thema visuelles Erkennen erfordert (z. B. Tiere, Pflanzen, Karten, Diagramme, Formen, Objekte).
+- Wenn visuelles Lernen zentral ist:
+  → 40–70 % der Fragen mit Bildern
+  → bevorzugt media_recommendation = 'question_image'
+  → typische Frage: \"Welcher ... ist hier abgebildet?\"
+- Wenn visuelle Unterscheidung wichtig ist:
+  → media_recommendation = 'answer_images'
+- Bei abstrakten Themen:
+  → media_recommendation = 'none'
+- Bei Bildern:
+  → media_prompt = konkrete Bildbeschreibung (z. B. \"realistic photo of a magpie bird sitting on a branch, side view\")
+  → media_search_terms = kurze Suchbegriffe (z. B. \"Elster Vogel Seitenansicht\")
+- Bei answer_images:
+  → jede Option bekommt eigenen media_prompt + media_search_terms
+- Bei 'none':
+  → media_prompt und media_search_terms leer lassen
+- Bilder werden später im Admin geprüft, nicht automatisch verwendet.
 ");
 }
 

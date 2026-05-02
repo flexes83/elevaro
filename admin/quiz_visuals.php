@@ -1,45 +1,83 @@
 <?php
 require_once __DIR__ . '/../app/includes/db.php';
 require_once __DIR__ . '/../app/includes/quiz_theme.php';
+require_once __DIR__ . '/../app/includes/image_tools.php';
 
 $pdo = elevaro_db();
 $quizId = (int)($_GET['quiz_id'] ?? $_POST['quiz_id'] ?? 0);
+$error = null;
 
 if (!$quizId) {
     die('quiz_id fehlt.');
 }
 
-$stmt = $pdo->prepare("
-    SELECT q.*, sub.name AS subject_name
-    FROM quizzes q
-    LEFT JOIN subjects sub ON sub.id = q.subject_id
-    WHERE q.id = :id
-    LIMIT 1
-");
-$stmt->execute(['id' => $quizId]);
-$quiz = $stmt->fetch();
+function loadQuiz(PDO $pdo, int $quizId): array
+{
+    $stmt = $pdo->prepare("
+        SELECT q.*, sub.name AS subject_name
+        FROM quizzes q
+        LEFT JOIN subjects sub ON sub.id = q.subject_id
+        WHERE q.id = :id
+        LIMIT 1
+    ");
+    $stmt->execute(['id' => $quizId]);
+    $quiz = $stmt->fetch();
 
-if (!$quiz) {
-    die('Quiz nicht gefunden.');
+    if (!$quiz) {
+        die('Quiz nicht gefunden.');
+    }
+
+    return $quiz;
 }
 
+$quiz = loadQuiz($pdo, $quizId);
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['auto_theme'])) {
-        $theme = elevaro_subject_theme($quiz['subject_name'] ?? '', $quiz['title']);
-        $stmt = $pdo->prepare("
-            UPDATE quizzes
-            SET theme_color_1 = :c1,
-                theme_color_2 = :c2,
-                theme_emoji = :emoji
-            WHERE id = :id
-        ");
-        $stmt->execute([
-            'c1' => $theme['color_1'],
-            'c2' => $theme['color_2'],
-            'emoji' => $theme['emoji'],
-            'id' => $quizId,
-        ]);
-    } else {
+    try {
+        if (isset($_POST['auto_theme'])) {
+            $theme = elevaro_subject_theme($quiz['subject_name'] ?? '', $quiz['title']);
+            $stmt = $pdo->prepare("
+                UPDATE quizzes
+                SET theme_color_1 = :c1,
+                    theme_color_2 = :c2,
+                    theme_emoji = :emoji
+                WHERE id = :id
+            ");
+            $stmt->execute([
+                'c1' => $theme['color_1'],
+                'c2' => $theme['color_2'],
+                'emoji' => $theme['emoji'],
+                'id' => $quizId,
+            ]);
+
+            header('Location: quiz_visuals.php?quiz_id=' . $quizId . '&saved=1');
+            exit;
+        }
+
+        if (isset($_POST['generate_card_image'])) {
+            $prompt = trim($_POST['image_prompt'] ?? '') ?: elevaro_card_image_prompt($quiz);
+            $generated = elevaro_generate_and_store_image($prompt, 'quiz-cards', $quizId);
+
+            $stmt = $pdo->prepare("
+                UPDATE quizzes
+                SET image_path = :image_path,
+                    image_source = 'ai',
+                    image_prompt = :image_prompt,
+                    image_status = 'draft',
+                    image_credit = :credit
+                WHERE id = :id
+            ");
+            $stmt->execute([
+                'image_path' => $generated['path'],
+                'image_prompt' => $prompt,
+                'credit' => 'KI-generiert',
+                'id' => $quizId,
+            ]);
+
+            header('Location: quiz_visuals.php?quiz_id=' . $quizId . '&generated=1');
+            exit;
+        }
+
         $stmt = $pdo->prepare("
             UPDATE quizzes
             SET image_path = :image_path,
@@ -64,13 +102,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'theme_emoji' => trim($_POST['theme_emoji'] ?? '') ?: '🎯',
             'id' => $quizId,
         ]);
-    }
 
-    header('Location: quiz_visuals.php?quiz_id=' . $quizId . '&saved=1');
-    exit;
+        header('Location: quiz_visuals.php?quiz_id=' . $quizId . '&saved=1');
+        exit;
+
+    } catch (Throwable $e) {
+        $error = $e->getMessage();
+    }
 }
 
-$imagePrompt = $quiz['image_prompt'] ?: elevaro_image_prompt_for_quiz($quiz);
+$quiz = loadQuiz($pdo, $quizId);
+$imagePrompt = $quiz['image_prompt'] ?: elevaro_card_image_prompt($quiz);
+$freepikQuery = trim($quiz['title'] . ' ' . ($quiz['subject_name'] ?? '') . ' learning illustration');
 
 function h($value): string {
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
@@ -86,11 +129,17 @@ function h($value): string {
   <link href="../assets/css/quiz_cards.css" rel="stylesheet">
 </head>
 <body class="bg-light p-4">
-  <div class="container" style="max-width: 1060px;">
+  <div class="container" style="max-width: 1100px;">
     <a href="quiz_questions.php?quiz_id=<?= (int)$quizId ?>" class="btn btn-light mb-3">← zurück zum Quiz</a>
 
     <?php if (!empty($_GET['saved'])): ?>
       <div class="alert alert-success">Gespeichert.</div>
+    <?php endif; ?>
+    <?php if (!empty($_GET['generated'])): ?>
+      <div class="alert alert-info">KI-Bild wurde als Entwurf gespeichert. Bitte prüfen und bei Gefallen auf „approved“ setzen.</div>
+    <?php endif; ?>
+    <?php if ($error): ?>
+      <div class="alert alert-danger"><?= h($error) ?></div>
     <?php endif; ?>
 
     <div class="row g-4">
@@ -99,7 +148,7 @@ function h($value): string {
         <p class="text-muted"><?= h($quiz['title']) ?></p>
 
         <article class="elevaro-quiz-card mb-4" style="--quiz-c1: <?= h($quiz['theme_color_1'] ?: '#5a4ff3') ?>; --quiz-c2: <?= h($quiz['theme_color_2'] ?: '#8b7cff') ?>;">
-          <?php if (!empty($quiz['image_path']) && $quiz['image_status'] === 'approved'): ?>
+          <?php if (!empty($quiz['image_path']) && in_array($quiz['image_status'], ['approved','draft'], true)): ?>
             <img src="<?= h($quiz['image_path']) ?>" alt="" class="elevaro-quiz-card-img">
           <?php else: ?>
             <div class="elevaro-quiz-card-visual">
@@ -113,7 +162,7 @@ function h($value): string {
           </div>
         </article>
 
-        <form method="post">
+        <form method="post" class="mb-2">
           <input type="hidden" name="auto_theme" value="1">
           <button class="btn btn-outline-primary">🎨 Theme automatisch neu setzen</button>
         </form>
@@ -141,7 +190,7 @@ function h($value): string {
 
                 <div class="col-12">
                   <label class="form-label fw-bold">Bildpfad</label>
-                  <input class="form-control" name="image_path" value="<?= h($quiz['image_path'] ?? '') ?>" placeholder="/uploads/quizzes/bild.jpg oder Freepik-Download">
+                  <input class="form-control" name="image_path" value="<?= h($quiz['image_path'] ?? '') ?>" placeholder="/uploads/ai/quiz-cards/bild.png oder Freepik-Download">
                 </div>
 
                 <div class="col-md-6">
@@ -170,19 +219,19 @@ function h($value): string {
                 <div class="col-12">
                   <label class="form-label fw-bold">KI-Bildprompt</label>
                   <textarea class="form-control" rows="6" name="image_prompt"><?= h($imagePrompt) ?></textarea>
-                  <div class="form-text">Kann für einen späteren Bildgenerator oder manuell in einem Bildtool genutzt werden.</div>
                 </div>
               </div>
 
-              <button class="btn btn-primary btn-lg mt-4">Speichern</button>
+              <div class="d-flex gap-2 flex-wrap mt-4">
+                <button class="btn btn-primary btn-lg">Speichern</button>
+                <button class="btn btn-outline-primary btn-lg" name="generate_card_image" value="1">✨ KI-Bild generieren</button>
+                <a class="btn btn-light btn-lg" target="_blank" href="<?= h(elevaro_freepik_search_url($freepikQuery)) ?>">Freepik suchen</a>
+              </div>
+
+              <div class="form-text mt-3">
+                KI-Bilder werden als Entwurf gespeichert. Für Freepik öffnet sich die Suche; den finalen Downloadpfad trägst du danach oben ein.
+              </div>
             </form>
-
-            <hr class="my-4">
-
-            <div class="alert alert-info mb-0">
-              Nächster Ausbauschritt: Button „KI-Bild generieren“ oder „Freepik suchen“ direkt hier anbinden.
-              Die Datenstruktur ist dafür vorbereitet.
-            </div>
           </div>
         </div>
       </div>

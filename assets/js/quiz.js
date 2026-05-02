@@ -57,7 +57,13 @@
 
     const q = questions[index];
 
-    questionEl.textContent = q.question;
+    questionEl.innerHTML = '';
+    const title = document.createElement('span');
+    title.textContent = q.question;
+    questionEl.appendChild(title);
+
+    renderQuestionMedia(q);
+
     answersEl.innerHTML = '';
     feedbackEl.classList.add('d-none');
     feedbackEl.innerHTML = '';
@@ -67,13 +73,47 @@
     progressBar.style.width = `${(index / questions.length) * 100}%`;
 
     q.options.forEach(option => {
+      const normalized = typeof option === 'string'
+        ? { text: option, media: { type: 'none' } }
+        : option;
+
       const btn = document.createElement('button');
-      btn.className = 'btn btn-outline-primary answer-btn';
+      btn.className = hasImageMedia(normalized.media) ? 'btn answer-btn image-answer-btn' : 'btn btn-outline-primary answer-btn';
       btn.type = 'button';
-      btn.textContent = option;
-      btn.addEventListener('click', () => selectAnswer(btn, option, q));
+      btn.dataset.answer = normalized.text;
+
+      if (hasImageMedia(normalized.media)) {
+        btn.innerHTML = `
+          <span class="option-image-wrap">
+            <img src="${escapeAttribute(normalized.media.path)}" alt="${escapeAttribute(normalized.media.alt || normalized.text)}">
+          </span>
+          <span class="option-label">${escapeHtml(normalized.text)}</span>
+        `;
+      } else {
+        btn.textContent = normalized.text;
+      }
+
+      btn.addEventListener('click', () => selectAnswer(btn, normalized.text, q));
       answersEl.appendChild(btn);
     });
+  }
+
+  function renderQuestionMedia(question) {
+    const existing = document.getElementById('questionMedia');
+    if (existing) existing.remove();
+
+    if (!hasImageMedia(question.media)) return;
+
+    const media = document.createElement('div');
+    media.id = 'questionMedia';
+    media.className = 'question-media';
+
+    media.innerHTML = `
+      <img src="${escapeAttribute(question.media.path)}" alt="${escapeAttribute(question.media.alt || question.question)}">
+      ${question.media.credit ? `<small>${escapeHtml(question.media.credit)}</small>` : ''}
+    `;
+
+    questionEl.insertAdjacentElement('afterend', media);
   }
 
   function selectAnswer(button, answer, question) {
@@ -86,7 +126,7 @@
     [...answersEl.children].forEach(btn => {
       btn.disabled = true;
 
-      if (btn.textContent === question.answer) {
+      if (btn.dataset.answer === question.answer) {
         btn.classList.add('correct');
       }
     });
@@ -190,6 +230,10 @@
     });
   }
 
+  function hasImageMedia(media) {
+    return media && media.type === 'image' && media.path;
+  }
+
   function getOrCreateSessionId() {
     let id = localStorage.getItem('elevaro_session_id');
 
@@ -209,6 +253,10 @@
       '"': '&quot;',
       "'": '&#039;'
     }[char]));
+  }
+
+  function escapeAttribute(str) {
+    return escapeHtml(str).replace(/`/g, '&#096;');
   }
 
   startBtn.addEventListener('click', () => startQuiz(false));
