@@ -1,0 +1,8 @@
+{
+  "id": "mathe_klasse5_bruchrechnen",
+  "title": "Bruchrechnen – Grundlagen",
+  "description": "Übe einfache Brüche, Anteile und Grundrechenarten passend für Klasse 5.",
+  "subject": "Mathe",
+  "grade": 5,
+  "questions_file": "bruchrechnen.questions.json"
+}
