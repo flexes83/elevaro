@@ -292,15 +292,38 @@ function generateQuestionsForIdea(array $idea): array
                             'type' => 'array',
                             'minItems' => 4,
                             'maxItems' => 4,
-                            'items' => ['type' => 'string']
+                            'items' => [
+                                'type' => 'object',
+                                'additionalProperties' => false,
+                                'properties' => [
+                                    'text' => ['type' => 'string'],
+                                    'media_prompt' => ['type' => 'string'],
+                                    'media_search_terms' => ['type' => 'string']
+                                ],
+                                'required' => ['text','media_prompt','media_search_terms']
+                            ]
                         ],
                         'answer' => ['type' => 'string'],
                         'explanation' => ['type' => 'string'],
                         'difficulty' => ['type' => 'number', 'minimum' => 0.05, 'maximum' => 0.95],
                         'difficulty_label' => ['type' => 'string', 'enum' => ['leicht','mittel','schwer']],
-                        'common_mistake' => ['type' => 'string']
+                        'common_mistake' => ['type' => 'string'],
+                        'media_recommendation' => ['type' => 'string', 'enum' => ['none','question_image','answer_images']],
+                        'media_prompt' => ['type' => 'string'],
+                        'media_search_terms' => ['type' => 'string']
                     ],
-                    'required' => ['question','options','answer','explanation','difficulty','difficulty_label','common_mistake']
+                    'required' => [
+                        'question',
+                        'options',
+                        'answer',
+                        'explanation',
+                        'difficulty',
+                        'difficulty_label',
+                        'common_mistake',
+                        'media_recommendation',
+                        'media_prompt',
+                        'media_search_terms'
+                    ]
                 ]
             ]
         ],
@@ -308,7 +331,7 @@ function generateQuestionsForIdea(array $idea): array
     ];
 
     $result = elevaro_openai_chat_json([
-        ['role' => 'system', 'content' => 'Du bist ein erfahrener Lehrer und erstellst didaktisch saubere Multiple-Choice-Fragen. Du lieferst ausschließlich valide JSON-Daten.'],
+        ['role' => 'system', 'content' => 'Du bist ein erfahrener Lehrer und erstellst didaktisch saubere Multiple-Choice-Fragen. Du entscheidest sehr zurückhaltend, ob Bilder didaktisch sinnvoll sind. Du lieferst ausschließlich valide JSON-Daten.'],
         ['role' => 'user', 'content' => $prompt],
     ], $schema, 0.42);
 
@@ -336,13 +359,27 @@ Offizielle Quellen / Links:
 Auszüge / Stichpunkte aus Bildungsplan:
 {$idea['curriculum_notes']}
 
-Regeln:
+Allgemeine Regeln:
 - Falls die Quellen/Stichpunkte konkrete Kompetenzen nennen, orientiere dich daran.
 - Erfinde keine exakten Bildungsplanformulierungen.
 - Fragen müssen altersgerecht und eindeutig sein.
 - exakt 4 Antwortmöglichkeiten, genau eine richtig.
 - ungefähr 5 leicht, 6 mittel, 4 schwer.
 - falsche Antworten sollen typische Missverständnisse abbilden.
+
+Medien-/Bild-Regeln:
+- Verwende Bilder NICHT standardmäßig.
+- media_recommendation muss meistens 'none' sein.
+- Empfiehl Bilder nur, wenn sie den Lernzweck klar verbessern.
+- Bildfragen sind sinnvoll bei: Tiere/Pflanzen erkennen, Karten, Diagramme, Geometrie, Kunst/Bilder beschreiben, Gegenstände/Orte/Phänomene visuell unterscheiden.
+- Bei abstrakten Themen, Grammatik, reinen Rechenaufgaben oder Begriffsabfragen soll media_recommendation 'none' sein.
+- Wenn ein Bild zur Frage sinnvoll ist: media_recommendation = 'question_image'.
+- Wenn die Antwortoptionen sinnvollerweise Bilder sind: media_recommendation = 'answer_images'.
+- media_prompt enthält bei question_image einen konkreten Bildprompt.
+- media_search_terms enthält passende Suchbegriffe, z. B. für Freepik oder Bilddatenbanken.
+- Bei answer_images enthält jede Option eigene media_prompt und media_search_terms.
+- Bei media_recommendation = 'none' bleiben media_prompt und media_search_terms leer.
+- Die eigentlichen Bilder werden später im Admin reviewt und ausgewählt.
 ");
 }
 
@@ -353,23 +390,45 @@ function saveQuestionsAsDraft(PDO $pdo, int $quizId, array $questions): void
     foreach ($questions as $q) {
         $sortOrder++;
 
-        if (!in_array($q['answer'], $q['options'], true)) {
-            $q['options'][0] = $q['answer'];
+        $optionTexts = array_map(static function ($option) {
+            return is_array($option) ? (string)$option['text'] : (string)$option;
+        }, $q['options']);
+
+        if (!in_array($q['answer'], $optionTexts, true)) {
+            $q['options'][0] = [
+                'text' => $q['answer'],
+                'media_prompt' => '',
+                'media_search_terms' => ''
+            ];
             shuffle($q['options']);
+        }
+
+        $mediaRecommendation = $q['media_recommendation'] ?? 'none';
+        if (!in_array($mediaRecommendation, ['none','question_image','answer_images'], true)) {
+            $mediaRecommendation = 'none';
         }
 
         $stmt = $pdo->prepare("
             INSERT INTO questions
-              (quiz_id, question_key, type, question_text, correct_answer, explanation,
+              (quiz_id, question_key, type, question_text,
+               media_type, media_path, media_alt,
+               media_recommendation, media_prompt, media_search_terms,
+               correct_answer, explanation,
                difficulty_manual, difficulty_calculated, status, ai_generated, sort_order)
             VALUES
-              (:quiz_id, :question_key, 'mc', :question_text, :correct_answer, :explanation,
+              (:quiz_id, :question_key, 'mc', :question_text,
+               'none', NULL, NULL,
+               :media_recommendation, :media_prompt, :media_search_terms,
+               :correct_answer, :explanation,
                :difficulty_manual, :difficulty_calculated, 'draft', 1, :sort_order)
         ");
         $stmt->execute([
             'quiz_id' => $quizId,
             'question_key' => slugify($q['question']) . '-' . substr(md5(uniqid('', true)), 0, 6),
             'question_text' => $q['question'],
+            'media_recommendation' => $mediaRecommendation,
+            'media_prompt' => $mediaRecommendation === 'question_image' ? ($q['media_prompt'] ?? '') : '',
+            'media_search_terms' => $mediaRecommendation === 'question_image' ? ($q['media_search_terms'] ?? '') : '',
             'correct_answer' => $q['answer'],
             'explanation' => trim($q['explanation'] . "\n\nTypischer Fehler: " . $q['common_mistake']),
             'difficulty_manual' => $q['difficulty'],
@@ -380,14 +439,30 @@ function saveQuestionsAsDraft(PDO $pdo, int $quizId, array $questions): void
         $questionId = (int)$pdo->lastInsertId();
 
         foreach (array_values($q['options']) as $i => $option) {
+            $text = is_array($option) ? (string)$option['text'] : (string)$option;
+
+            $optionMediaPrompt = '';
+            $optionMediaSearchTerms = '';
+
+            if ($mediaRecommendation === 'answer_images' && is_array($option)) {
+                $optionMediaPrompt = $option['media_prompt'] ?? '';
+                $optionMediaSearchTerms = $option['media_search_terms'] ?? '';
+            }
+
             $stmt = $pdo->prepare("
-                INSERT INTO question_options (question_id, option_text, is_correct, sort_order)
-                VALUES (:question_id, :option_text, :is_correct, :sort_order)
+                INSERT INTO question_options
+                  (question_id, option_text, media_type, media_path, media_alt,
+                   media_prompt, media_search_terms, is_correct, sort_order)
+                VALUES
+                  (:question_id, :option_text, 'none', NULL, NULL,
+                   :media_prompt, :media_search_terms, :is_correct, :sort_order)
             ");
             $stmt->execute([
                 'question_id' => $questionId,
-                'option_text' => $option,
-                'is_correct' => $option === $q['answer'] ? 1 : 0,
+                'option_text' => $text,
+                'media_prompt' => $optionMediaPrompt,
+                'media_search_terms' => $optionMediaSearchTerms,
+                'is_correct' => $text === $q['answer'] ? 1 : 0,
                 'sort_order' => $i + 1,
             ]);
         }
@@ -661,22 +736,6 @@ function h($value): string
       </div>
     </div>
 
-    <?php if ($recentBatches): ?>
-      <div class="card card-soft mb-4">
-        <div class="card-body p-4">
-          <h3 class="h5 fw-bold">Gespeicherte KI-Auswahlen</h3>
-          <div class="list-group list-group-flush">
-            <?php foreach ($recentBatches as $batch): ?>
-              <a class="list-group-item list-group-item-action" href="?batch_id=<?= (int)$batch['id'] ?>">
-                <?= h($batch['state_name']) ?> · <?= h($batch['school_type_name']) ?> · Klasse <?= (int)$batch['grade'] ?> · <?= h($batch['subject_name']) ?>
-                <small class="text-muted d-block"><?= h($batch['created_at']) ?><?= $batch['focus'] ? ' · ' . h($batch['focus']) : '' ?></small>
-              </a>
-            <?php endforeach; ?>
-          </div>
-        </div>
-      </div>
-    <?php endif; ?>
-
     <?php if ($activeBatch): ?>
       <div class="mb-3">
         <h3 class="fw-bold">2. Gespeicherte Vorschläge</h3>
@@ -726,6 +785,22 @@ function h($value): string
         <div class="card-body p-4">
           <h4 class="fw-bold">🧪 Verwendeter Prompt</h4>
           <pre class="debug-prompt"><?= h($activeBatch['prompt']) ?></pre>
+        </div>
+      </div>
+    <?php endif; ?>
+
+    <?php if ($recentBatches): ?>
+      <div class="card card-soft mb-4">
+        <div class="card-body p-4">
+          <h3 class="h5 fw-bold">Gespeicherte KI-Auswahlen</h3>
+          <div class="list-group list-group-flush">
+            <?php foreach ($recentBatches as $batch): ?>
+              <a class="list-group-item list-group-item-action" href="?batch_id=<?= (int)$batch['id'] ?>">
+                <?= h($batch['state_name']) ?> · <?= h($batch['school_type_name']) ?> · Klasse <?= (int)$batch['grade'] ?> · <?= h($batch['subject_name']) ?>
+                <small class="text-muted d-block"><?= h($batch['created_at']) ?><?= $batch['focus'] ? ' · ' . h($batch['focus']) : '' ?></small>
+              </a>
+            <?php endforeach; ?>
+          </div>
         </div>
       </div>
     <?php endif; ?>
