@@ -1,0 +1,89 @@
+{
+  "order": 1,
+  "slug": "voegel",
+  "title": "Vogelquiz",
+  "shortTitle": "Vögel",
+  "category": "Natur & Tiere",
+  "icon": "🐦",
+  "color": "#4d8f6f",
+  "softColor": "#eaf7ef",
+  "accent": "#ffdc7a",
+  "permalink": "voegel",
+  "coverImage": "assets/quizzes/voegel/img/rotkehlchen.jpg",
+  "cardImages": [
+    "assets/quizzes/voegel/img/blaumeise.jpg",
+    "assets/quizzes/voegel/img/buntspecht.jpg",
+    "assets/quizzes/voegel/img/pirol.jpg"
+  ],
+  "description": "Vögel erkennen, Merkmale lernen und falsche Antworten gezielt wiederholen.",
+  "longDescription": "Ein mobiles Vogelquiz mit echten Bildern, Beschreibungen und Wiederholungsmodus. Ideal zum Üben für die Ornithologen-Prüfung.",
+  "seoTitle": "Vogelquiz für Kinder – Vögel erkennen und üben",
+  "seoDescription": "Mobiles Vogelquiz für Kinder mit Bildern, Multiple Choice, Wackelkandidaten und persönlichem Fortschritt.",
+  "imageBase": "assets/quizzes/voegel/img/",
+  "roundLength": 12,
+  "questionCounts": [
+    5,
+    10,
+    15,
+    20
+  ],
+  "mailReports": true,
+  "avatars": [
+    "🐦",
+    "🦉",
+    "🪶",
+    "🌿",
+    "⭐",
+    "🦜"
+  ],
+  "tags": [
+    "Bilder",
+    "Merkmale",
+    "Prüfung"
+  ],
+  "learningGoals": [
+    "Vögel anhand echter Bilder erkennen",
+    "Beschreibungen und Merkmale zuordnen",
+    "Falsche Antworten aus der Runde erneut üben",
+    "Wackelkandidaten langfristig wiederholen"
+  ],
+  "modes": [
+    {
+      "id": "normal",
+      "label": "Prüfungsrunde",
+      "icon": "🎯",
+      "description": "Bilder, Namen und Beschreibungen gemischt"
+    },
+    {
+      "id": "images",
+      "label": "Nur Bilder",
+      "icon": "🖼️",
+      "description": "Vögel nur anhand von Fotos erkennen",
+      "typeFilter": [
+        "image_choice",
+        "image_select",
+        "image"
+      ]
+    },
+    {
+      "id": "descriptions",
+      "label": "Beschreibungen",
+      "icon": "📝",
+      "description": "Merkmale lesen und zuordnen",
+      "categoryFilter": [
+        "Beschreibungen"
+      ]
+    },
+    {
+      "id": "weak",
+      "label": "Wackelkandidaten",
+      "icon": "🔁",
+      "description": "Fragen, die noch nicht sicher sitzen"
+    }
+  ],
+  "imageSearchPrompts": [
+    "European robin bird photo on branch no text no logo no watermark",
+    "great spotted woodpecker photo tree no text no logo no watermark",
+    "European goldfinch photo no text no logo no watermark"
+  ]
+}

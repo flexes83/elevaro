@@ -1,0 +1,4 @@
+Hinweis zur Luv/Lee-Grafik:
+Die Datei data/quizzes/luv_lee_schema_clean.svg ist als Asset-Vorlage enthalten.
+Für den Livebetrieb bitte nach assets/quizzes/schwarzwald/img/luv_lee_schema_clean.svg kopieren,
+da schwarzwald.json imageBase auf assets/quizzes/schwarzwald/img/ zeigt.

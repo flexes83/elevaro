@@ -1,0 +1,60 @@
+{
+  "order": 1,
+  "slug": "mathe-klasse-5-bruchrechnen",
+  "title": "Bruchrechnen – Klasse 5",
+  "shortTitle": "Bruchrechnen",
+  "category": "Mathe Klasse 5",
+  "icon": "➗",
+  "color": "#4f46e5",
+  "softColor": "#eef2ff",
+  "accent": "#facc15",
+  "permalink": "mathe-klasse-5-bruchrechnen",
+  "coverImage": "assets/quizzes/mathe-klasse-5-bruchrechnen/img/cover.svg",
+  "cardImages": [
+    "assets/quizzes/mathe-klasse-5-bruchrechnen/img/cover.svg"
+  ],
+  "description": "Übe die Grundlagen des Bruchrechnens: Bruchteile, Erweitern, Kürzen und einfache Rechnungen.",
+  "longDescription": "Ein schulnahes Mathe-Quiz für Klasse 5. Du wiederholst Bruchteile, Zähler und Nenner, einfache Bruchvergleiche, Erweitern, Kürzen und typische Aufgaben aus dem Unterricht.",
+  "seoTitle": "Bruchrechnen Klasse 5 Quiz – Mathe spielerisch üben",
+  "seoDescription": "Bruchrechnen für Klasse 5 als spielerisches Quiz üben: Bruchteile, Zähler, Nenner, Kürzen, Erweitern und einfache Aufgaben mit direktem Feedback.",
+  "imageBase": "assets/quizzes/mathe-klasse-5-bruchrechnen/img/",
+  "roundLength": 10,
+  "questionCounts": [5, 10, 15],
+  "mailReports": false,
+  "avatars": ["🐼", "⭐", "🧠", "🎯", "➗", "🚀"],
+  "tags": ["Mathe", "Klasse 5", "Brüche"],
+  "learningGoals": [
+    "Zähler und Nenner sicher unterscheiden",
+    "Bruchteile erkennen und vergleichen",
+    "einfache Brüche kürzen und erweitern",
+    "typische Unterrichtsfragen wiederholen"
+  ],
+  "modes": [
+    {
+      "id": "normal",
+      "label": "Gemischte Runde",
+      "icon": "🎯",
+      "description": "Alles zum Bruchrechnen gemischt"
+    },
+    {
+      "id": "grundlagen",
+      "label": "Grundlagen",
+      "icon": "🧠",
+      "description": "Zähler, Nenner und Bruchteile",
+      "categoryFilter": ["Grundlagen", "Bruchteile"]
+    },
+    {
+      "id": "rechnen",
+      "label": "Rechnen",
+      "icon": "➗",
+      "description": "Kürzen, Erweitern und Vergleichen",
+      "categoryFilter": ["Kürzen", "Erweitern", "Vergleichen"]
+    },
+    {
+      "id": "weak",
+      "label": "Wackelkandidaten",
+      "icon": "🔁",
+      "description": "Fragen, die noch nicht sicher sitzen"
+    }
+  ]
+}
