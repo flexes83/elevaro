@@ -2,7 +2,7 @@
 
 require_once __DIR__ . '/config.php';
 
-function elevaro_openai_chat_json(array $messages, array $schema, float $temperature = 0.45): array
+function elevaro_openai_chat_json(array $messages, array $schema, float $temperature = 0.35): array
 {
     $config = elevaro_config('openai');
 
@@ -17,7 +17,7 @@ function elevaro_openai_chat_json(array $messages, array $schema, float $tempera
         'response_format' => [
             'type' => 'json_schema',
             'json_schema' => [
-                'name' => 'elevaro_admin_generation',
+                'name' => 'elevaro_generation',
                 'strict' => true,
                 'schema' => $schema
             ]

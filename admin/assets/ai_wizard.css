@@ -1,1 +1,39 @@
-body{background:linear-gradient(135deg,#fff 0%,#f7f6ff 100%)}.admin-shell{max-width:1180px}.brand{color:#5a4ff3;letter-spacing:-.03em}.hero-card,.step-card,.topic-card,.quiz-card{border:0;border-radius:1.5rem;box-shadow:0 1rem 2.5rem rgba(23,32,51,.08)}.badge-soft{background:#f3f1ff;color:#4037c9}.ai-glow{background:radial-gradient(circle at top right,rgba(90,79,243,.16),transparent 18rem),#fff}.small-muted{font-size:.88rem;color:#6c7482}textarea.form-control{min-height:100px}pre{background:#f8f9fa;border-radius:1rem;padding:1rem}
+body {
+  background: linear-gradient(135deg, #ffffff 0%, #f7f6ff 100%);
+}
+
+.admin-shell {
+  max-width: 1200px;
+}
+
+.brand {
+  color: #5a4ff3;
+  letter-spacing: -.03em;
+}
+
+.card-soft {
+  border: 0;
+  border-radius: 1.5rem;
+  box-shadow: 0 1rem 2.5rem rgba(23,32,51,.08);
+}
+
+.badge-soft {
+  background: #f3f1ff;
+  color: #4037c9;
+}
+
+pre.debug-prompt {
+  white-space: pre-wrap;
+  font-size: 12px;
+  background: #172033;
+  color: #e8e7ff;
+  border-radius: 1rem;
+  padding: 1rem;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.small-muted {
+  font-size: .88rem;
+  color: #6c7482;
+}
