@@ -177,7 +177,6 @@
     const step = steps[state.step];
 
     document.body.dataset.step = String(state.step);
-    document.body.style.setProperty('--bg-x', `${Math.min(state.step * 18, 100)}%`);
 
     els.progress.style.width = `${((state.step + 1) / steps.length) * 100}%`;
     els.illustration.textContent = step.illustration;
@@ -263,7 +262,6 @@
 
     els.progress.style.width = '100%';
     document.body.dataset.step = String(steps.length);
-    document.body.style.setProperty('--bg-x', '100%');
     els.illustration.textContent = '🏆';
     els.illustration.classList.add('success-pop');
     els.hint.textContent = name ? `Perfekt, ${name}. Ich habe etwas Passendes gefunden.` : 'Perfekt. Ich habe etwas Passendes gefunden.';
