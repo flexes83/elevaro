@@ -145,3 +145,185 @@ function curriculum_topics(string $stateCode, string $schoolTypeCode, int $grade
 
     return $stmt->fetchAll();
 }
+
+
+function curriculum_recommendations(string $stateCode, string $schoolTypeCode, int $grade, ?string $subjectCode = null, ?string $topicCode = null): array
+{
+    $pdo = elevaro_db();
+
+    $items = [];
+
+    /*
+     * 1) Exact curriculum match.
+     * This respects state, school type, grade, subject and optionally the selected topic.
+     */
+    $params = [
+        'state' => $stateCode,
+        'school_type' => $schoolTypeCode,
+        'grade' => $grade
+    ];
+
+    $subjectWhere = '';
+    if ($subjectCode) {
+        $subjectWhere = 'AND sub.code = :subject';
+        $params['subject'] = $subjectCode;
+    }
+
+    $topicWhere = '';
+    if ($topicCode) {
+        $topicWhere = 'AND t.code = :topic';
+        $params['topic'] = $topicCode;
+    }
+
+    $stmt = $pdo->prepare("
+        SELECT
+            t.code AS topic_code,
+            t.title AS topic_title,
+            t.description AS topic_description,
+            sub.code AS subject_code,
+            sub.name AS subject_name,
+            sub.icon AS subject_icon,
+            q.quiz_key,
+            q.title AS quiz_title,
+            q.description AS quiz_description,
+            q.theme_color_1,
+            q.theme_color_2,
+            q.theme_emoji,
+            q.image_path,
+            q.image_status
+        FROM curriculum_topics t
+        JOIN states s ON s.id = t.state_id
+        JOIN school_types st ON st.id = t.school_type_id
+        JOIN subjects sub ON sub.id = t.subject_id
+        LEFT JOIN quiz_topic_map qtm ON qtm.topic_id = t.id
+        LEFT JOIN quizzes q
+          ON q.id = qtm.quiz_id
+         AND q.is_active = 1
+         AND (q.status = 'published' OR q.status IS NULL OR q.status = '')
+        WHERE s.code = :state
+          AND st.code = :school_type
+          AND t.grade = :grade
+          {$subjectWhere}
+          {$topicWhere}
+        ORDER BY
+          CASE WHEN q.quiz_key IS NULL THEN 1 ELSE 0 END,
+          sub.sort_order ASC,
+          t.sort_order ASC,
+          q.title ASC
+    ");
+
+    $stmt->execute($params);
+    $items = $stmt->fetchAll();
+
+    /*
+     * 2) Fallback: If the exact selected topic has no linked quiz yet,
+     * show other published quizzes from the same context.
+     */
+    $hasUsableQuiz = false;
+    foreach ($items as $item) {
+        if (!empty($item['quiz_key'])) {
+            $hasUsableQuiz = true;
+            break;
+        }
+    }
+
+    if (!$hasUsableQuiz && $topicCode) {
+        $fallbackParams = [
+            'state' => $stateCode,
+            'school_type' => $schoolTypeCode,
+            'grade' => $grade
+        ];
+
+        $fallbackSubjectWhere = '';
+        if ($subjectCode) {
+            $fallbackSubjectWhere = 'AND sub.code = :subject';
+            $fallbackParams['subject'] = $subjectCode;
+        }
+
+        $stmt = $pdo->prepare("
+            SELECT
+                t.code AS topic_code,
+                t.title AS topic_title,
+                t.description AS topic_description,
+                sub.code AS subject_code,
+                sub.name AS subject_name,
+                sub.icon AS subject_icon,
+                q.quiz_key,
+                q.title AS quiz_title,
+                q.description AS quiz_description,
+                q.theme_color_1,
+                q.theme_color_2,
+                q.theme_emoji,
+                q.image_path,
+                q.image_status
+            FROM curriculum_topics t
+            JOIN states s ON s.id = t.state_id
+            JOIN school_types st ON st.id = t.school_type_id
+            JOIN subjects sub ON sub.id = t.subject_id
+            JOIN quiz_topic_map qtm ON qtm.topic_id = t.id
+            JOIN quizzes q
+              ON q.id = qtm.quiz_id
+             AND q.is_active = 1
+             AND (q.status = 'published' OR q.status IS NULL OR q.status = '')
+            WHERE s.code = :state
+              AND st.code = :school_type
+              AND t.grade = :grade
+              {$fallbackSubjectWhere}
+            ORDER BY sub.sort_order ASC, t.sort_order ASC, q.title ASC
+            LIMIT 12
+        ");
+
+        $stmt->execute($fallbackParams);
+        $fallbackItems = $stmt->fetchAll();
+
+        if (!empty($fallbackItems)) {
+            return $fallbackItems;
+        }
+    }
+
+    /*
+     * 3) Last fallback: quizzes directly assigned to subject/grade,
+     * even if they are not yet mapped to curriculum_topics.
+     */
+    if (!$hasUsableQuiz && $subjectCode) {
+        $stmt = $pdo->prepare("
+            SELECT
+                NULL AS topic_code,
+                'Passende Quizze' AS topic_title,
+                NULL AS topic_description,
+                sub.code AS subject_code,
+                sub.name AS subject_name,
+                sub.icon AS subject_icon,
+                q.quiz_key,
+                q.title AS quiz_title,
+                q.description AS quiz_description,
+                q.theme_color_1,
+                q.theme_color_2,
+                q.theme_emoji,
+                q.image_path,
+                q.image_status
+            FROM quizzes q
+            JOIN subjects sub ON sub.id = q.subject_id
+            WHERE sub.code = :subject
+              AND q.grade = :grade
+              AND q.is_active = 1
+              AND (q.status = 'published' OR q.status IS NULL OR q.status = '')
+            ORDER BY q.title ASC
+            LIMIT 12
+        ");
+
+        $stmt->execute([
+            'subject' => $subjectCode,
+            'grade' => $grade
+        ]);
+
+        $directItems = $stmt->fetchAll();
+
+        if (!empty($directItems)) {
+            return $directItems;
+        }
+    }
+
+    return $items;
+}
+

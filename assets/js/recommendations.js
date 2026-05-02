@@ -38,6 +38,10 @@ async function loadRecommendations(profile) {
     params.set('subject', values.subject);
   }
 
+  if (values.topic) {
+    params.set('topic', values.topic);
+  }
+
   const res = await fetch('api/recommendations.php?' + params.toString());
   const json = await res.json();
 

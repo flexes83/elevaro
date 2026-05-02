@@ -9,6 +9,7 @@ try {
     $schoolType = $_GET['school_type'] ?? '';
     $grade = (int)($_GET['grade'] ?? 0);
     $subject = $_GET['subject'] ?? null;
+    $topic = $_GET['topic'] ?? null;
 
     if (!$state || !$schoolType || !$grade) {
         http_response_code(400);
@@ -21,7 +22,7 @@ try {
 
     echo json_encode([
         'success' => true,
-        'items' => curriculum_recommendations($state, $schoolType, $grade, $subject ?: null)
+        'items' => curriculum_recommendations($state, $schoolType, $grade, $subject ?: null, $topic ?: null)
     ], JSON_UNESCAPED_UNICODE);
 
 } catch (Throwable $e) {
