@@ -18,14 +18,14 @@
       type: 'name',
       title: 'Wie dürfen wir dich nennen?',
       text: 'Dein Vorname reicht völlig. So fühlt sich Elevaro persönlicher an – du kannst den Schritt aber auch überspringen.',
-      hint: 'Hi! Ich begleite dich beim Lernen.',
-      illustration: '🐼'
+      hint: 'Dein Lernkompass startet.',
+      illustration: '✨'
     },
     {
       key: 'state',
       title: 'Wo gehst du zur Schule?',
       text: 'Wähle dein Bundesland. So können wir später Inhalte passend zum Lehrplan vorschlagen.',
-      hint: 'Ich suche nach deinem Lehrplan.',
+      hint: 'Wir richten die Inhalte auf deinen Lernort aus.',
       illustration: '🗺️',
       action: 'states'
     },
@@ -33,7 +33,7 @@
       key: 'school_type',
       title: 'Welche Schulart passt zu dir?',
       text: 'Je nach Bundesland gibt es unterschiedliche Schularten. Wir zeigen dir nur passende Optionen.',
-      hint: 'Okay, jetzt wird’s genauer.',
+      hint: 'Damit die Vorschläge wirklich passen.',
       illustration: '🏫',
       action: 'school_types'
     },
@@ -41,7 +41,7 @@
       key: 'grade',
       title: 'In welcher Klasse bist du?',
       text: 'Davon hängt ab, welche Fächer und Themen für dich wirklich relevant sind.',
-      hint: 'Nice. Das grenzt die Themen ein.',
+      hint: 'Ein Schritt näher an passenden Quizzen.',
       illustration: '🎒',
       action: 'grades'
     },
@@ -49,7 +49,7 @@
       key: 'subject',
       title: 'Was möchtest du üben?',
       text: 'Wir zeigen dir nur Fächer, die für deine Klasse sinnvoll sind.',
-      hint: 'Fast geschafft.',
+      hint: 'Jetzt wird aus Schule ein Lernziel.',
       illustration: '📚',
       action: 'subjects'
     },
@@ -57,8 +57,8 @@
       key: 'topic',
       title: 'Womit willst du starten?',
       text: 'Wähle ein Thema. Danach zeigen wir dir passende Quiz-Empfehlungen.',
-      hint: 'Bereit für dein erstes Quiz?',
-      illustration: '🚀',
+      hint: 'Such dir den besten Einstieg aus.',
+      illustration: '🎯',
       action: 'topics'
     }
   ];
@@ -176,8 +176,14 @@
   async function render() {
     const step = steps[state.step];
 
+    document.body.dataset.step = String(state.step);
+    document.body.style.setProperty('--bg-x', `${Math.min(state.step * 18, 100)}%`);
+
     els.progress.style.width = `${((state.step + 1) / steps.length) * 100}%`;
     els.illustration.textContent = step.illustration;
+    els.illustration.classList.remove('success-pop');
+    void els.illustration.offsetWidth;
+    els.illustration.classList.add('success-pop');
     els.hint.textContent = step.hint;
     els.badge.textContent = `Schritt ${state.step + 1} von ${steps.length}`;
     els.title.textContent = step.title;
@@ -256,7 +262,9 @@
     }
 
     els.progress.style.width = '100%';
-    els.illustration.textContent = '🎉';
+    document.body.dataset.step = String(steps.length);
+    document.body.style.setProperty('--bg-x', '100%');
+    els.illustration.textContent = '🏆';
     els.illustration.classList.add('success-pop');
     els.hint.textContent = name ? `Perfekt, ${name}. Ich habe etwas Passendes gefunden.` : 'Perfekt. Ich habe etwas Passendes gefunden.';
     els.badge.textContent = 'Bereit';

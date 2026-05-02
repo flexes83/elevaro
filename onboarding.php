@@ -6,17 +6,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Los geht’s – Elevaro</title>
   <meta name="description" content="Finde Quizze, die zu deinem Bundesland, deiner Schulart und deiner Klasse passen.">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/onboarding.css">
-
-<link rel="stylesheet" href="assets/css/design-system.css">
 </head>
-<body>
+<body data-step="0">
 
-<nav class="navbar bg-white border-bottom">
+<nav class="navbar onboarding-nav">
   <div class="container">
     <a class="navbar-brand fw-bold" href="/">Elevaro</a>
-    <span class="text-muted small">Spielerisch zu guten Noten.</span>
+    <span class="nav-claim">Spielerisch zu guten Noten.</span>
   </div>
 </nav>
 
@@ -24,15 +26,22 @@
   <div class="container">
     <div class="onboarding-shell mx-auto">
 
-      <div class="progress mb-4" style="height: 10px;">
-        <div id="stepProgress" class="progress-bar" style="width: 0%"></div>
+      <div class="progress-shell mb-4">
+        <div class="progress" style="height: 10px;">
+          <div id="stepProgress" class="progress-bar" style="width: 0%"></div>
+        </div>
       </div>
 
       <div class="onboarding-card">
         <div class="row g-4 align-items-center">
           <div class="col-lg-4 text-center">
-            <div id="stepIllustration" class="step-illustration">🐼</div>
-            <div id="pandaHint" class="panda-hint">Ich suche dir passende Quizze raus.</div>
+            <div class="visual-stage">
+              <div class="visual-orbit orbit-a"></div>
+              <div class="visual-orbit orbit-b"></div>
+              <div id="stepIllustration" class="step-illustration">✨</div>
+            </div>
+
+            <div id="pandaHint" class="panda-hint">Dein Lernkompass startet.</div>
           </div>
 
           <div class="col-lg-8">
