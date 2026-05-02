@@ -76,6 +76,7 @@
 
   function initHeroQuiz() {
     const contextEl = document.getElementById('demoContext');
+    const metaEl = document.getElementById('demoMeta');
     const titleEl = document.getElementById('demoTitle');
     const progressEl = document.getElementById('demoProgress');
     const mediaEl = document.getElementById('demoMedia');
@@ -91,18 +92,8 @@
 
     const questions = [
       {
-        context: 'Englisch · Klasse 5',
-        title: 'this, that, these & those',
-        question: 'Which sentence is correct?',
-        options: ['This are my shoes.', 'These are my shoes.', 'Those is my shoes.'],
-        correct: 1,
-        feedback: 'Richtig! „These“ nutzt du bei mehreren Dingen in der Nähe.',
-        media: null,
-        points: 120,
-        streak: 3
-      },
-      {
         context: 'Biologie · Arten erkennen',
+        meta: 'Klasse 5 · Gymnasium',
         title: 'Vogelarten bestimmen',
         question: 'Welcher Vogel ist hier abgebildet?',
         options: ['Amsel', 'Elster', 'Star'],
@@ -113,15 +104,28 @@
         streak: 4
       },
       {
+        context: 'Englisch · Grammatik',
+        meta: 'Klasse 5 · Gymnasium',
+        title: 'this, that, these & those',
+        question: 'Which sentence is correct?',
+        options: ['This are my shoes.', 'These are my shoes.', 'Those is my shoes.'],
+        correct: 1,
+        feedback: 'Richtig! „These“ nutzt du bei mehreren Dingen in der Nähe.',
+        media: null,
+        points: 140,
+        streak: 5
+      },
+      {
         context: 'Geographie · Orientierung',
+        meta: 'Klasse 5 · Gymnasium',
         title: 'Karten lesen',
         question: 'Welche Richtung liegt auf Karten meistens oben?',
         options: ['Süden', 'Westen', 'Norden'],
         correct: 2,
         feedback: 'Ja! Auf den meisten Karten ist Norden oben.',
         media: 'map',
-        points: 140,
-        streak: 5
+        points: 150,
+        streak: 6
       }
     ];
 
@@ -134,6 +138,7 @@
 
       setTimeout(() => {
         contextEl.textContent = q.context;
+        metaEl.textContent = q.meta;
         titleEl.textContent = q.title;
         questionEl.textContent = q.question;
         answersEl.innerHTML = '';
@@ -144,10 +149,10 @@
 
         if (q.media === 'bird') {
           mediaEl.classList.remove('d-none');
-          mediaEl.innerHTML = '<div class="demo-media-inner"><span class="demo-bird"></span></div>';
+          mediaEl.innerHTML = '<img src="assets/img/magpie.jpg" class="demo-img" alt="Elster">';
         } else if (q.media === 'map') {
           mediaEl.classList.remove('d-none');
-          mediaEl.innerHTML = '<div class="demo-media-inner map-demo"><span class="media-emoji">🗺️</span></div>';
+          mediaEl.innerHTML = '<div class="demo-media-inner"><span class="media-emoji">🗺️</span></div>';
         } else {
           mediaEl.classList.add('d-none');
           mediaEl.innerHTML = '';
@@ -188,8 +193,8 @@
       const shellRect = shell.getBoundingClientRect();
       const targetRect = target.getBoundingClientRect();
 
-      const x = targetRect.left - shellRect.left + targetRect.width * 0.72;
-      const y = targetRect.top - shellRect.top + targetRect.height * 0.55;
+      const x = targetRect.left - shellRect.left + targetRect.width / 2;
+      const y = targetRect.top - shellRect.top + targetRect.height / 2;
 
       cursorEl.style.left = `${x}px`;
       cursorEl.style.top = `${y}px`;
