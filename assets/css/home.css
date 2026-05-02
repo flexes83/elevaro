@@ -1,0 +1,316 @@
+:root {
+  --elevaro-primary: #5a4ff3;
+  --elevaro-primary-dark: #4037c9;
+  --elevaro-soft: #f3f1ff;
+  --elevaro-bg: #f8f7ff;
+  --elevaro-text: #172033;
+  --elevaro-muted: #6c7482;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  color: var(--elevaro-text);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #fff;
+}
+
+.fw-black {
+  font-weight: 900;
+  letter-spacing: -0.055em;
+}
+
+.navbar-brand {
+  color: var(--elevaro-primary) !important;
+  letter-spacing: -0.035em;
+}
+
+.btn {
+  border-radius: 999px;
+  font-weight: 750;
+  padding-inline: 1.15rem;
+}
+
+.btn-primary {
+  background: var(--elevaro-primary);
+  border-color: var(--elevaro-primary);
+}
+
+.btn-primary:hover {
+  background: var(--elevaro-primary-dark);
+  border-color: var(--elevaro-primary-dark);
+}
+
+.btn-light {
+  background: #fff;
+  border-color: rgba(23,32,51,.08);
+}
+
+.home-hero {
+  padding: 5.5rem 0 6rem;
+  background:
+    radial-gradient(circle at top right, rgba(90,79,243,.18), transparent 33rem),
+    radial-gradient(circle at 10% 20%, rgba(68,210,163,.12), transparent 24rem),
+    linear-gradient(135deg, #fff 0%, #f7f6ff 100%);
+}
+
+.hero-badge,
+.small-label {
+  display: inline-flex;
+  border-radius: 999px;
+  background: var(--elevaro-soft);
+  color: var(--elevaro-primary-dark);
+  padding: .38rem .78rem;
+  font-size: .82rem;
+  font-weight: 850;
+}
+
+.lead {
+  color: var(--elevaro-muted);
+  max-width: 680px;
+}
+
+.trust-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .7rem;
+}
+
+.trust-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  border-radius: 999px;
+  padding: .45rem .75rem;
+  background: rgba(255,255,255,.72);
+  border: 1px solid rgba(23,32,51,.06);
+  font-size: .9rem;
+  font-weight: 650;
+}
+
+.trust-row span::before {
+  content: "✓";
+  color: var(--elevaro-primary);
+  font-weight: 900;
+}
+
+.hero-card,
+.returning-box,
+.step-card,
+.quiz-card,
+.teacher-card {
+  background: rgba(255,255,255,.94);
+  box-shadow: 0 1.2rem 3.5rem rgba(23,32,51,.09);
+  border: 1px solid rgba(23,32,51,.045);
+}
+
+.hero-card {
+  border-radius: 2rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.hero-panda {
+  width: 180px;
+  height: 180px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--elevaro-soft);
+  font-size: 5.2rem;
+  margin-bottom: 1.25rem;
+  animation: floaty 3s ease-in-out infinite;
+}
+
+.mini-flow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .65rem;
+}
+
+.mini-flow div {
+  background: var(--elevaro-bg);
+  border-radius: 1rem;
+  padding: .75rem .55rem;
+}
+
+.mini-flow strong {
+  display: block;
+  color: var(--elevaro-primary);
+  font-size: 1.2rem;
+}
+
+.mini-flow span {
+  font-size: .82rem;
+  font-weight: 700;
+}
+
+.returning-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  border-radius: 1.5rem;
+  padding: 1rem 1.25rem;
+}
+
+.section-padding {
+  padding: 5rem 0;
+}
+
+.bg-soft {
+  background: var(--elevaro-bg);
+}
+
+.section-head p {
+  max-width: 680px;
+  margin-inline: auto;
+}
+
+.step-card {
+  border-radius: 1.5rem;
+  padding: 1.6rem;
+}
+
+.step-icon {
+  width: 58px;
+  height: 58px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1.2rem;
+  background: var(--elevaro-soft);
+  font-size: 1.85rem;
+  margin-bottom: 1.1rem;
+}
+
+.step-card p,
+.quiz-card p,
+.teacher-card p {
+  color: var(--elevaro-muted);
+}
+
+.quiz-grid {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr 1fr;
+  gap: 1rem;
+}
+
+.quiz-card {
+  border-radius: 1.5rem;
+  padding: 1.45rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 270px;
+}
+
+.quiz-card.featured {
+  background:
+    radial-gradient(circle at top right, rgba(90,79,243,.18), transparent 18rem),
+    #fff;
+}
+
+.quiz-badge {
+  width: fit-content;
+  display: inline-flex;
+  border-radius: 999px;
+  background: var(--elevaro-soft);
+  color: var(--elevaro-primary-dark);
+  padding: .35rem .7rem;
+  font-size: .8rem;
+  font-weight: 850;
+  margin-bottom: .9rem;
+}
+
+.quiz-card h3 {
+  font-size: 1.35rem;
+  font-weight: 850;
+  letter-spacing: -.02em;
+}
+
+.quiz-actions {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+  flex-wrap: wrap;
+}
+
+.quiz-meta {
+  font-size: .87rem;
+  color: var(--elevaro-muted);
+  font-weight: 650;
+}
+
+.disabled-card {
+  opacity: .82;
+}
+
+.teacher-card {
+  border-radius: 2rem;
+  padding: 2rem;
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.teacher-card > div {
+  max-width: 740px;
+}
+
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@media (max-width: 992px) {
+  .home-hero {
+    padding: 4rem 0;
+  }
+
+  .quiz-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .teacher-card,
+  .returning-box {
+    display: block;
+  }
+
+  .teacher-card .btn,
+  .returning-box .btn {
+    margin-top: 1rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .section-padding {
+    padding: 3.5rem 0;
+  }
+
+  .display-3 {
+    font-size: 2.8rem;
+  }
+
+  .hero-card {
+    padding: 1.35rem;
+  }
+
+  .hero-panda {
+    width: 140px;
+    height: 140px;
+    font-size: 4rem;
+  }
+
+  .mini-flow {
+    grid-template-columns: 1fr;
+  }
+
+  .quiz-actions .btn {
+    width: 100%;
+  }
+}
