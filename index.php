@@ -1,5 +1,5 @@
 <?php
-// Elevaro refined hero homepage
+// Elevaro polished hero homepage
 ?>
 <!DOCTYPE html>
 <html lang="de">
@@ -69,8 +69,9 @@
         <div class="demo-shell">
           <div class="demo-top">
             <div>
-              <span id="demoContext">Englisch · Klasse 5</span>
-              <strong id="demoTitle">this, that, these & those</strong>
+              <span id="demoContext">Biologie · Arten erkennen</span>
+              <small id="demoMeta" class="demo-meta">Klasse 5 · Gymnasium</small>
+              <strong id="demoTitle">Vogelarten bestimmen</strong>
             </div>
 
             <div class="demo-stats">
@@ -152,7 +153,7 @@
       <div class="showcase-grid">
         <article class="showcase-card large-card">
           <div class="showcase-visual bird-visual">
-            <div class="bird-photo-mini"></div>
+            <img src="assets/img/magpie.jpg" alt="Elster" class="showcase-photo">
             <div class="answer-chips">
               <span>Elster</span>
               <span>Amsel</span>
