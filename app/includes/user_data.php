@@ -17,10 +17,16 @@ if (!function_exists('elevaro_table_exists')) {
 function elevaro_table_exists(string $tableName): bool
 {
     try {
-        $stmt = elevaro_db()->prepare('SHOW TABLES LIKE :table_name');
+        $stmt = elevaro_db()->prepare("
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = :table_name
+        ");
         $stmt->execute(['table_name' => $tableName]);
-        return (bool)$stmt->fetchColumn();
+        return (int)$stmt->fetchColumn() > 0;
     } catch (Throwable $e) {
+        error_log('Elevaro table detection failed for ' . $tableName . ': ' . $e->getMessage());
         return false;
     }
 }
@@ -43,6 +49,7 @@ function elevaro_column_exists(string $tableName, string $columnName): bool
         ]);
         return (int)$stmt->fetchColumn() > 0;
     } catch (Throwable $e) {
+        error_log('Elevaro column detection failed for ' . $tableName . '.' . $columnName . ': ' . $e->getMessage());
         return false;
     }
 }

@@ -15,6 +15,7 @@ $out = [
     'columns' => [],
     'progress' => null,
     'recent_events' => [],
+    'database' => elevaro_db()->query('SELECT DATABASE()')->fetchColumn(),
 ];
 
 foreach (['user_answer_events','user_question_progress','user_quiz_sessions','auth_users'] as $table) {
