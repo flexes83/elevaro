@@ -12,24 +12,15 @@ try {
     $topic = $_GET['topic'] ?? null;
     $tags = $_GET['tags'] ?? null;
 
-    if (!$state || !$schoolType || !$grade) {
-        http_response_code(400);
-        echo json_encode([
-            'success' => false,
-            'message' => 'Missing required parameters'
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
+    if (!$grade) {
+        throw new RuntimeException('Klasse fehlt.');
     }
 
     echo json_encode([
         'success' => true,
         'items' => curriculum_recommendations($state, $schoolType, $grade, $subject ?: null, $topic ?: null, $tags ?: null)
     ], JSON_UNESCAPED_UNICODE);
-
 } catch (Throwable $e) {
     http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'message' => $e->getMessage()
-    ], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['success' => false, 'message' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
