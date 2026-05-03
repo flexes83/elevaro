@@ -1,23 +1,179 @@
 <?php
 
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/auth.php';
 
 function elevaro_get_quiz_by_key(string $quizKey): ?array
 {
-    $stmt = elevaro_db()->prepare("
+    $pdo = elevaro_db();
+
+    $stmt = $pdo->prepare("
         SELECT
-            q.*
+            q.*,
+            sub.code AS subject_code,
+            sub.name AS subject_name,
+            sub.icon AS subject_icon,
+            GROUP_CONCAT(DISTINCT tag.name ORDER BY tag.name SEPARATOR ', ') AS tag_names
         FROM quizzes q
+        LEFT JOIN subjects sub ON sub.id = q.subject_id
+        LEFT JOIN quiz_tag_map qtm ON qtm.quiz_id = q.id
+        LEFT JOIN tags tag ON tag.id = qtm.tag_id
         WHERE q.quiz_key = :quiz_key
           AND q.is_active = 1
           AND q.status = 'published'
+        GROUP BY q.id, sub.id
         LIMIT 1
     ");
 
     $stmt->execute(['quiz_key' => $quizKey]);
     $quiz = $stmt->fetch();
 
-    return $quiz ?: null;
+    if (!$quiz) {
+        return null;
+    }
+
+    $topicStmt = $pdo->prepare("
+        SELECT
+          ct.title,
+          ct.description,
+          ct.learning_goal,
+          s.name AS state_name,
+          st.name AS school_type_name
+        FROM quiz_topic_map qtm
+        JOIN curriculum_topics ct ON ct.id = qtm.topic_id
+        LEFT JOIN states s ON s.id = ct.state_id
+        LEFT JOIN school_types st ON st.id = ct.school_type_id
+        WHERE qtm.quiz_id = :quiz_id
+        ORDER BY ct.sort_order ASC, ct.id ASC
+        LIMIT 1
+    ");
+    $topicStmt->execute(['quiz_id' => (int)$quiz['id']]);
+    $topic = $topicStmt->fetch();
+
+    if ($topic) {
+        $quiz['topic_title'] = $topic['title'] ?? '';
+        $quiz['topic_description'] = $topic['description'] ?? '';
+        $quiz['learning_goal'] = $topic['learning_goal'] ?? '';
+        $quiz['state_name'] = $topic['state_name'] ?? '';
+        $quiz['school_type_name'] = $topic['school_type_name'] ?? '';
+    } else {
+        $quiz['topic_title'] = '';
+        $quiz['topic_description'] = '';
+        $quiz['learning_goal'] = '';
+        $quiz['state_name'] = '';
+        $quiz['school_type_name'] = '';
+    }
+
+    $quiz['question_count'] = elevaro_get_quiz_question_count((int)$quiz['id']);
+    $quiz['progress'] = elevaro_get_quiz_intro_progress((int)$quiz['id']);
+
+    return $quiz;
+}
+
+function elevaro_get_quiz_question_count(int $quizId): int
+{
+    $stmt = elevaro_db()->prepare("
+        SELECT COUNT(*)
+        FROM questions
+        WHERE quiz_id = :quiz_id
+          AND status = 'published'
+    ");
+    $stmt->execute(['quiz_id' => $quizId]);
+
+    return (int)$stmt->fetchColumn();
+}
+
+function elevaro_get_quiz_intro_progress(int $quizId): array
+{
+    if (!function_exists('auth_user')) {
+        return [
+            'total' => elevaro_get_quiz_question_count($quizId),
+            'passed' => 0,
+            'failed' => 0,
+            'unanswered' => elevaro_get_quiz_question_count($quizId),
+            'attempted' => 0,
+            'played' => false,
+        ];
+    }
+
+    $user = auth_user();
+
+    if (!$user || !function_exists('elevaro_db')) {
+        $total = elevaro_get_quiz_question_count($quizId);
+        return [
+            'total' => $total,
+            'passed' => 0,
+            'failed' => 0,
+            'unanswered' => $total,
+            'attempted' => 0,
+            'played' => false,
+        ];
+    }
+
+    try {
+        $pdo = elevaro_db();
+        $total = elevaro_get_quiz_question_count($quizId);
+
+        if (!elevaro_table_exists('user_question_progress')) {
+            return [
+                'total' => $total,
+                'passed' => 0,
+                'failed' => 0,
+                'unanswered' => $total,
+                'attempted' => 0,
+                'played' => false,
+            ];
+        }
+
+        $stmt = $pdo->prepare("
+            SELECT
+              SUM(CASE WHEN is_mastered = 1 THEN 1 ELSE 0 END) AS passed,
+              SUM(CASE WHEN needs_recovery = 1 THEN 1 ELSE 0 END) AS failed,
+              SUM(CASE WHEN answered_count > 0 THEN 1 ELSE 0 END) AS attempted
+            FROM user_question_progress
+            WHERE user_id = :user_id
+              AND quiz_id = :quiz_id
+        ");
+        $stmt->execute([
+            'user_id' => (int)$user['id'],
+            'quiz_id' => $quizId,
+        ]);
+
+        $row = $stmt->fetch() ?: [];
+        $passed = (int)($row['passed'] ?? 0);
+        $failed = (int)($row['failed'] ?? 0);
+        $attempted = (int)($row['attempted'] ?? 0);
+
+        return [
+            'total' => $total,
+            'passed' => $passed,
+            'failed' => $failed,
+            'unanswered' => max($total - $passed - $failed, 0),
+            'attempted' => $attempted,
+            'played' => $attempted > 0 || $passed > 0 || $failed > 0,
+        ];
+    } catch (Throwable $e) {
+        $total = elevaro_get_quiz_question_count($quizId);
+        return [
+            'total' => $total,
+            'passed' => 0,
+            'failed' => 0,
+            'unanswered' => $total,
+            'attempted' => 0,
+            'played' => false,
+        ];
+    }
+}
+
+function elevaro_table_exists(string $tableName): bool
+{
+    try {
+        $stmt = elevaro_db()->prepare("SHOW TABLES LIKE :table_name");
+        $stmt->execute(['table_name' => $tableName]);
+        return (bool)$stmt->fetchColumn();
+    } catch (Throwable $e) {
+        return false;
+    }
 }
 
 function elevaro_get_questions_for_quiz(int $quizId, bool $adaptiveOrder = true): array
@@ -60,7 +216,8 @@ function elevaro_get_questions_for_quiz(int $quizId, bool $adaptiveOrder = true)
     foreach ($optionsStmt->fetchAll() as $option) {
         $qid = (int)$option['question_id'];
         $optionsByQuestion[$qid][] = [
-            'text' => $option['option_text'],
+            'text' => (string)$option['option_text'],
+            'label' => (string)$option['option_text'],
             'is_correct' => (bool)$option['is_correct'],
             'media' => [
                 'type' => $option['media_type'] ?? 'none',
@@ -69,6 +226,9 @@ function elevaro_get_questions_for_quiz(int $quizId, bool $adaptiveOrder = true)
                 'credit' => $option['media_credit'] ?? null,
                 'source' => $option['media_source'] ?? null,
             ],
+            'media_type' => $option['media_type'] ?? 'none',
+            'media_path' => $option['media_path'] ?? null,
+            'media_alt' => $option['media_alt'] ?? null,
         ];
     }
 

@@ -26,8 +26,8 @@
 
 .elevaro-quiz-card-media {
   position: relative;
-  height: 230px;
-  min-height: 230px;
+  height: 220px;
+  min-height: 220px;
   overflow: hidden;
   display: grid;
   place-items: center;
@@ -73,7 +73,8 @@
   z-index: 2;
   left: 1rem;
   top: 1rem;
-  max-width: calc(100% - 6.2rem);
+  display: inline-flex;
+  max-width: calc(100% - 6rem);
   border-radius: 999px;
   padding: .38rem .7rem;
   background: rgba(255,255,255,.26);
@@ -101,7 +102,7 @@
     conic-gradient(
       #00b894 0deg var(--quiz-donut-green, 0deg),
       #ff7675 var(--quiz-donut-green, 0deg) calc(var(--quiz-donut-green, 0deg) + var(--quiz-donut-red, 0deg)),
-      rgba(255,255,255,.62) calc(var(--quiz-donut-green, 0deg) + var(--quiz-donut-red, 0deg)) 360deg
+      rgba(255,255,255,.58) calc(var(--quiz-donut-green, 0deg) + var(--quiz-donut-red, 0deg)) 360deg
     );
   box-shadow: 0 .7rem 1.4rem rgba(23,32,51,.16);
 }
@@ -116,7 +117,7 @@
 }
 
 .elevaro-quiz-card-donut.is-empty {
-  background: rgba(255,255,255,.62);
+  background: rgba(255,255,255,.6);
 }
 
 .elevaro-quiz-card-donut-label {
@@ -218,4 +219,35 @@
   .elevaro-quiz-card-footer .btn {
     width: 100%;
   }
+}
+
+
+/* Image display fix: real images fill the full card media area */
+.elevaro-quiz-card-media {
+  isolation: isolate;
+}
+
+.elevaro-quiz-card-img {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.elevaro-quiz-card-media:has(.elevaro-quiz-card-img) .elevaro-quiz-card-fallback {
+  display: none;
+}
+
+.elevaro-quiz-card-media:has(.elevaro-quiz-card-img)::after {
+  z-index: 1;
+  height: 48%;
+  background: linear-gradient(to top, rgba(23,32,51,.35), transparent);
+}
+
+.elevaro-quiz-card-badge,
+.elevaro-quiz-card-donut {
+  position: absolute;
 }

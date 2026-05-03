@@ -25,15 +25,12 @@
     chemie: ['#e17055', '#fab1a0']
   };
 
-  const visibleImageStatuses = new Set(['', 'draft', 'approved', 'generated', 'selected', 'active']);
-
   function create(item, options = {}) {
     const card = document.createElement('article');
     card.className = 'elevaro-quiz-card';
 
     const subjectCode = String(item.subject_code || item.subject || '').toLowerCase();
     const colors = subjectColors[subjectCode] || ['#5a4ff3', '#00cec9'];
-
     const color1 = item.theme_color_1 || colors[0];
     const color2 = item.theme_color_2 || colors[1];
     const emoji = item.theme_emoji || item.subject_icon || subjectEmojis[subjectCode] || '🎯';
@@ -41,10 +38,9 @@
     const description = item.quiz_description || item.description || item.topic_description || 'Starte ein kurzes Quiz mit direktem Feedback.';
     const quizKey = item.quiz_key || item.key || '';
     const quizId = item.quiz_id || item.id || '';
-    const imagePath = item.image_path || item.card_image_path || item.coverImage || '';
-    const imageStatus = String(item.image_status || '').toLowerCase();
-    const hasImage = imagePath && visibleImageStatuses.has(imageStatus);
-
+    const imagePath = item.image_path || item.card_image_path || '';
+    const imageStatus = item.image_status || '';
+    const hasImage = imagePath && (!imageStatus || imageStatus === 'approved' || imageStatus === 'generated' || imageStatus === 'selected');
     const tags = normalizeTags(item);
     const progress = normalizeProgress(item);
 
@@ -57,19 +53,22 @@
       ? `<img class="elevaro-quiz-card-img" src="${escapeAttr(imagePath)}" alt="">`
       : `<span class="elevaro-quiz-card-fallback">${escapeHtml(emoji)}</span>`;
 
-    const donutLabel = progress.played ? `${Math.round(progress.greenPercent)}%` : '';
+    const donutLabel = progress.played
+      ? `${Math.round(progress.greenPercent)}%`
+      : '';
 
-    const adminEdit = (item.can_edit || options.canEdit) && quizId
+    const adminEdit = item.can_edit || options.canEdit
       ? `<a class="elevaro-quiz-card-admin" href="/admin/quiz_questions.php?quiz_id=${encodeURIComponent(quizId)}">bearbeiten</a>`
       : '';
 
-    const startHref = quizKey ? `/quiz.php?key=${encodeURIComponent(quizKey)}` : '#';
-    const badgeText = `${item.subject_name || 'Quiz'} · ${item.tag_names || item.topic_title || 'Lernbereich'}`;
+    const startHref = quizKey
+      ? `/quiz.php?key=${encodeURIComponent(quizKey)}`
+      : '#';
 
     card.innerHTML = `
       <div class="elevaro-quiz-card-media">
         ${media}
-        <span class="elevaro-quiz-card-badge">${escapeHtml(badgeText)}</span>
+        <span class="elevaro-quiz-card-badge">${escapeHtml(item.subject_name || 'Quiz')} · ${escapeHtml(item.topic_title || 'Lernbereich')}</span>
         <span class="elevaro-quiz-card-donut ${progress.played ? '' : 'is-empty'}" title="${escapeAttr(progress.title)}">
           <span class="elevaro-quiz-card-donut-label">${escapeHtml(donutLabel)}</span>
         </span>
@@ -102,8 +101,8 @@
     const passed = number(item.progress_passed ?? item.correct_questions ?? 0);
     const failed = number(item.progress_failed ?? item.failed_questions ?? 0);
     let unanswered = number(item.progress_unanswered ?? 0);
-    const attempted = number(item.progress_attempted ?? item.answered_questions ?? 0);
-    const played = attempted > 0 || passed > 0 || failed > 0;
+
+    const played = number(item.progress_attempted ?? item.answered_questions ?? 0) > 0 || passed > 0 || failed > 0;
 
     if (!unanswered && total > 0) {
       unanswered = Math.max(total - passed - failed, 0);
@@ -122,17 +121,16 @@
       };
     }
 
-    const greenDeg = (passed / denom) * 360;
-    const redDeg = (failed / denom) * 360;
-    const greenPercent = (passed / denom) * 100;
+    const greenPercent = denom ? (passed / denom) * 100 : 0;
+    const redPercent = denom ? (failed / denom) * 100 : 0;
 
     return {
       played: true,
-      greenDeg,
-      redDeg,
+      greenDeg: (passed / denom) * 360,
+      redDeg: (failed / denom) * 360,
       greenPercent,
       meta: `${passed}/${denom} bestanden`,
-      title: `${passed} bestanden, ${failed} noch nachzuarbeiten, ${unanswered} unbearbeitet`
+      title: `${passed} bestanden, ${failed} offen nach Fehlern, ${unanswered} unbearbeitet`
     };
   }
 
@@ -167,5 +165,7 @@
     return escapeHtml(value).replace(/`/g, '&#096;');
   }
 
-  window.ElevaroQuizCard = { create };
+  window.ElevaroQuizCard = {
+    create
+  };
 })();
