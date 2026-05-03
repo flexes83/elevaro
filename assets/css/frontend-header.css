@@ -1,4 +1,4 @@
-/* Elevaro frontend auth header */
+/* Elevaro central frontend header */
 
 .elevaro-topbar {
   z-index: 1030;
@@ -47,19 +47,15 @@
   color: #fff;
 }
 
-.elevaro-user-menu {
-  position: relative;
-}
-
 .elevaro-user-button {
   display: inline-flex;
   align-items: center;
   gap: .55rem;
   min-height: 38px;
-  padding: .25rem .6rem .25rem .25rem;
+  padding: .25rem .65rem .25rem .25rem;
   border: 1px solid rgba(23,32,51,.08);
   border-radius: 999px;
-  background: rgba(255,255,255,.84);
+  background: rgba(255,255,255,.9);
   color: var(--ink, #172033);
   font-weight: 850;
   letter-spacing: -.02em;
@@ -67,7 +63,7 @@
 }
 
 .elevaro-topbar-glass .elevaro-user-button {
-  border-color: rgba(255,255,255,.2);
+  border-color: rgba(255,255,255,.22);
   background: rgba(255,255,255,.18);
   color: #fff;
   box-shadow: none;
