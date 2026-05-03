@@ -173,6 +173,9 @@ function elevaro_get_questions_for_quiz(int $quizId, bool $adaptiveOrder = true)
     foreach ($questions as $question) {
         $qid = (int)$question['id'];
         $options = $optionsByQuestion[$qid] ?? [];
+        if (count($options) > 1) {
+            shuffle($options);
+        }
 
         $payload[] = [
             'id' => $qid,

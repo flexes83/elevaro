@@ -137,7 +137,7 @@ $introEmoji = $quiz['theme_emoji'] ?? $quiz['subject_icon'] ?? '🎯';
         </div>
       </div>
 
-      <div class="quiz-highscore-placeholder">
+      <div id="introExtras" class="quiz-highscore-placeholder">
         <div>
           <strong>Highscores</strong>
           <span>Kommt später: Klassenranglisten, Bestzeiten und Serien.</span>
@@ -145,6 +145,14 @@ $introEmoji = $quiz['theme_emoji'] ?? $quiz['subject_icon'] ?? '🎯';
       </div>
 
       <div id="quizCard" class="quiz-card d-none">
+        <div id="quizPlayMedia" class="quiz-play-media <?= $hasImage ? 'has-image' : '' ?>">
+          <?php if ($hasImage): ?>
+            <img src="<?= qh($imagePath) ?>" alt="">
+          <?php else: ?>
+            <span><?= qh($introEmoji) ?></span>
+          <?php endif; ?>
+        </div>
+
         <div class="d-flex justify-content-between align-items-center mb-4">
           <div class="progress flex-grow-1 me-3" style="height: 10px;">
             <div id="progressBar" class="progress-bar" style="width: 0%"></div>
@@ -200,7 +208,10 @@ window.ELEVARO_QUIZ = {
   dbId: <?= (int)$quiz['id'] ?>,
   id: <?= json_encode($quiz['quiz_key'], JSON_UNESCAPED_UNICODE) ?>,
   title: <?= json_encode($quiz['title'], JSON_UNESCAPED_UNICODE) ?>,
-  questions: <?= json_encode($quiz['questions'], JSON_UNESCAPED_UNICODE) ?>
+  questions: <?= json_encode($quiz['questions'], JSON_UNESCAPED_UNICODE) ?>,
+  imagePath: <?= json_encode($imagePath, JSON_UNESCAPED_UNICODE) ?>,
+  hasImage: <?= $hasImage ? 'true' : 'false' ?>,
+  emoji: <?= json_encode($introEmoji, JSON_UNESCAPED_UNICODE) ?>
 };
 </script>
 <script src="assets/js/quiz.js?v=<?= filemtime(__DIR__ . '/assets/js/quiz.js') ?>"></script>

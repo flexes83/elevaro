@@ -15,6 +15,8 @@
   const sessionId = getOrCreateSessionId();
 
   const introCard = document.getElementById('introCard');
+  const introExtras = document.getElementById('introExtras');
+  const quizPlayMedia = document.getElementById('quizPlayMedia');
   const quizCard = document.getElementById('quizCard');
   const resultCard = document.getElementById('resultCard');
 
@@ -54,6 +56,7 @@
     startQuizSession();
 
     introCard.classList.add('d-none');
+    if (introExtras) introExtras.classList.add('d-none');
     resultCard.classList.add('d-none');
     quizCard.classList.remove('d-none');
     quizCard.classList.add('quiz-pop-in');
@@ -334,7 +337,8 @@
         selected_answer: selectedAnswer,
         correct_answer: question.answer,
         is_correct: isCorrect,
-        session_id: quizSessionId || sessionId,
+        session_id: quizSessionId || null,
+        session_token: sessionId,
         response_time_ms: responseTimeMs,
         points
       })
