@@ -111,16 +111,6 @@ function elevaro_get_quiz_intro_progress(int $quizId): array
     ];
 }
 
-function elevaro_table_exists(string $tableName): bool
-{
-    try {
-        $stmt = elevaro_db()->prepare("SHOW TABLES LIKE :table_name");
-        $stmt->execute(['table_name' => $tableName]);
-        return (bool)$stmt->fetchColumn();
-    } catch (Throwable $e) {
-        return false;
-    }
-}
 
 function elevaro_get_questions_for_quiz(int $quizId, bool $adaptiveOrder = true): array
 {
