@@ -72,11 +72,15 @@ function auth_login(string $login, string $password): bool
     $stmt = $pdo->prepare("
         SELECT *
         FROM auth_users
-        WHERE (email = :login OR username = :login)
+        WHERE (email = :email_login OR username = :username_login)
           AND status = 'active'
         LIMIT 1
     ");
-    $stmt->execute(['login' => $login]);
+    $stmt->execute([
+        'email_login' => $login,
+        'username_login' => $login,
+    ]);
+
     $user = $stmt->fetch();
 
     if (!$user || !password_verify($password, $user['password_hash'])) {
