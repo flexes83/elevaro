@@ -737,7 +737,6 @@ function h($value): string
 {
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 }
-?>
 
 admin_header('KI Curriculum Wizard', 'Themen werden gespeichert. Du kannst mehrere Quizze aus einer einmaligen KI-Auswahl erstellen.');
 ?>
