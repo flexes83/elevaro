@@ -1,4 +1,5 @@
-<?php ?>
+<?php
+require_once __DIR__ . '/app/includes/frontend_header.php'; ?>
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -6,42 +7,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Los geht’s – Elevaro</title>
   <meta name="description" content="Finde Quizze, die zu deinem Bundesland, deiner Schulart und deiner Klasse passen.">
-  <link rel="preconnect" href="https://cdn.jsdelivr.net">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/onboarding.css">
+  <link rel="stylesheet" href="/assets/css/frontend-header.css">
 </head>
-<body data-step="0">
+<body>
 
-<nav class="navbar onboarding-nav">
-  <div class="container">
-    <a class="navbar-brand fw-bold" href="/">Elevaro</a>
-    <span class="nav-claim">Spielerisch zu guten Noten.</span>
-  </div>
-</nav>
+<?php elevaro_frontend_header('light', []); ?>
 
 <main class="onboarding-wrap">
   <div class="container">
     <div class="onboarding-shell mx-auto">
 
-      <div class="progress-shell mb-4">
-        <div class="progress" style="height: 10px;">
-          <div id="stepProgress" class="progress-bar" style="width: 0%"></div>
-        </div>
+      <div class="progress mb-4" style="height: 10px;">
+        <div id="stepProgress" class="progress-bar" style="width: 0%"></div>
       </div>
 
       <div class="onboarding-card">
         <div class="row g-4 align-items-center">
           <div class="col-lg-4 text-center">
-            <div class="visual-stage">
-              <div class="visual-orbit orbit-a"></div>
-              <div class="visual-orbit orbit-b"></div>
-              <div id="stepIllustration" class="step-illustration">✨</div>
-            </div>
-
-            <div id="pandaHint" class="panda-hint">Dein Lernkompass startet.</div>
+            <div id="stepIllustration" class="step-illustration">🐼</div>
+            <div id="pandaHint" class="panda-hint">Ich suche dir passende Quizze raus.</div>
           </div>
 
           <div class="col-lg-8">
@@ -70,5 +56,6 @@
 </main>
 
 <script src="assets/js/onboarding.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

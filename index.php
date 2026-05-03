@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/app/includes/frontend_header.php';
 // Elevaro polished hero homepage
 ?>
 <!DOCTYPE html>
@@ -14,21 +15,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/home.css">
-
-<link rel="stylesheet" href="assets/css/design-system.css">
+  <link rel="stylesheet" href="/assets/css/frontend-header.css">
 </head>
 <body>
 
-<nav class="navbar navbar-expand-lg nav-glass fixed-top">
-  <div class="container">
-    <a class="navbar-brand fw-bold" href="/">Elevaro</a>
-
-    <div class="ms-auto d-flex align-items-center gap-2">
-      <a href="#showcase" class="btn btn-sm btn-ghost d-none d-md-inline-flex">Beispiele</a>
-      <a href="onboarding.php" class="btn btn-sm btn-light">Quizze finden</a>
-    </div>
-  </div>
-</nav>
+<?php elevaro_frontend_header('glass', ['show_examples' => true]); ?>
 
 <header class="hero">
   <div class="hero-gradient"></div>
@@ -221,5 +212,6 @@
 </footer>
 
 <script src="assets/js/home.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

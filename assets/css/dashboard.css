@@ -1,0 +1,135 @@
+/* Elevaro role dashboards */
+
+:root {
+  --primary: #5a4ff3;
+  --primary-dark: #3429c7;
+  --cyan: #00cec9;
+  --ink: #172033;
+  --muted: #6c7482;
+  --soft: #f4f2ff;
+  --font-body: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 650;
+  letter-spacing: -.015em;
+  background:
+    radial-gradient(circle at 16% 18%, rgba(255,255,255,.5), transparent 20rem),
+    radial-gradient(circle at 82% 12%, rgba(0,206,201,.22), transparent 28rem),
+    radial-gradient(circle at 20% 82%, rgba(253,121,168,.13), transparent 24rem),
+    linear-gradient(135deg, #fff 0%, #f7f6ff 36%, #eefbff 100%);
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  letter-spacing: -.055em;
+  font-weight: 800;
+}
+
+.dashboard-wrap {
+  padding: 4.5rem 0 6rem;
+}
+
+.dashboard-hero,
+.dashboard-card {
+  border: 1px solid rgba(255,255,255,.78);
+  border-radius: 2rem;
+  background: rgba(255,255,255,.88);
+  box-shadow: 0 1.5rem 4rem rgba(23,32,51,.1);
+  backdrop-filter: blur(18px);
+}
+
+.dashboard-hero {
+  padding: 2rem;
+  margin-bottom: 1.25rem;
+}
+
+.dashboard-hero h1 {
+  font-size: clamp(2.3rem, 5vw, 4rem);
+  line-height: .96;
+}
+
+.dashboard-hero p {
+  max-width: 760px;
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1.2fr .8fr;
+  gap: 1rem;
+}
+
+.dashboard-card {
+  padding: 1.5rem;
+}
+
+.dashboard-card h2 {
+  font-size: 1.55rem;
+}
+
+.quick-actions {
+  display: grid;
+  gap: .65rem;
+}
+
+.quick-actions .btn {
+  justify-content: flex-start;
+  border-radius: 1rem;
+  padding: .85rem 1rem;
+  font-weight: 850;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: .8rem;
+}
+
+.stat-tile {
+  border-radius: 1.25rem;
+  padding: 1rem;
+  background: var(--soft);
+}
+
+.stat-tile strong {
+  display: block;
+  font-size: 1.9rem;
+  line-height: 1;
+}
+
+.stat-tile span {
+  color: var(--muted);
+  font-size: .92rem;
+  font-weight: 750;
+}
+
+.placeholder-list {
+  display: grid;
+  gap: .7rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.placeholder-list li {
+  border-radius: 1rem;
+  padding: .85rem 1rem;
+  background: #fff;
+  border: 1px solid rgba(23,32,51,.07);
+  color: var(--muted);
+  font-weight: 750;
+}
+
+@media (max-width: 992px) {
+  .dashboard-grid,
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,126 @@
+/* Elevaro frontend auth header */
+
+.elevaro-topbar {
+  z-index: 1030;
+}
+
+.elevaro-topbar .navbar-brand {
+  font-family: var(--font-display, "Plus Jakarta Sans", "Inter", system-ui, sans-serif);
+  letter-spacing: -.04em;
+  font-weight: 800;
+}
+
+.elevaro-topbar-light {
+  background: rgba(255,255,255,.78);
+  border-bottom: 1px solid rgba(23,32,51,.07);
+  backdrop-filter: blur(18px);
+}
+
+.elevaro-topbar-light .navbar-brand {
+  color: var(--primary, #5a4ff3) !important;
+}
+
+.elevaro-topbar-glass {
+  background: rgba(255,255,255,.12);
+  border-bottom: 1px solid rgba(255,255,255,.18);
+  backdrop-filter: blur(18px);
+}
+
+.elevaro-topbar-glass .navbar-brand {
+  color: #fff !important;
+}
+
+.elevaro-topbar .btn {
+  border-radius: 999px;
+  font-weight: 850;
+  letter-spacing: -.025em;
+}
+
+.elevaro-topbar .btn-ghost {
+  background: rgba(255,255,255,.14);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.16);
+}
+
+.elevaro-topbar .btn-ghost:hover {
+  background: rgba(255,255,255,.22);
+  color: #fff;
+}
+
+.elevaro-user-menu {
+  position: relative;
+}
+
+.elevaro-user-button {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  min-height: 38px;
+  padding: .25rem .6rem .25rem .25rem;
+  border: 1px solid rgba(23,32,51,.08);
+  border-radius: 999px;
+  background: rgba(255,255,255,.84);
+  color: var(--ink, #172033);
+  font-weight: 850;
+  letter-spacing: -.02em;
+  box-shadow: 0 .5rem 1.5rem rgba(23,32,51,.08);
+}
+
+.elevaro-topbar-glass .elevaro-user-button {
+  border-color: rgba(255,255,255,.2);
+  background: rgba(255,255,255,.18);
+  color: #fff;
+  box-shadow: none;
+}
+
+.elevaro-avatar {
+  width: 32px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255,255,255,.75), transparent 1.1rem),
+    linear-gradient(135deg, #5a4ff3, #00cec9);
+  color: #fff;
+  font-size: .78rem;
+  font-weight: 950;
+}
+
+.elevaro-user-name {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.elevaro-user-menu .dropdown-menu {
+  min-width: 240px;
+  border: 1px solid rgba(23,32,51,.08);
+  border-radius: 1.1rem;
+  padding: .55rem;
+  box-shadow: 0 1rem 3rem rgba(23,32,51,.14);
+}
+
+.elevaro-user-menu .dropdown-header {
+  display: grid;
+  gap: .12rem;
+  padding: .65rem .75rem;
+  color: var(--ink, #172033);
+}
+
+.elevaro-user-menu .dropdown-header strong {
+  font-weight: 900;
+}
+
+.elevaro-user-menu .dropdown-header span,
+.elevaro-user-menu .dropdown-header small {
+  color: var(--muted, #6c7482);
+  font-size: .82rem;
+}
+
+.elevaro-user-menu .dropdown-item {
+  border-radius: .75rem;
+  font-weight: 750;
+  padding: .55rem .75rem;
+}

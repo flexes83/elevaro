@@ -1,0 +1,24 @@
+app/includes/frontend_header.php
+No syntax errors detected in /mnt/data/elevaro_frontend_auth_header_work/elevaro_mvp/app/includes/frontend_header.php
+
+student_dashboard.php
+No syntax errors detected in /mnt/data/elevaro_frontend_auth_header_work/elevaro_mvp/student_dashboard.php
+
+teacher_dashboard.php
+No syntax errors detected in /mnt/data/elevaro_frontend_auth_header_work/elevaro_mvp/teacher_dashboard.php
+
+dashboard.php
+No syntax errors detected in /mnt/data/elevaro_frontend_auth_header_work/elevaro_mvp/dashboard.php
+
+account.php
+No syntax errors detected in /mnt/data/elevaro_frontend_auth_header_work/elevaro_mvp/account.php
+
+index.php
+No syntax errors detected in /mnt/data/elevaro_frontend_auth_header_work/elevaro_mvp/index.php
+
+onboarding.php
+No syntax errors detected in /mnt/data/elevaro_frontend_auth_header_work/elevaro_mvp/onboarding.php
+
+recommendations.php
+No syntax errors detected in /mnt/data/elevaro_frontend_auth_header_work/elevaro_mvp/recommendations.php
+
