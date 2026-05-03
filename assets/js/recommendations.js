@@ -119,34 +119,13 @@
   }
 
   function createQuizCard(item) {
-    const card = document.createElement('article');
-    card.className = 'quiz-card recommendation-card';
-    const color1 = item.theme_color_1 || subjectColor(item.subject_code, 0);
-    const color2 = item.theme_color_2 || subjectColor(item.subject_code, 1);
-    const emoji = item.theme_emoji || item.subject_icon || subjectEmoji(item.subject_code);
-    const hasImage = item.image_path && (!item.image_status || item.image_status === 'approved');
-    card.style.setProperty('--card-c1', color1);
-    card.style.setProperty('--card-c2', color2);
-
-    const visual = hasImage
-      ? `<img class="quiz-card-img" src="${escapeAttr(item.image_path)}" alt="">`
-      : `<span class="quiz-card-emoji">${escapeHtml(emoji)}</span>`;
-
-    if (document.getElementById('recommendationsGrid')) {
-      card.innerHTML = `
-        <div class="quiz-card-visual">${visual}<span class="quiz-card-badge">${escapeHtml(item.subject_name || 'Quiz')} · ${escapeHtml(item.tag_names || item.topic_title || 'Lernbereich')}</span></div>
-        <div class="quiz-card-body">
-          <h3>${escapeHtml(item.quiz_title || item.topic_title || 'Quiz')}</h3>
-          <p>${escapeHtml(item.quiz_description || item.topic_description || 'Starte ein kurzes Quiz mit direktem Feedback.')}</p>
-          <div class="quiz-card-footer"><a class="btn btn-primary" href="${quizLink(item.quiz_key)}">Quiz starten</a><span class="quiz-meta">kurz & motivierend</span></div>
-        </div>`;
-    } else {
-      card.innerHTML = `
-        <span class="recommendation-topic">${escapeHtml((item.subject_icon || '') + ' ' + (item.subject_name || 'Quiz'))} · ${escapeHtml(item.tag_names || item.topic_title || 'Lernbereich')}</span>
-        <h3>${escapeHtml(item.quiz_title || item.topic_title || 'Quiz')}</h3>
-        <p>${escapeHtml(item.quiz_description || item.topic_description || 'Ein passendes Quiz für deinen Lernweg.')}</p>
-        <div class="recommendation-actions"><a href="${quizLink(item.quiz_key)}" class="btn btn-primary">Quiz starten</a></div>`;
+    if (window.ElevaroQuizCard && typeof window.ElevaroQuizCard.create === 'function') {
+      return window.ElevaroQuizCard.create(item);
     }
+
+    const card = document.createElement('article');
+    card.className = 'elevaro-quiz-card';
+    card.textContent = item.quiz_title || item.title || 'Quiz';
     return card;
   }
 

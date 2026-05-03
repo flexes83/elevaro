@@ -26,8 +26,8 @@
 
 .elevaro-quiz-card-media {
   position: relative;
-  height: 220px;
-  min-height: 220px;
+  height: 230px;
+  min-height: 230px;
   overflow: hidden;
   display: grid;
   place-items: center;
@@ -73,8 +73,7 @@
   z-index: 2;
   left: 1rem;
   top: 1rem;
-  display: inline-flex;
-  max-width: calc(100% - 6rem);
+  max-width: calc(100% - 6.2rem);
   border-radius: 999px;
   padding: .38rem .7rem;
   background: rgba(255,255,255,.26);
@@ -102,7 +101,7 @@
     conic-gradient(
       #00b894 0deg var(--quiz-donut-green, 0deg),
       #ff7675 var(--quiz-donut-green, 0deg) calc(var(--quiz-donut-green, 0deg) + var(--quiz-donut-red, 0deg)),
-      rgba(255,255,255,.58) calc(var(--quiz-donut-green, 0deg) + var(--quiz-donut-red, 0deg)) 360deg
+      rgba(255,255,255,.62) calc(var(--quiz-donut-green, 0deg) + var(--quiz-donut-red, 0deg)) 360deg
     );
   box-shadow: 0 .7rem 1.4rem rgba(23,32,51,.16);
 }
@@ -117,7 +116,7 @@
 }
 
 .elevaro-quiz-card-donut.is-empty {
-  background: rgba(255,255,255,.6);
+  background: rgba(255,255,255,.62);
 }
 
 .elevaro-quiz-card-donut-label {

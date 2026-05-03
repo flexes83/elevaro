@@ -121,6 +121,7 @@ function curriculum_topics(string $stateCode, string $schoolTypeCode, int $grade
             t.code,
             t.title,
             t.description,
+            q.id AS quiz_id,
             q.quiz_key,
             q.title AS quiz_title
         FROM curriculum_topics t
@@ -366,6 +367,7 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
                     sub.code AS subject_code,
                     sub.name AS subject_name,
                     sub.icon AS subject_icon,
+                    q.id AS quiz_id,
                     q.quiz_key,
                     q.title AS quiz_title,
                     q.description AS quiz_description,
@@ -374,6 +376,7 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
                     q.theme_emoji,
                     q.image_path,
                     q.image_status,
+                    (SELECT COUNT(*) FROM questions qq WHERE qq.quiz_id = q.id AND qq.status IN ('published','draft')) AS question_count,
                     GROUP_CONCAT(DISTINCT tag.name ORDER BY tag.name SEPARATOR ', ') AS tag_names
                 FROM quizzes q
                 JOIN subjects sub ON sub.id = q.subject_id
@@ -428,6 +431,7 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
             sub.code AS subject_code,
             sub.name AS subject_name,
             sub.icon AS subject_icon,
+            q.id AS quiz_id,
             q.quiz_key,
             q.title AS quiz_title,
             q.description AS quiz_description,
@@ -435,7 +439,8 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
             q.theme_color_2,
             q.theme_emoji,
             q.image_path,
-            q.image_status
+            q.image_status,
+                    (SELECT COUNT(*) FROM questions qq WHERE qq.quiz_id = q.id AND qq.status IN ('published','draft')) AS question_count
         FROM curriculum_topics t
         JOIN states s ON s.id = t.state_id
         JOIN school_types st ON st.id = t.school_type_id
@@ -477,6 +482,7 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
                 sub.code AS subject_code,
                 sub.name AS subject_name,
                 sub.icon AS subject_icon,
+                q.id AS quiz_id,
                 q.quiz_key,
                 q.title AS quiz_title,
                 q.description AS quiz_description,
@@ -484,7 +490,8 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
                 q.theme_color_2,
                 q.theme_emoji,
                 q.image_path,
-                q.image_status
+                q.image_status,
+                    (SELECT COUNT(*) FROM questions qq WHERE qq.quiz_id = q.id AND qq.status IN ('published','draft')) AS question_count
             FROM quizzes q
             JOIN subjects sub ON sub.id = q.subject_id
             WHERE sub.code = :subject

@@ -414,3 +414,16 @@ p { color: var(--muted); }
     width: 100%;
   }
 }
+
+
+/* Unified quiz card grid */
+.recommendations-grid.elevaro-quiz-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.15rem;
+}
+@media (max-width: 992px) {
+  .recommendations-grid.elevaro-quiz-grid {
+    grid-template-columns: 1fr;
+  }
+}
