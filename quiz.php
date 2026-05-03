@@ -24,7 +24,7 @@ if (empty($quiz['questions'])) {
   <title><?= htmlspecialchars($quiz['title']) ?> – Elevaro</title>
   <meta name="description" content="<?= htmlspecialchars($quiz['description'] ?? '') ?>">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/quiz.css">
+  <link rel="stylesheet" href="assets/css/quiz.css?v=<?= filemtime(__DIR__ . '/assets/css/quiz.css') ?>">
 
 <link rel="stylesheet" href="assets/css/design-system.css">
 </head>
@@ -125,6 +125,6 @@ window.ELEVARO_QUIZ = {
   questions: <?= json_encode($quiz['questions'], JSON_UNESCAPED_UNICODE) ?>
 };
 </script>
-<script src="assets/js/quiz.js"></script>
+<script src="assets/js/quiz.js?v=<?= filemtime(__DIR__ . '/assets/js/quiz.js') ?>"></script>
 </body>
 </html>

@@ -91,8 +91,12 @@ function elevaro_get_questions_for_quiz(int $quizId, bool $adaptiveOrder = true)
             ],
             'options' => array_map(static function ($option) {
                 return [
-                    'text' => $option['text'],
-                    'media' => $option['media'],
+                    'text' => (string)($option['text'] ?? ''),
+                    'label' => (string)($option['text'] ?? ''),
+                    'media' => $option['media'] ?? ['type' => 'none'],
+                    'media_type' => $option['media']['type'] ?? 'none',
+                    'media_path' => $option['media']['path'] ?? null,
+                    'media_alt' => $option['media']['alt'] ?? null,
                 ];
             }, $options),
             'answer' => $question['correct_answer'],

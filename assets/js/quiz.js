@@ -51,11 +51,88 @@
     renderQuestion();
   }
 
+
+  function normalizeQuestion(question) {
+    const q = question || {};
+    return {
+      ...q,
+      question: getValueText(q.question || q.question_text || q.title || ''),
+      answer: getValueText(q.answer || q.correct_answer || ''),
+      fact: getValueText(q.fact || q.explanation || ''),
+      media: normalizeMedia(q.media),
+      options: Array.isArray(q.options) ? q.options : []
+    };
+  }
+
+  function normalizeOption(option) {
+    if (typeof option === 'string' || typeof option === 'number') {
+      return {
+        text: String(option),
+        media: { type: 'none' }
+      };
+    }
+
+    const obj = option && typeof option === 'object' ? option : {};
+
+    return {
+      text: getValueText(
+        obj.text ??
+        obj.label ??
+        obj.option_text ??
+        obj.answer ??
+        obj.title ??
+        obj.name ??
+        ''
+      ),
+      media: normalizeMedia(obj.media || {
+        type: obj.media_type || 'none',
+        path: obj.media_path || obj.image || obj.path || null,
+        alt: obj.media_alt || obj.alt || obj.label || obj.text || null,
+        credit: obj.media_credit || obj.credit || null,
+        source: obj.media_source || obj.source || null
+      })
+    };
+  }
+
+  function normalizeMedia(media) {
+    if (!media || typeof media !== 'object') {
+      return { type: 'none' };
+    }
+
+    return {
+      type: media.type || media.media_type || 'none',
+      path: media.path || media.media_path || media.image || null,
+      alt: media.alt || media.media_alt || '',
+      credit: media.credit || media.media_credit || '',
+      source: media.source || media.media_source || ''
+    };
+  }
+
+  function getValueText(value) {
+    if (typeof value === 'string' || typeof value === 'number') {
+      return String(value);
+    }
+
+    if (value && typeof value === 'object') {
+      return String(
+        value.text ??
+        value.label ??
+        value.option_text ??
+        value.answer ??
+        value.title ??
+        value.name ??
+        ''
+      );
+    }
+
+    return '';
+  }
+
   function renderQuestion() {
     selected = false;
     questionStartedAt = Date.now();
 
-    const q = questions[index];
+    const q = normalizeQuestion(questions[index]);
 
     questionEl.innerHTML = '';
     const title = document.createElement('span');
@@ -73,9 +150,7 @@
     progressBar.style.width = `${(index / questions.length) * 100}%`;
 
     q.options.forEach(option => {
-      const normalized = typeof option === 'string'
-        ? { text: option, media: { type: 'none' } }
-        : option;
+      const normalized = normalizeOption(option);
 
       const btn = document.createElement('button');
       btn.className = hasImageMedia(normalized.media) ? 'btn answer-btn image-answer-btn' : 'btn btn-outline-primary answer-btn';
