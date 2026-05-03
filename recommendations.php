@@ -15,6 +15,7 @@ require_once __DIR__ . '/app/includes/frontend_header.php';
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="/assets/css/frontend-header.css">
   <link rel="stylesheet" href="/assets/css/recommendations.css">
+  <link rel="stylesheet" href="/assets/css/quiz-card.css">
 </head>
 <body>
 
@@ -73,7 +74,7 @@ require_once __DIR__ . '/app/includes/frontend_header.php';
         <p>Das dauert nur einen Moment.</p>
       </div>
 
-      <div id="recommendationsGrid" class="recommendations-grid d-none"></div>
+      <div id="recommendationsGrid" class="recommendations-grid elevaro-quiz-grid d-none"></div>
 
       <div id="emptyState" class="state-card d-none">
         <div class="state-icon">🧭</div>
@@ -86,6 +87,7 @@ require_once __DIR__ . '/app/includes/frontend_header.php';
   </div>
 </main>
 
+<script src="/assets/js/quiz-card.js"></script>
 <script src="/assets/js/recommendations.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
