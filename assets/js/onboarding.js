@@ -57,9 +57,9 @@
     {
       key: 'topic',
       title: 'Womit willst du starten?',
-      text: 'Wähle einen Lernbereich. Wir nutzen ihn als weichen Filter und zeigen dir passende Quiz-Empfehlungen.',
-      hint: 'Such dir den besten Einstieg aus.',
-      illustration: '🎯',
+      text: 'Wähle ein Thema. Danach zeigen wir dir passende Quiz-Empfehlungen.',
+      hint: 'Bereit für dein erstes Quiz?',
+      illustration: '🚀',
       action: 'topics'
     }
   ];
@@ -174,45 +174,6 @@
     return '';
   }
 
-  function tagsFromTopic(item) {
-    const raw = [
-      item.code,
-      item.title,
-      item.name,
-      item.description,
-      state.values.subject
-    ].filter(Boolean).join(' ').toLowerCase();
-
-    const tags = new Set();
-
-    const rules = [
-      ['karte', ['karte', 'landkarte', 'orientierung', 'himmelsrichtung', 'norden', 'süden', 'osten', 'westen']],
-      ['grundbegriffe', ['grundbegriff', 'begriff', 'kontinent', 'land', 'stadt', 'fluss', 'gebirge']],
-      ['geographie', ['geographie', 'erdkunde', 'geo']],
-      ['grammatik', ['grammatik', 'pronomen', 'demonstrativ', 'simple present', 'verb']],
-      ['englisch', ['englisch', 'english', 'this', 'that', 'these', 'those']],
-      ['arten-erkennen', ['vogel', 'tier', 'pflanze', 'bestimmen', 'erkennen', 'art']],
-      ['bilder', ['bild', 'karte', 'diagramm', 'bestimmen', 'erkennen']]
-    ];
-
-    rules.forEach(([tag, needles]) => {
-      if (needles.some(needle => raw.includes(needle))) {
-        tags.add(tag);
-      }
-    });
-
-    if (item.code) tags.add(String(item.code).toLowerCase());
-    if (state.values.subject) tags.add(String(state.values.subject).toLowerCase());
-
-    return Array.from(tags);
-  }
-
-  function labelForFocus(item, fallbackLabel) {
-    if (!item) return fallbackLabel;
-    return item.group_title || item.title || item.name || fallbackLabel;
-  }
-
-
   async function render() {
     const step = steps[state.step];
 
@@ -262,6 +223,12 @@
     }
   }
 
+  function focusTagsFromArea(item) {
+    if (Array.isArray(item.tags)) return item.tags;
+    if (typeof item.tags === 'string') return item.tags.split(',').map(tag => tag.trim()).filter(Boolean);
+    return [item.code].filter(Boolean);
+  }
+
   function choose(code, label, item) {
     const step = steps[state.step];
 
@@ -269,18 +236,13 @@
     state.labels[step.key] = label;
 
     if (step.key === 'topic') {
-      state.values.focus_tags = tagsFromTopic(item);
-      state.labels.focus = labelForFocus(item, label);
+      state.values.focus_tags = focusTagsFromArea(item);
+      state.labels.focus = label;
     }
 
     for (let i = state.step + 1; i < steps.length; i++) {
       state.values[steps[i].key] = null;
       delete state.labels[steps[i].key];
-    }
-
-    if (step.key !== 'topic') {
-      state.values.focus_tags = [];
-      delete state.labels.focus;
     }
 
     if (state.step < steps.length - 1) {

@@ -153,19 +153,14 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
 
     $tags = array_values(array_filter(array_map(static function ($tag) {
         $tag = trim(mb_strtolower($tag, 'UTF-8'));
-        return preg_replace('/[^a-z0-9äöüß\-]+/iu', '', $tag);
+        $tag = str_replace(['ä','ö','ü','ß'], ['ae','oe','ue','ss'], $tag);
+        $tag = preg_replace('/[^a-z0-9\-]+/', '-', $tag);
+        return trim($tag, '-');
     }, explode(',', (string)$tagsCsv))));
 
-    /*
-     * Tag-based recommendations:
-     * Onboarding chooses a broader learning area. We therefore rank quizzes by tag overlap.
-     * Existing systems without quiz_tags still work because we fall back to topic text matching.
-     */
     if (!empty($tags)) {
         $params = [
-            'state' => $stateCode,
-            'school_type' => $schoolTypeCode,
-            'grade' => $grade
+            'grade' => $grade,
         ];
 
         $subjectWhere = '';
@@ -174,14 +169,12 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
             $params['subject'] = $subjectCode;
         }
 
-        $likeParts = [];
+        $tagPlaceholders = [];
         foreach ($tags as $i => $tag) {
             $key = 'tag_' . $i;
-            $likeParts[] = "LOWER(CONCAT_WS(' ', t.code, t.title, t.description, q.title, q.description, sub.code, sub.name)) LIKE :{$key}";
-            $params[$key] = '%' . $tag . '%';
+            $tagPlaceholders[] = ':' . $key;
+            $params[$key] = $tag;
         }
-
-        $tagWhere = $likeParts ? 'AND (' . implode(' OR ', $likeParts) . ')' : '';
 
         $stmt = $pdo->prepare("
             SELECT DISTINCT
@@ -198,22 +191,21 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
                 q.theme_color_2,
                 q.theme_emoji,
                 q.image_path,
-                q.image_status
-            FROM curriculum_topics t
-            JOIN states s ON s.id = t.state_id
-            JOIN school_types st ON st.id = t.school_type_id
-            JOIN subjects sub ON sub.id = t.subject_id
-            JOIN quiz_topic_map qtm ON qtm.topic_id = t.id
-            JOIN quizzes q
-              ON q.id = qtm.quiz_id
-             AND q.is_active = 1
-             AND (q.status = 'published' OR q.status IS NULL OR q.status = '')
-            WHERE s.code = :state
-              AND st.code = :school_type
-              AND t.grade = :grade
+                q.image_status,
+                GROUP_CONCAT(DISTINCT tag.name ORDER BY tag.name SEPARATOR ', ') AS tag_names
+            FROM quizzes q
+            JOIN subjects sub ON sub.id = q.subject_id
+            LEFT JOIN quiz_topic_map qtm ON qtm.quiz_id = q.id
+            LEFT JOIN curriculum_topics t ON t.id = qtm.topic_id
+            JOIN quiz_tag_map qtag ON qtag.quiz_id = q.id
+            JOIN tags tag ON tag.id = qtag.tag_id
+            WHERE q.grade = :grade
               {$subjectWhere}
-              {$tagWhere}
-            ORDER BY sub.sort_order ASC, t.sort_order ASC, q.title ASC
+              AND q.is_active = 1
+              AND (q.status = 'published' OR q.status IS NULL OR q.status = '')
+              AND tag.slug IN (" . implode(',', $tagPlaceholders) . ")
+            GROUP BY q.id, t.id, sub.id
+            ORDER BY COUNT(DISTINCT tag.id) DESC, q.title ASC
             LIMIT 12
         ");
 
@@ -225,9 +217,6 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
         }
     }
 
-    /*
-     * Exact topic fallback: useful if no tag results exist.
-     */
     $params = [
         'state' => $stateCode,
         'school_type' => $schoolTypeCode,
@@ -261,7 +250,8 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
             q.theme_color_2,
             q.theme_emoji,
             q.image_path,
-            q.image_status
+            q.image_status,
+            GROUP_CONCAT(DISTINCT tag.name ORDER BY tag.name SEPARATOR ', ') AS tag_names
         FROM curriculum_topics t
         JOIN states s ON s.id = t.state_id
         JOIN school_types st ON st.id = t.school_type_id
@@ -271,11 +261,14 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
           ON q.id = qtm.quiz_id
          AND q.is_active = 1
          AND (q.status = 'published' OR q.status IS NULL OR q.status = '')
+        LEFT JOIN quiz_tag_map qtag ON qtag.quiz_id = q.id
+        LEFT JOIN tags tag ON tag.id = qtag.tag_id
         WHERE s.code = :state
           AND st.code = :school_type
           AND t.grade = :grade
           {$subjectWhere}
           {$topicWhere}
+        GROUP BY t.id, q.id, sub.id
         ORDER BY
           CASE WHEN q.quiz_key IS NULL THEN 1 ELSE 0 END,
           sub.sort_order ASC,
@@ -298,9 +291,6 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
         return $items;
     }
 
-    /*
-     * Broad fallback: subject + grade.
-     */
     if ($subjectCode) {
         $stmt = $pdo->prepare("
             SELECT
@@ -317,13 +307,17 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
                 q.theme_color_2,
                 q.theme_emoji,
                 q.image_path,
-                q.image_status
+                q.image_status,
+                GROUP_CONCAT(DISTINCT tag.name ORDER BY tag.name SEPARATOR ', ') AS tag_names
             FROM quizzes q
             JOIN subjects sub ON sub.id = q.subject_id
+            LEFT JOIN quiz_tag_map qtag ON qtag.quiz_id = q.id
+            LEFT JOIN tags tag ON tag.id = qtag.tag_id
             WHERE sub.code = :subject
               AND q.grade = :grade
               AND q.is_active = 1
               AND (q.status = 'published' OR q.status IS NULL OR q.status = '')
+            GROUP BY q.id, sub.id
             ORDER BY q.title ASC
             LIMIT 12
         ");

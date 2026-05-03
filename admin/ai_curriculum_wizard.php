@@ -216,6 +216,7 @@ function createQuizAndQuestionsFromIdea(PDO $pdo, int $quizIdeaId): int
     $pdo->commit();
 
     $questions = generateQuestionsForIdea($idea);
+    saveQuizTags($pdo, $quizId, $questions['tags'] ?? []);
     saveQuestionsAsDraft($pdo, $quizId, $questions['questions']);
 
     return $quizId;
@@ -279,6 +280,20 @@ function generateQuestionsForIdea(array $idea): array
         'type' => 'object',
         'additionalProperties' => false,
         'properties' => [
+            'tags' => [
+                'type' => 'array',
+                'minItems' => 2,
+                'maxItems' => 5,
+                'items' => [
+                    'type' => 'object',
+                    'additionalProperties' => false,
+                    'properties' => [
+                        'slug' => ['type' => 'string'],
+                        'name' => ['type' => 'string']
+                    ],
+                    'required' => ['slug','name']
+                ]
+            ],
             'questions' => [
                 'type' => 'array',
                 'minItems' => 15,
@@ -327,7 +342,7 @@ function generateQuestionsForIdea(array $idea): array
                 ]
             ]
         ],
-        'required' => ['questions']
+        'required' => ['tags','questions']
     ];
 
     $result = elevaro_openai_chat_json([
@@ -367,6 +382,22 @@ Allgemeine Regeln:
 - ungefähr 5 leicht, 6 mittel, 4 schwer.
 - falsche Antworten sollen typische Missverständnisse abbilden.
 
+Tag-Regeln:
+
+- Gib 2–5 abstrakte Tags für das gesamte Quiz zurück.
+- Tags sind breite Lernbereiche, keine einzelne Frage und kein zu enges Detail.
+- Beispiele:
+  → Ornithologie
+  → Vogelarten
+  → Bruchrechnen
+  → Simple Past
+  → Kartenkunde
+  → Demonstrativpronomen
+  → Geometrie
+- slug ist kleingeschrieben, ohne Leerzeichen, mit Bindestrichen, z. B. "simple-past" oder "bruchrechnen".
+- name ist die schöne Anzeigeform, z. B. "Simple Past" oder "Ornithologie".
+- Nutze keine Tags wie "Quiz", "Klasse 5" oder "leicht".
+
 Medien-Regeln:
 
 - Prüfe, ob das Thema visuelles Erkennen erfordert (z. B. Tiere, Pflanzen, Karten, Diagramme, Formen, Objekte).
@@ -388,6 +419,69 @@ Medien-Regeln:
 - Bilder werden später im Admin geprüft, nicht automatisch verwendet.
 ");
 }
+
+
+function saveQuizTags(PDO $pdo, int $quizId, array $tags): void
+{
+    foreach ($tags as $tag) {
+        $name = trim((string)($tag['name'] ?? ''));
+        $slug = trim((string)($tag['slug'] ?? ''));
+
+        if ($name === '' && $slug === '') {
+            continue;
+        }
+
+        if ($slug === '') {
+            $slug = slugify($name);
+        }
+
+        $slug = normalizeTagSlug($slug);
+        if ($slug === '') {
+            continue;
+        }
+
+        if ($name === '') {
+            $name = ucwords(str_replace('-', ' ', $slug));
+        }
+
+        $stmt = $pdo->prepare("
+            INSERT INTO tags (slug, name)
+            VALUES (:slug, :name)
+            ON DUPLICATE KEY UPDATE name = VALUES(name)
+        ");
+        $stmt->execute([
+            'slug' => $slug,
+            'name' => $name,
+        ]);
+
+        $stmt = $pdo->prepare("SELECT id FROM tags WHERE slug = :slug LIMIT 1");
+        $stmt->execute(['slug' => $slug]);
+        $tagId = (int)$stmt->fetchColumn();
+
+        if (!$tagId) {
+            continue;
+        }
+
+        $stmt = $pdo->prepare("
+            INSERT IGNORE INTO quiz_tag_map (quiz_id, tag_id)
+            VALUES (:quiz_id, :tag_id)
+        ");
+        $stmt->execute([
+            'quiz_id' => $quizId,
+            'tag_id' => $tagId,
+        ]);
+    }
+}
+
+function normalizeTagSlug(string $slug): string
+{
+    $slug = mb_strtolower($slug, 'UTF-8');
+    $slug = str_replace(['ä','ö','ü','ß'], ['ae','oe','ue','ss'], $slug);
+    $slug = preg_replace('/[^a-z0-9]+/', '-', $slug);
+    $slug = trim($slug, '-');
+    return mb_substr($slug, 0, 120, 'UTF-8');
+}
+
 
 function saveQuestionsAsDraft(PDO $pdo, int $quizId, array $questions): void
 {
@@ -659,8 +753,6 @@ function h($value): string
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="assets/ai_wizard.css" rel="stylesheet">
-
-<link rel="stylesheet" href="../assets/css/design-system.css">
 </head>
 <body class="p-4">
   <div class="container admin-shell">
