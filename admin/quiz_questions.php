@@ -293,6 +293,7 @@ admin_header('Fragen Review', $quiz['title']);
 ?>
 <div class="mb-3 d-flex gap-2 flex-wrap">
   <a class="btn btn-outline-primary btn-sm" href="quiz_audio.php?quiz_id=<?= (int)$quizId ?>">🔊 Listening-Intro</a>
+  <a class="btn btn-outline-success btn-sm" href="quiz_listening.php?quiz_id=<?= (int)$quizId ?>">🎧 Listening-Quiz</a>
   <a class="btn btn-outline-secondary btn-sm" href="quiz_visuals.php?quiz_id=<?= (int)$quizId ?>">🎨 Quiz-Bild</a>
 </div>
 
@@ -311,6 +312,7 @@ admin_header('Fragen Review', $quiz['title']);
     <div class="d-flex gap-2 align-items-start flex-wrap">
       <a class="btn btn-outline-primary" href="quiz_ai_generate.php?quiz_id=<?=$quizId?>">✨ Fragen generieren</a>
       <a class="btn btn-outline-secondary" href="quiz_visuals.php?quiz_id=<?=$quizId?>">🎨 Visuals</a>
+      <a class="btn btn-outline-success" href="quiz_listening.php?quiz_id=<?=$quizId?>">🎧 Listening</a>
       <a class="btn btn-light" target="_blank" href="../quiz.php?key=<?=admin_h($quiz['quiz_key'])?>">Vorschau</a>
     </div>
   </div>

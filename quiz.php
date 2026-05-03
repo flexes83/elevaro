@@ -55,6 +55,10 @@ $requiresIntroAudio = !empty($quiz['requires_intro_audio']);
 $introAudioPath = trim((string)($quiz['intro_audio_path'] ?? ''));
 $introAudioText = trim((string)($quiz['intro_audio_text'] ?? ''));
 $hasIntroAudio = $requiresIntroAudio && $introAudioPath !== '';
+$listeningMode = !empty($quiz['listening_mode']);
+$listeningText = trim((string)($quiz['listening_text'] ?? ''));
+$listeningAudioPath = trim((string)($quiz['listening_audio_path'] ?? ''));
+$hasListeningAudio = $listeningMode && $listeningAudioPath !== '';
 ?>
 <!DOCTYPE html>
 <html lang="de">
@@ -150,8 +154,26 @@ $hasIntroAudio = $requiresIntroAudio && $introAudioPath !== '';
             </div>
           <?php endif; ?>
 
+          <?php if ($listeningMode): ?>
+            <div id="listeningComprehensionBox" class="listening-comprehension-box <?= $hasListeningAudio ? '' : 'is-missing' ?>">
+              <div class="listening-comprehension-icon">🎧</div>
+              <div>
+                <strong>Listening-Comprehension</strong>
+                <p>
+                  Hör dir den vollständigen Infotext aufmerksam an. Die Fragen beziehen sich danach auf genau diesen Text.
+                  <?php if (!$hasListeningAudio): ?>
+                    <br><span>Audio wurde noch nicht generiert.</span>
+                  <?php endif; ?>
+                </p>
+                <?php if ($hasListeningAudio): ?>
+                  <audio id="listeningComprehensionAudio" controls preload="metadata" src="<?= qh($listeningAudioPath) ?>"></audio>
+                <?php endif; ?>
+              </div>
+            </div>
+          <?php endif; ?>
+
           <div class="quiz-intro-actions">
-            <button id="startBtn" class="btn btn-primary btn-lg" <?= $hasIntroAudio ? 'disabled' : '' ?>><?= $hasIntroAudio ? 'Audio zuerst anhören' : 'Quiz starten' ?></button>
+            <button id="startBtn" class="btn btn-primary btn-lg" <?= ($hasIntroAudio || $hasListeningAudio) ? 'disabled' : '' ?>><?= ($hasIntroAudio || $hasListeningAudio) ? 'Audio zuerst anhören' : 'Quiz starten' ?></button>
             <span class="quiz-progress-text">
               <?= $played ? qh($passed . ' von ' . $total . ' bestanden') : qh($total . ' Fragen') ?>
             </span>
@@ -236,7 +258,10 @@ window.ELEVARO_QUIZ = {
   emoji: <?= json_encode($introEmoji, JSON_UNESCAPED_UNICODE) ?>,
   requiresIntroAudio: <?= $requiresIntroAudio ? 'true' : 'false' ?>,
   hasIntroAudio: <?= $hasIntroAudio ? 'true' : 'false' ?>,
-  introAudioPath: <?= json_encode($introAudioPath, JSON_UNESCAPED_UNICODE) ?>
+  introAudioPath: <?= json_encode($introAudioPath, JSON_UNESCAPED_UNICODE) ?>,
+  listeningMode: <?= $listeningMode ? 'true' : 'false' ?>,
+  hasListeningAudio: <?= $hasListeningAudio ? 'true' : 'false' ?>,
+  listeningAudioPath: <?= json_encode($listeningAudioPath, JSON_UNESCAPED_UNICODE) ?>
 };
 </script>
 <script src="assets/js/quiz.js?v=<?= filemtime(__DIR__ . '/assets/js/quiz.js') ?>"></script>

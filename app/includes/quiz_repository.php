@@ -208,6 +208,8 @@ function elevaro_get_questions_for_quiz(int $quizId, bool $adaptiveOrder = true)
             'answer' => $question['correct_answer'],
             'fact' => $question['explanation'],
             'difficulty' => (float)$question['difficulty'],
+            'source_context' => $question['source_context'] ?? 'general',
+            'source_excerpt' => $question['source_excerpt'] ?? null,
         ];
     }
 

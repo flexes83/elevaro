@@ -22,6 +22,8 @@
 
   const startBtn = document.getElementById('startBtn');
   const introAudio = document.getElementById('introAudio');
+  const listeningComprehensionAudio = document.getElementById('listeningComprehensionAudio');
+  const listeningComprehensionBox = document.getElementById('listeningComprehensionBox');
   const listeningIntroBox = document.getElementById('listeningIntroBox');
   const nextBtn = document.getElementById('nextBtn');
   const restartBtn = document.getElementById('restartBtn');
@@ -69,6 +71,34 @@
       if (listeningIntroBox) {
         listeningIntroBox.classList.remove('is-playing');
       }
+    });
+  }
+
+
+  function setupListeningComprehensionGate() {
+    if (!window.ELEVARO_QUIZ.listeningMode || !listeningComprehensionAudio || !startBtn) {
+      return;
+    }
+
+    startBtn.disabled = true;
+    startBtn.textContent = 'Hörtext zuerst anhören';
+    startBtn.classList.add('is-audio-locked');
+
+    const unlock = () => {
+      startBtn.disabled = false;
+      startBtn.textContent = 'Quiz starten';
+      startBtn.classList.remove('is-audio-locked');
+      if (listeningComprehensionBox) {
+        listeningComprehensionBox.classList.add('is-complete');
+      }
+    };
+
+    listeningComprehensionAudio.addEventListener('ended', unlock);
+    listeningComprehensionAudio.addEventListener('play', () => {
+      if (listeningComprehensionBox) listeningComprehensionBox.classList.add('is-playing');
+    });
+    listeningComprehensionAudio.addEventListener('pause', () => {
+      if (listeningComprehensionBox) listeningComprehensionBox.classList.remove('is-playing');
     });
   }
 
@@ -559,6 +589,7 @@
   }
 
   setupIntroAudioGate();
+  setupListeningComprehensionGate();
 
   startBtn.addEventListener('click', () => startQuiz(false));
 
