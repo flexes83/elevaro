@@ -51,6 +51,10 @@ $gradeLabel = !empty($quiz['grade']) ? ((int)$quiz['grade'] . '. Klasse') : '';
 $stateLabel = $quiz['state_name'] ?? '';
 $learningGoal = $quiz['learning_goal'] ?: ($quiz['topic_description'] ?? '');
 $introEmoji = $quiz['theme_emoji'] ?? $quiz['subject_icon'] ?? '🎯';
+$requiresIntroAudio = !empty($quiz['requires_intro_audio']);
+$introAudioPath = trim((string)($quiz['intro_audio_path'] ?? ''));
+$introAudioText = trim((string)($quiz['intro_audio_text'] ?? ''));
+$hasIntroAudio = $requiresIntroAudio && $introAudioPath !== '';
 ?>
 <!DOCTYPE html>
 <html lang="de">
@@ -128,8 +132,26 @@ $introEmoji = $quiz['theme_emoji'] ?? $quiz['subject_icon'] ?? '🎯';
             </div>
           <?php endif; ?>
 
+          <?php if ($requiresIntroAudio): ?>
+            <div id="listeningIntroBox" class="listening-intro-box <?= $hasIntroAudio ? '' : 'is-missing' ?>">
+              <div class="listening-intro-icon">🔊</div>
+              <div>
+                <strong>Listening-Intro</strong>
+                <p>
+                  Hör dir den Text aufmerksam an. Danach kannst du das Quiz starten.
+                  <?php if (!$hasIntroAudio): ?>
+                    <br><span>Audio wurde noch nicht generiert.</span>
+                  <?php endif; ?>
+                </p>
+                <?php if ($hasIntroAudio): ?>
+                  <audio id="introAudio" controls preload="metadata" src="<?= qh($introAudioPath) ?>"></audio>
+                <?php endif; ?>
+              </div>
+            </div>
+          <?php endif; ?>
+
           <div class="quiz-intro-actions">
-            <button id="startBtn" class="btn btn-primary btn-lg">Quiz starten</button>
+            <button id="startBtn" class="btn btn-primary btn-lg" <?= $hasIntroAudio ? 'disabled' : '' ?>><?= $hasIntroAudio ? 'Audio zuerst anhören' : 'Quiz starten' ?></button>
             <span class="quiz-progress-text">
               <?= $played ? qh($passed . ' von ' . $total . ' bestanden') : qh($total . ' Fragen') ?>
             </span>
@@ -211,7 +233,10 @@ window.ELEVARO_QUIZ = {
   questions: <?= json_encode($quiz['questions'], JSON_UNESCAPED_UNICODE) ?>,
   imagePath: <?= json_encode($imagePath, JSON_UNESCAPED_UNICODE) ?>,
   hasImage: <?= $hasImage ? 'true' : 'false' ?>,
-  emoji: <?= json_encode($introEmoji, JSON_UNESCAPED_UNICODE) ?>
+  emoji: <?= json_encode($introEmoji, JSON_UNESCAPED_UNICODE) ?>,
+  requiresIntroAudio: <?= $requiresIntroAudio ? 'true' : 'false' ?>,
+  hasIntroAudio: <?= $hasIntroAudio ? 'true' : 'false' ?>,
+  introAudioPath: <?= json_encode($introAudioPath, JSON_UNESCAPED_UNICODE) ?>
 };
 </script>
 <script src="assets/js/quiz.js?v=<?= filemtime(__DIR__ . '/assets/js/quiz.js') ?>"></script>

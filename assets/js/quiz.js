@@ -21,6 +21,8 @@
   const resultCard = document.getElementById('resultCard');
 
   const startBtn = document.getElementById('startBtn');
+  const introAudio = document.getElementById('introAudio');
+  const listeningIntroBox = document.getElementById('listeningIntroBox');
   const nextBtn = document.getElementById('nextBtn');
   const restartBtn = document.getElementById('restartBtn');
   const weakBtn = document.getElementById('weakBtn');
@@ -39,6 +41,36 @@
   const weakBox = document.getElementById('weakBox');
   const weakList = document.getElementById('weakList');
   const resultPanda = document.getElementById('resultPanda');
+
+  function setupIntroAudioGate() {
+    if (!window.ELEVARO_QUIZ.requiresIntroAudio || !introAudio || !startBtn) {
+      return;
+    }
+
+    startBtn.disabled = true;
+    startBtn.classList.add('is-audio-locked');
+
+    const unlock = () => {
+      startBtn.disabled = false;
+      startBtn.textContent = 'Quiz starten';
+      startBtn.classList.remove('is-audio-locked');
+      if (listeningIntroBox) {
+        listeningIntroBox.classList.add('is-complete');
+      }
+    };
+
+    introAudio.addEventListener('ended', unlock);
+    introAudio.addEventListener('play', () => {
+      if (listeningIntroBox) {
+        listeningIntroBox.classList.add('is-playing');
+      }
+    });
+    introAudio.addEventListener('pause', () => {
+      if (listeningIntroBox) {
+        listeningIntroBox.classList.remove('is-playing');
+      }
+    });
+  }
 
   function startQuiz(useWeak = false) {
     questions = useWeak ? [...weakQuestions] : [...originalQuestions];
@@ -74,6 +106,7 @@
       answer: getValueText(q.answer || q.correct_answer || ''),
       fact: getValueText(q.fact || q.explanation || ''),
       media: normalizeMedia(q.media),
+      audio: normalizeAudio(q.audio),
       options: Array.isArray(q.options) ? q.options : []
     };
   }
@@ -105,6 +138,18 @@
         credit: obj.media_credit || obj.credit || null,
         source: obj.media_source || obj.source || null
       })
+    };
+  }
+
+  function normalizeAudio(audio) {
+    if (!audio || typeof audio !== 'object') {
+      return { path: null, text: null, status: 'none' };
+    }
+
+    return {
+      path: audio.path || audio.audio_path || null,
+      text: audio.text || audio.audio_text || null,
+      status: audio.status || audio.audio_status || 'none'
     };
   }
 
@@ -157,6 +202,7 @@
     questionEl.appendChild(title);
 
     renderQuestionMedia(q);
+    renderQuestionAudio(q);
 
     answersEl.innerHTML = '';
     feedbackEl.classList.add('d-none');
@@ -188,6 +234,29 @@
       btn.addEventListener('click', () => selectAnswer(btn, normalized.text, q));
       answersEl.appendChild(btn);
     });
+  }
+
+  function renderQuestionAudio(question) {
+    const existing = document.getElementById('questionListeningBox');
+    if (existing) existing.remove();
+
+    if (question.type !== 'listening_mc' || !question.audio || !question.audio.path) {
+      return;
+    }
+
+    const box = document.createElement('div');
+    box.id = 'questionListeningBox';
+    box.className = 'question-listening-box';
+    box.innerHTML = `
+      <div class="question-listening-icon">🔊</div>
+      <div>
+        <strong>Hör genau hin</strong>
+        <p>Spiele den Hörtext ab und wähle dann die passende Antwort.</p>
+        <audio controls preload="metadata" src="${escapeAttribute(question.audio.path)}"></audio>
+      </div>
+    `;
+
+    questionEl.insertAdjacentElement('afterend', box);
   }
 
   function renderQuestionMedia(question) {
@@ -488,6 +557,8 @@
   function escapeAttribute(str) {
     return escapeHtml(str).replace(/`/g, '&#096;');
   }
+
+  setupIntroAudioGate();
 
   startBtn.addEventListener('click', () => startQuiz(false));
 

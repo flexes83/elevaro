@@ -188,6 +188,13 @@ function elevaro_get_questions_for_quiz(int $quizId, bool $adaptiveOrder = true)
                 'credit' => $question['media_credit'] ?? null,
                 'source' => $question['media_source'] ?? null,
             ],
+            'audio' => [
+                'text' => $question['audio_text'] ?? null,
+                'path' => $question['audio_path'] ?? null,
+                'voice_id' => $question['audio_voice_id'] ?? null,
+                'model_id' => $question['audio_model_id'] ?? null,
+                'status' => $question['audio_status'] ?? 'none',
+            ],
             'options' => array_map(static function ($option) {
                 return [
                     'text' => (string)($option['text'] ?? ''),

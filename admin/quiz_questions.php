@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/../app/includes/image_tools.php';
+require_once __DIR__ . '/../app/includes/elevenlabs_client.php';
+require_once __DIR__ . '/../app/includes/listening_question_ai.php';
 
 $pdo = admin_db();
 $quizId = (int)($_GET['quiz_id'] ?? 0);
@@ -22,6 +24,26 @@ function admin_load_option(PDO $pdo, int $optionId): ?array
     $stmt = $pdo->prepare("SELECT * FROM question_options WHERE id = :id LIMIT 1");
     $stmt->execute(['id' => $optionId]);
     return $stmt->fetch() ?: null;
+}
+
+function admin_load_options_for_question(PDO $pdo, int $questionId): array
+{
+    $stmt = $pdo->prepare("SELECT * FROM question_options WHERE question_id = :id ORDER BY sort_order, id");
+    $stmt->execute(['id' => $questionId]);
+    return $stmt->fetchAll();
+}
+
+function admin_question_audio_columns_ready(PDO $pdo): bool
+{
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*)
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'questions'
+          AND COLUMN_NAME IN ('audio_text','audio_path','audio_status')
+    ");
+    $stmt->execute();
+    return (int)$stmt->fetchColumn() >= 3;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -60,6 +82,98 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+
+    if ($action === 'generate_question_audio_text') {
+        $questionId = (int)($_POST['question_id'] ?? 0);
+        $question = admin_load_question($pdo, $questionId);
+        if ($question && admin_question_audio_columns_ready($pdo)) {
+            $opts = admin_load_options_for_question($pdo, $questionId);
+            $text = elevaro_generate_listening_question_text($quiz ?? [], $question, $opts);
+            $pdo->prepare("
+                UPDATE questions
+                SET type = 'listening_mc',
+                    audio_text = :audio_text,
+                    audio_status = 'draft'
+                WHERE id = :id
+            ")->execute([
+                'audio_text' => $text,
+                'id' => $questionId,
+            ]);
+        }
+        header('Location: quiz_questions.php?quiz_id=' . $quizId . '&audio_text_generated=1');
+        exit;
+    }
+
+    if ($action === 'generate_question_audio') {
+        $questionId = (int)($_POST['question_id'] ?? 0);
+        $question = admin_load_question($pdo, $questionId);
+        if ($question && admin_question_audio_columns_ready($pdo)) {
+            $text = trim((string)($question['audio_text'] ?? ''));
+            if ($text === '') {
+                $text = trim((string)($question['question_text'] ?? ''));
+            }
+
+            $voiceId = trim((string)($question['audio_voice_id'] ?? '')) ?: elevaro_resolve_voice_for_quiz_question($quiz ?? [], $question);
+            $modelId = trim((string)($question['audio_model_id'] ?? '')) ?: null;
+            $generated = elevaro_generate_question_audio_file($text, $questionId, $voiceId, $modelId);
+
+            $pdo->prepare("
+                UPDATE questions
+                SET type = 'listening_mc',
+                    audio_text = :audio_text,
+                    audio_path = :audio_path,
+                    audio_voice_id = :audio_voice_id,
+                    audio_model_id = :audio_model_id,
+                    audio_status = 'generated',
+                    audio_error = NULL,
+                    audio_generated_at = NOW()
+                WHERE id = :id
+            ")->execute([
+                'audio_text' => $text,
+                'audio_path' => $generated['path'],
+                'audio_voice_id' => $generated['voice_id'],
+                'audio_model_id' => $generated['model_id'],
+                'id' => $questionId,
+            ]);
+
+            try {
+                $pdo->prepare("
+                    INSERT INTO audio_generation_events
+                      (quiz_id, question_id, provider, voice_id, model_id, characters_used, audio_path, status)
+                    VALUES
+                      (:quiz_id, :question_id, 'elevenlabs', :voice_id, :model_id, :characters_used, :audio_path, 'success')
+                ")->execute([
+                    'quiz_id' => $quizId,
+                    'question_id' => $questionId,
+                    'voice_id' => $generated['voice_id'],
+                    'model_id' => $generated['model_id'],
+                    'characters_used' => $generated['characters_used'],
+                    'audio_path' => $generated['path'],
+                ]);
+            } catch (Throwable $ignore) {}
+        }
+        header('Location: quiz_questions.php?quiz_id=' . $quizId . '&audio_generated=1');
+        exit;
+    }
+
+    if ($action === 'clear_question_audio') {
+        $questionId = (int)($_POST['question_id'] ?? 0);
+        if ($questionId && admin_question_audio_columns_ready($pdo)) {
+            $pdo->prepare("
+                UPDATE questions
+                SET type = 'mc',
+                    audio_text = NULL,
+                    audio_path = NULL,
+                    audio_status = 'none',
+                    audio_error = NULL,
+                    audio_generated_at = NULL
+                WHERE id = :id
+            ")->execute(['id' => $questionId]);
+        }
+        header('Location: quiz_questions.php?quiz_id=' . $quizId . '&audio_cleared=1');
+        exit;
+    }
+
     foreach ($_POST['questions'] ?? [] as $qid => $d) {
         $pdo->prepare("
             UPDATE questions
@@ -89,6 +203,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'st' => $d['status'] ?? 'draft',
             'id' => (int)$qid,
         ]);
+
+        if (admin_question_audio_columns_ready($pdo)) {
+            $pdo->prepare("
+                UPDATE questions
+                SET type = :type,
+                    audio_text = :audio_text,
+                    audio_path = :audio_path,
+                    audio_voice_id = :audio_voice_id,
+                    audio_model_id = :audio_model_id,
+                    audio_status = :audio_status
+                WHERE id = :id
+            ")->execute([
+                'type' => $d['type'] ?? 'mc',
+                'audio_text' => trim($d['audio_text'] ?? '') ?: null,
+                'audio_path' => trim($d['audio_path'] ?? '') ?: null,
+                'audio_voice_id' => trim($d['audio_voice_id'] ?? '') ?: null,
+                'audio_model_id' => trim($d['audio_model_id'] ?? '') ?: null,
+                'audio_status' => trim($d['audio_path'] ?? '') ? 'generated' : (trim($d['audio_text'] ?? '') ? 'draft' : 'none'),
+                'id' => (int)$qid,
+            ]);
+        }
 
         foreach ($d['options'] ?? [] as $oid => $od) {
             $txt = $od['option_text'] ?? '';
@@ -156,6 +291,11 @@ function media_label(?string $value): string
 
 admin_header('Fragen Review', $quiz['title']);
 ?>
+<div class="mb-3 d-flex gap-2 flex-wrap">
+  <a class="btn btn-outline-primary btn-sm" href="quiz_audio.php?quiz_id=<?= (int)$quizId ?>">🔊 Listening-Intro</a>
+  <a class="btn btn-outline-secondary btn-sm" href="quiz_visuals.php?quiz_id=<?= (int)$quizId ?>">🎨 Quiz-Bild</a>
+</div>
+
 <?php if(isset($_GET['saved'])): ?><div class="alert alert-success">Gespeichert.</div><?php endif; ?>
 <?php if(isset($_GET['ai_generated'])): ?><div class="alert alert-info">KI-Fragen wurden als Entwurf gespeichert. Bitte prüfen und veröffentlichen.</div><?php endif; ?>
 <?php if(isset($_GET['published'])): ?><div class="alert alert-success">Quiz veröffentlicht.</div><?php endif; ?>
@@ -188,8 +328,54 @@ admin_header('Fragen Review', $quiz['title']);
       <small class="text-muted"><?= (int)($q['times_correct']??0)?> richtig / <?= (int)($q['times_wrong']??0)?> falsch · Schwierigkeit <?=admin_h($q['calculated_difficulty']??$q['difficulty_calculated'])?></small>
     </div>
 
+    <div class="row g-2 mt-3">
+      <div class="col-md-4">
+        <label class="form-label fw-bold">Fragetyp</label>
+        <select class="form-select" name="questions[<?=(int)$q['id']?>][type]">
+          <option value="mc" <?=($q['type']??'mc')==='mc'?'selected':''?>>Multiple Choice</option>
+          <option value="listening_mc" <?=($q['type']??'mc')==='listening_mc'?'selected':''?>>Listening MC</option>
+        </select>
+      </div>
+    </div>
+
     <label class="form-label fw-bold mt-3">Frage</label>
     <textarea class="form-control mb-3" name="questions[<?=(int)$q['id']?>][question_text]"><?=admin_h($q['question_text'])?></textarea>
+
+    <div class="border rounded p-3 mb-3 bg-white">
+      <h6 class="fw-bold">Listening zur Frage</h6>
+      <?php if(!admin_question_audio_columns_ready($pdo)): ?>
+        <div class="alert alert-warning py-2">Bitte zuerst <code>database/schema_audio_v82_listening_questions.sql</code> ausführen.</div>
+      <?php else: ?>
+        <label class="form-label">Hörtext</label>
+        <textarea class="form-control mb-2" rows="3" name="questions[<?=(int)$q['id']?>][audio_text]" placeholder="Text, der vorgelesen werden soll"><?=admin_h($q['audio_text'] ?? '')?></textarea>
+        <div class="row g-2">
+          <div class="col-md-6">
+            <label class="form-label">Audio-Pfad</label>
+            <input class="form-control" name="questions[<?=(int)$q['id']?>][audio_path]" value="<?=admin_h($q['audio_path'] ?? '')?>">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Voice-ID</label>
+            <input class="form-control" name="questions[<?=(int)$q['id']?>][audio_voice_id]" value="<?=admin_h($q['audio_voice_id'] ?? '')?>">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Model-ID</label>
+            <input class="form-control" name="questions[<?=(int)$q['id']?>][audio_model_id]" value="<?=admin_h($q['audio_model_id'] ?? '')?>">
+          </div>
+        </div>
+
+        <?php if(!empty($q['audio_path'])): ?>
+          <audio class="w-100 mt-2" controls src="<?=admin_h($q['audio_path'])?>"></audio>
+        <?php endif; ?>
+
+        <div class="d-flex gap-2 mt-3 flex-wrap">
+          <button class="btn btn-sm btn-outline-primary" name="action" value="generate_question_audio_text" type="submit" onclick="this.form.question_id.value='<?=(int)$q['id']?>'">✨ Hörtext generieren</button>
+          <button class="btn btn-sm btn-success" name="action" value="generate_question_audio" type="submit" onclick="this.form.question_id.value='<?=(int)$q['id']?>'">🔊 Audio generieren</button>
+          <?php if(!empty($q['audio_path']) || !empty($q['audio_text'])): ?>
+            <button class="btn btn-sm btn-outline-danger" name="action" value="clear_question_audio" type="submit" onclick="this.form.question_id.value='<?=(int)$q['id']?>'">Audio entfernen</button>
+          <?php endif; ?>
+        </div>
+      <?php endif; ?>
+    </div>
 
     <div class="border rounded p-3 mb-3 bg-light">
       <h6 class="fw-bold">Medien zur Frage</h6>
