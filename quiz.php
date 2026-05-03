@@ -15,18 +15,54 @@ if (empty($quiz['questions'])) {
     echo 'Dieses Quiz enthält noch keine veröffentlichten Fragen.';
     exit;
 }
+
+function qh($value): string
+{
+    return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
+}
+
+$tags = array_filter(array_map('trim', explode(',', (string)($quiz['tag_names'] ?? ''))));
+
+$imagePath = trim((string)($quiz['image_path'] ?? ''));
+$imageStatus = strtolower((string)($quiz['image_status'] ?? ''));
+$visibleStatuses = ['', 'draft', 'approved', 'generated', 'selected', 'active'];
+$hasImage = $imagePath !== '' && in_array($imageStatus, $visibleStatuses, true);
+
+$progress = $quiz['progress'] ?? [
+    'total' => count($quiz['questions']),
+    'passed' => 0,
+    'failed' => 0,
+    'unanswered' => count($quiz['questions']),
+    'attempted' => 0,
+    'played' => false,
+];
+
+$total = max((int)($progress['total'] ?? count($quiz['questions'])), 0);
+$passed = (int)($progress['passed'] ?? 0);
+$failed = (int)($progress['failed'] ?? 0);
+$greenDeg = $total > 0 ? ($passed / $total) * 360 : 0;
+$redDeg = $total > 0 ? ($failed / $total) * 360 : 0;
+$played = !empty($progress['played']);
+$percent = $total > 0 ? round(($passed / $total) * 100) : 0;
+
+$subjectLabel = $quiz['subject_name'] ?? '';
+$schoolLabel = $quiz['school_type_name'] ?? '';
+$gradeLabel = !empty($quiz['grade']) ? ((int)$quiz['grade'] . '. Klasse') : '';
+$stateLabel = $quiz['state_name'] ?? '';
+$learningGoal = $quiz['learning_goal'] ?: ($quiz['topic_description'] ?? '');
+$introEmoji = $quiz['theme_emoji'] ?? $quiz['subject_icon'] ?? '🎯';
 ?>
 <!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><?= htmlspecialchars($quiz['title']) ?> – Elevaro</title>
-  <meta name="description" content="<?= htmlspecialchars($quiz['description'] ?? '') ?>">
+  <title><?= qh($quiz['title']) ?> – Elevaro</title>
+  <meta name="description" content="<?= qh($quiz['description'] ?? '') ?>">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/quiz.css">
-
-<link rel="stylesheet" href="assets/css/design-system.css">
+  <link rel="stylesheet" href="assets/css/quiz.css?v=<?= filemtime(__DIR__ . '/assets/css/quiz.css') ?>">
+  <link rel="stylesheet" href="assets/css/design-system.css">
 </head>
 <body class="quiz-page">
 
@@ -46,23 +82,65 @@ if (empty($quiz['questions'])) {
 
       <div class="quiz-header mb-4">
         <span class="quiz-eyebrow">Quiz</span>
-        <h1 class="fw-bold mb-2"><?= htmlspecialchars($quiz['title']) ?></h1>
-        <p class="text-muted mb-0"><?= htmlspecialchars($quiz['description'] ?? '') ?></p>
+        <h1 class="fw-bold mb-2"><?= qh($quiz['title']) ?></h1>
+        <p class="text-muted mb-0"><?= qh($quiz['description'] ?? '') ?></p>
       </div>
 
-      <div id="introCard" class="quiz-card">
-        <div class="row align-items-center g-4">
-          <div class="col-md-4 text-center">
-            <div class="quiz-panda">🐼</div>
+      <div id="introCard" class="quiz-intro-card">
+        <div class="quiz-intro-media <?= $hasImage ? 'has-image' : '' ?>">
+          <?php if ($hasImage): ?>
+            <img src="<?= qh($imagePath) ?>" alt="">
+          <?php else: ?>
+            <span><?= qh($introEmoji) ?></span>
+          <?php endif; ?>
+
+          <div class="quiz-intro-donut <?= $played ? '' : 'is-empty' ?>"
+               style="--quiz-green: <?= qh((string)$greenDeg) ?>deg; --quiz-red: <?= qh((string)$redDeg) ?>deg;"
+               title="<?= $played ? qh($passed . ' bestanden, ' . $failed . ' nachzuarbeiten') : 'Noch nicht gespielt' ?>">
+            <span><?= $played ? qh($percent . '%') : '' ?></span>
           </div>
-          <div class="col-md-8">
-            <h2 class="h3 fw-bold">Bereit?</h2>
-            <p class="text-muted">
-              Du startest mit den leichteren Fragen. Je besser Elevaro deine Antworten kennenlernt,
-              desto smarter können später passende Fragen vorgeschlagen werden.
-            </p>
+        </div>
+
+        <div class="quiz-intro-content">
+          <div class="quiz-meta-row">
+            <?php if ($subjectLabel): ?><span><?= qh($subjectLabel) ?></span><?php endif; ?>
+            <?php if ($gradeLabel): ?><span><?= qh($gradeLabel) ?></span><?php endif; ?>
+            <?php if ($schoolLabel): ?><span><?= qh($schoolLabel) ?></span><?php endif; ?>
+            <?php if ($stateLabel): ?><span><?= qh($stateLabel) ?></span><?php endif; ?>
+          </div>
+
+          <h2>Bereit?</h2>
+
+          <?php if ($learningGoal): ?>
+            <p class="quiz-learning-goal"><strong>Lernziel:</strong> <?= qh($learningGoal) ?></p>
+          <?php endif; ?>
+
+          <p>
+            Du startest mit leichteren Fragen. Je besser Elevaro deine Antworten kennenlernt,
+            desto smarter können später passende Fragen vorgeschlagen werden.
+          </p>
+
+          <?php if ($tags): ?>
+            <div class="quiz-tags">
+              <?php foreach (array_slice($tags, 0, 6) as $tag): ?>
+                <span><?= qh($tag) ?></span>
+              <?php endforeach; ?>
+            </div>
+          <?php endif; ?>
+
+          <div class="quiz-intro-actions">
             <button id="startBtn" class="btn btn-primary btn-lg">Quiz starten</button>
+            <span class="quiz-progress-text">
+              <?= $played ? qh($passed . ' von ' . $total . ' bestanden') : qh($total . ' Fragen') ?>
+            </span>
           </div>
+        </div>
+      </div>
+
+      <div class="quiz-highscore-placeholder">
+        <div>
+          <strong>Highscores</strong>
+          <span>Kommt später: Klassenranglisten, Bestzeiten und Serien.</span>
         </div>
       </div>
 
@@ -81,7 +159,7 @@ if (empty($quiz['questions'])) {
       </div>
 
       <div id="resultCard" class="quiz-card d-none text-center">
-        <div id="resultPanda" class="quiz-panda small-panda mb-3">🐼</div>
+        <div id="resultPanda" class="quiz-panda small-panda mb-3">🏆</div>
         <span class="quiz-eyebrow">Ergebnis</span>
         <h2 id="resultHeadline" class="fw-bold mt-2">Geschafft!</h2>
         <p id="resultText" class="lead text-muted"></p>
@@ -125,6 +203,6 @@ window.ELEVARO_QUIZ = {
   questions: <?= json_encode($quiz['questions'], JSON_UNESCAPED_UNICODE) ?>
 };
 </script>
-<script src="assets/js/quiz.js"></script>
+<script src="assets/js/quiz.js?v=<?= filemtime(__DIR__ . '/assets/js/quiz.js') ?>"></script>
 </body>
 </html>

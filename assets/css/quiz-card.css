@@ -251,3 +251,21 @@
 .elevaro-quiz-card-donut {
   position: absolute;
 }
+
+
+/* Card image/size refinement */
+.elevaro-quiz-card {
+  max-width: 100%;
+}
+
+.elevaro-quiz-card-media {
+  height: 190px;
+  min-height: 190px;
+}
+
+@media (min-width: 1280px) {
+  .elevaro-quiz-card-media {
+    height: 180px;
+    min-height: 180px;
+  }
+}

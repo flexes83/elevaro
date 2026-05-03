@@ -427,3 +427,27 @@ p { color: var(--muted); }
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Quizcard layout width fix */
+.recommendations-grid.elevaro-quiz-grid,
+#recommendationsGrid.elevaro-quiz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 420px));
+  gap: 1.15rem;
+  justify-content: start;
+}
+
+@media (min-width: 1280px) {
+  .recommendations-grid.elevaro-quiz-grid,
+  #recommendationsGrid.elevaro-quiz-grid {
+    grid-template-columns: repeat(3, minmax(300px, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .recommendations-grid.elevaro-quiz-grid,
+  #recommendationsGrid.elevaro-quiz-grid {
+    grid-template-columns: 1fr;
+  }
+}
