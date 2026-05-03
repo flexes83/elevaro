@@ -6,6 +6,10 @@
   let selected = false;
   let weakQuestions = [];
   let questionStartedAt = null;
+  let quizSessionId = null;
+  let currentStreak = 0;
+  let bestStreak = 0;
+  let totalPoints = 0;
 
   const name = localStorage.getItem('elevaro_profile_name');
   const sessionId = getOrCreateSessionId();
@@ -39,14 +43,20 @@
     index = 0;
     score = 0;
     selected = false;
+    currentStreak = 0;
+    bestStreak = 0;
+    totalPoints = 0;
 
     if (!useWeak) {
       weakQuestions = [];
     }
 
+    startQuizSession();
+
     introCard.classList.add('d-none');
     resultCard.classList.add('d-none');
     quizCard.classList.remove('d-none');
+    quizCard.classList.add('quiz-pop-in');
 
     renderQuestion();
   }
@@ -131,6 +141,9 @@
   function renderQuestion() {
     selected = false;
     questionStartedAt = Date.now();
+    quizCard.classList.remove('quiz-question-enter');
+    void quizCard.offsetWidth;
+    quizCard.classList.add('quiz-question-enter');
 
     const q = normalizeQuestion(questions[index]);
 
@@ -197,6 +210,9 @@
 
     const isCorrect = answer === question.answer;
     const responseTimeMs = questionStartedAt ? Date.now() - questionStartedAt : null;
+    const speedBonus = isCorrect && responseTimeMs && responseTimeMs < 5000 ? 5 : 0;
+    const streakBonus = isCorrect && currentStreak >= 2 ? 5 : 0;
+    const points = isCorrect ? 10 + speedBonus + streakBonus : 0;
 
     [...answersEl.children].forEach(btn => {
       btn.disabled = true;
@@ -208,23 +224,36 @@
 
     if (isCorrect) {
       score++;
+      currentStreak++;
+      bestStreak = Math.max(bestStreak, currentStreak);
+      totalPoints += points;
+
+      button.classList.add('answer-bounce');
+      launchPoints(button, points);
+      showComboEmoji(button, currentStreak);
+
       feedbackEl.innerHTML = `
-        <strong>Richtig!</strong>
+        <strong>${currentStreak >= 3 ? 'Serie läuft!' : 'Richtig!'}</strong>
         <span>${escapeHtml(question.fact || 'Das sitzt.')}</span>
+        <small class="quiz-reward-line">+${points} Punkte${speedBonus ? ' · Blitzbonus ⚡' : ''}${streakBonus ? ' · Serienbonus 🔥' : ''}</small>
       `;
       feedbackEl.className = 'feedback-box feedback-good mt-4';
     } else {
+      currentStreak = 0;
       button.classList.add('wrong');
       weakQuestions.push(question);
+      shakeElement(button);
       feedbackEl.innerHTML = `
         <strong>Fast!</strong>
         <span>Richtig wäre: <b>${escapeHtml(question.answer)}</b></span>
         ${question.fact ? `<small>${escapeHtml(question.fact)}</small>` : ''}
+        <small class="quiz-reward-line">Diese Frage zählt erst wieder als bestanden, wenn du sie 2× richtig beantwortest.</small>
       `;
       feedbackEl.className = 'feedback-box feedback-wrong mt-4';
     }
 
-    recordAnswer(question, answer, isCorrect, responseTimeMs);
+    updateMiniHud();
+    recordAnswer(question, answer, isCorrect, responseTimeMs, points);
 
     feedbackEl.classList.remove('d-none');
     nextBtn.classList.remove('d-none');
@@ -233,6 +262,7 @@
   function finishQuiz() {
     quizCard.classList.add('d-none');
     resultCard.classList.remove('d-none');
+    resultCard.classList.add('quiz-pop-in');
     progressBar.style.width = '100%';
 
     const total = questions.length;
@@ -245,25 +275,30 @@
     if (percent >= 90) {
       resultPanda.textContent = '🏆';
       resultHeadline.textContent = name ? `Stark, ${name}!` : 'Stark!';
-      resultText.textContent = `Du hast ${score} von ${total} Fragen richtig beantwortet. Das sitzt schon richtig gut.`;
+      resultText.innerHTML = `Du hast ${score} von ${total} Fragen richtig beantwortet.<br><b>${totalPoints} Punkte</b> · beste Serie: <b>${bestStreak}</b> 🔥`;
+      celebrateResult('confetti');
     } else if (percent >= 60) {
-      resultPanda.textContent = '🐼';
+      resultPanda.textContent = '🌟';
       resultHeadline.textContent = name ? `Gut gemacht, ${name}.` : 'Gut gemacht.';
-      resultText.textContent = `Du hast ${score} von ${total} Fragen richtig beantwortet. Ein paar Fragen kannst du noch festigen.`;
+      resultText.innerHTML = `Du hast ${score} von ${total} Fragen richtig beantwortet.<br><b>${totalPoints} Punkte</b> · beste Serie: <b>${bestStreak}</b> ✨`;
+      celebrateResult('spark');
     } else {
       resultPanda.textContent = '💪';
       resultHeadline.textContent = name ? `Dranbleiben, ${name}.` : 'Dranbleiben.';
-      resultText.textContent = `Du hast ${score} von ${total} Fragen richtig beantwortet. Übe die Wackelkandidaten und versuch es nochmal.`;
+      resultText.innerHTML = `Du hast ${score} von ${total} Fragen richtig beantwortet.<br><b>${totalPoints} Punkte</b>. Übe die Wackelkandidaten und versuch es nochmal.`;
     }
 
     localStorage.setItem('elevaro_progress_' + window.ELEVARO_QUIZ.id, JSON.stringify({
       score,
       total,
       percent,
+      points: totalPoints,
+      best_streak: bestStreak,
       weak_count: weakQuestions.length,
       date: new Date().toISOString()
     }));
 
+    completeQuizSession();
     renderWeakQuestions();
   }
 
@@ -286,23 +321,137 @@
     weakBtn.classList.remove('d-none');
   }
 
-  function recordAnswer(question, selectedAnswer, isCorrect, responseTimeMs) {
+  function recordAnswer(question, selectedAnswer, isCorrect, responseTimeMs, points = 0) {
     if (!question.id || !window.ELEVARO_QUIZ.dbId) return;
 
     fetch('api/answer.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
       body: JSON.stringify({
         quiz_id: window.ELEVARO_QUIZ.dbId,
         question_id: question.id,
         selected_answer: selectedAnswer,
+        correct_answer: question.answer,
         is_correct: isCorrect,
-        session_id: sessionId,
-        response_time_ms: responseTimeMs
+        session_id: quizSessionId || sessionId,
+        response_time_ms: responseTimeMs,
+        points
       })
-    }).catch(err => {
-      console.warn('Answer tracking failed', err);
+    })
+      .then(response => response.json().catch(() => null))
+      .then(data => {
+        if (data && data.success && data.progress) {
+          window.ELEVARO_LAST_PROGRESS = data.progress;
+        }
+      })
+      .catch(err => {
+        console.warn('Answer tracking failed', err);
+      });
+  }
+
+  function startQuizSession() {
+    if (!window.ELEVARO_QUIZ.dbId) return;
+
+    fetch('api/quiz_session.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        quiz_id: window.ELEVARO_QUIZ.dbId,
+        session_token: sessionId
+      })
+    })
+      .then(response => {
+        if (response.status === 401) return null;
+        return response.json();
+      })
+      .then(data => {
+        if (data && data.success && data.quiz_session_id) {
+          quizSessionId = data.quiz_session_id;
+        }
+      })
+      .catch(() => {});
+  }
+
+  function completeQuizSession() {
+    if (!quizSessionId) return;
+
+    fetch('api/quiz_complete.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        quiz_session_id: quizSessionId
+      })
+    }).catch(() => {});
+  }
+
+  function updateMiniHud() {
+    let hud = document.getElementById('quizMiniHud');
+
+    if (!hud) {
+      hud = document.createElement('div');
+      hud.id = 'quizMiniHud';
+      hud.className = 'quiz-mini-hud';
+      quizCard.prepend(hud);
+    }
+
+    hud.innerHTML = `
+      <span>⭐ ${totalPoints} Punkte</span>
+      <span>🔥 ${currentStreak}er Serie</span>
+      <span>🏅 Beste: ${bestStreak}</span>
+    `;
+  }
+
+  function launchPoints(anchor, points) {
+    const rect = anchor.getBoundingClientRect();
+    const bubble = document.createElement('div');
+    bubble.className = 'quiz-points-bubble';
+    bubble.textContent = `+${points}`;
+    bubble.style.left = `${rect.left + rect.width * 0.72}px`;
+    bubble.style.top = `${rect.top + rect.height * 0.5}px`;
+    document.body.appendChild(bubble);
+
+    window.setTimeout(() => bubble.remove(), 1000);
+  }
+
+  function showComboEmoji(anchor, streak) {
+    if (streak < 2) return;
+
+    const emojis = streak >= 5 ? ['🔥', '🚀', '🏆'] : ['✨', '🔥'];
+    const rect = anchor.getBoundingClientRect();
+
+    emojis.forEach((emoji, i) => {
+      const el = document.createElement('div');
+      el.className = 'quiz-combo-emoji';
+      el.textContent = emoji;
+      el.style.left = `${rect.right - 30 + i * 22}px`;
+      el.style.top = `${rect.top - 10 - i * 10}px`;
+      document.body.appendChild(el);
+      window.setTimeout(() => el.remove(), 1100);
     });
+  }
+
+  function shakeElement(el) {
+    el.classList.remove('quiz-shake');
+    void el.offsetWidth;
+    el.classList.add('quiz-shake');
+  }
+
+  function celebrateResult(type) {
+    const emojis = type === 'confetti' ? ['🎉', '✨', '🏆', '🚀', '🔥'] : ['✨', '🌟', '👏'];
+
+    for (let i = 0; i < 18; i++) {
+      const el = document.createElement('div');
+      el.className = 'quiz-result-confetti';
+      el.textContent = emojis[i % emojis.length];
+      el.style.left = `${15 + Math.random() * 70}vw`;
+      el.style.top = `${25 + Math.random() * 30}vh`;
+      el.style.animationDelay = `${Math.random() * .18}s`;
+      document.body.appendChild(el);
+      window.setTimeout(() => el.remove(), 1300);
+    }
   }
 
   function hasImageMedia(media) {

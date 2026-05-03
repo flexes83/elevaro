@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/user_data.php';
 
 function elevaro_get_quiz_by_key(string $quizKey): ?array
 {
@@ -85,84 +86,29 @@ function elevaro_get_quiz_question_count(int $quizId): int
 
 function elevaro_get_quiz_intro_progress(int $quizId): array
 {
-    if (!function_exists('auth_user')) {
+    $total = elevaro_get_quiz_question_count($quizId);
+    $userId = function_exists('elevaro_current_user_id') ? elevaro_current_user_id() : null;
+
+    if ($userId && function_exists('elevaro_get_user_quiz_progress')) {
+        $p = elevaro_get_user_quiz_progress($userId, $quizId);
         return [
-            'total' => elevaro_get_quiz_question_count($quizId),
-            'passed' => 0,
-            'failed' => 0,
-            'unanswered' => elevaro_get_quiz_question_count($quizId),
-            'attempted' => 0,
-            'played' => false,
+            'total' => (int)($p['progress_total'] ?? $total),
+            'passed' => (int)($p['progress_passed'] ?? 0),
+            'failed' => (int)($p['progress_failed'] ?? 0),
+            'unanswered' => (int)($p['progress_unanswered'] ?? $total),
+            'attempted' => (int)($p['progress_attempted'] ?? 0),
+            'played' => ((int)($p['progress_attempted'] ?? 0)) > 0,
         ];
     }
 
-    $user = auth_user();
-
-    if (!$user || !function_exists('elevaro_db')) {
-        $total = elevaro_get_quiz_question_count($quizId);
-        return [
-            'total' => $total,
-            'passed' => 0,
-            'failed' => 0,
-            'unanswered' => $total,
-            'attempted' => 0,
-            'played' => false,
-        ];
-    }
-
-    try {
-        $pdo = elevaro_db();
-        $total = elevaro_get_quiz_question_count($quizId);
-
-        if (!elevaro_table_exists('user_question_progress')) {
-            return [
-                'total' => $total,
-                'passed' => 0,
-                'failed' => 0,
-                'unanswered' => $total,
-                'attempted' => 0,
-                'played' => false,
-            ];
-        }
-
-        $stmt = $pdo->prepare("
-            SELECT
-              SUM(CASE WHEN is_mastered = 1 THEN 1 ELSE 0 END) AS passed,
-              SUM(CASE WHEN needs_recovery = 1 THEN 1 ELSE 0 END) AS failed,
-              SUM(CASE WHEN answered_count > 0 THEN 1 ELSE 0 END) AS attempted
-            FROM user_question_progress
-            WHERE user_id = :user_id
-              AND quiz_id = :quiz_id
-        ");
-        $stmt->execute([
-            'user_id' => (int)$user['id'],
-            'quiz_id' => $quizId,
-        ]);
-
-        $row = $stmt->fetch() ?: [];
-        $passed = (int)($row['passed'] ?? 0);
-        $failed = (int)($row['failed'] ?? 0);
-        $attempted = (int)($row['attempted'] ?? 0);
-
-        return [
-            'total' => $total,
-            'passed' => $passed,
-            'failed' => $failed,
-            'unanswered' => max($total - $passed - $failed, 0),
-            'attempted' => $attempted,
-            'played' => $attempted > 0 || $passed > 0 || $failed > 0,
-        ];
-    } catch (Throwable $e) {
-        $total = elevaro_get_quiz_question_count($quizId);
-        return [
-            'total' => $total,
-            'passed' => 0,
-            'failed' => 0,
-            'unanswered' => $total,
-            'attempted' => 0,
-            'played' => false,
-        ];
-    }
+    return [
+        'total' => $total,
+        'passed' => 0,
+        'failed' => 0,
+        'unanswered' => $total,
+        'attempted' => 0,
+        'played' => false,
+    ];
 }
 
 function elevaro_table_exists(string $tableName): bool

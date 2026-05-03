@@ -23,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 try {
     $payload = json_decode(file_get_contents('php://input') ?: '[]', true);
     $quizId = (int)($payload['quiz_id'] ?? 0);
+    $sessionToken = isset($payload['session_token']) ? (string)$payload['session_token'] : null;
 
     if (!$quizId) {
         throw new RuntimeException('quiz_id fehlt.');
@@ -30,7 +31,7 @@ try {
 
     echo json_encode([
         'success' => true,
-        'quiz_session_id' => elevaro_start_quiz_session($userId, $quizId),
+        'quiz_session_id' => elevaro_start_quiz_session($userId, $quizId, $sessionToken),
     ], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     http_response_code(500);

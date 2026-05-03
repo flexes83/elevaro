@@ -11,6 +11,17 @@ function elevaro_current_user_id(): ?int
     return $user ? (int)$user['id'] : null;
 }
 
+function elevaro_table_exists(string $tableName): bool
+{
+    try {
+        $stmt = elevaro_db()->prepare("SHOW TABLES LIKE :table_name");
+        $stmt->execute(['table_name' => $tableName]);
+        return (bool)$stmt->fetchColumn();
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
 function elevaro_user_has_active_access(?array $user = null): bool
 {
     $user = $user ?: auth_user();
@@ -19,7 +30,6 @@ function elevaro_user_has_active_access(?array $user = null): bool
         return false;
     }
 
-    // Admins always have access.
     if (($user['role'] ?? '') === 'admin') {
         return true;
     }
@@ -27,8 +37,30 @@ function elevaro_user_has_active_access(?array $user = null): bool
     return (int)($user['has_active_access'] ?? 1) === 1;
 }
 
+function elevaro_lookup_id_by_code(PDO $pdo, string $table, string $code): ?int
+{
+    if ($code === '') {
+        return null;
+    }
+
+    $allowed = ['states', 'school_types', 'subjects'];
+    if (!in_array($table, $allowed, true)) {
+        throw new InvalidArgumentException('Invalid lookup table.');
+    }
+
+    $stmt = $pdo->prepare("SELECT id FROM {$table} WHERE code = :code LIMIT 1");
+    $stmt->execute(['code' => $code]);
+    $id = $stmt->fetchColumn();
+
+    return $id ? (int)$id : null;
+}
+
 function elevaro_save_user_learning_profile(int $userId, array $profile): void
 {
+    if (!elevaro_table_exists('user_learning_profiles')) {
+        return;
+    }
+
     $pdo = elevaro_db();
 
     $values = $profile['values'] ?? [];
@@ -90,6 +122,10 @@ function elevaro_save_user_learning_profile(int $userId, array $profile): void
 
 function elevaro_get_user_learning_profile(int $userId): ?array
 {
+    if (!elevaro_table_exists('user_learning_profiles')) {
+        return null;
+    }
+
     $pdo = elevaro_db();
 
     $stmt = $pdo->prepare("SELECT * FROM user_learning_profiles WHERE user_id = :user_id LIMIT 1");
@@ -101,7 +137,6 @@ function elevaro_get_user_learning_profile(int $userId): ?array
     }
 
     $raw = json_decode((string)($row['raw_profile_json'] ?? ''), true);
-
     if (is_array($raw)) {
         return $raw;
     }
@@ -118,26 +153,12 @@ function elevaro_get_user_learning_profile(int $userId): ?array
     ];
 }
 
-function elevaro_lookup_id_by_code(PDO $pdo, string $table, string $code): ?int
+function elevaro_start_quiz_session(int $userId, int $quizId, ?string $sessionToken = null): int
 {
-    if ($code === '') {
-        return null;
+    if (!elevaro_table_exists('user_quiz_sessions')) {
+        return 0;
     }
 
-    $allowed = ['states', 'school_types', 'subjects'];
-    if (!in_array($table, $allowed, true)) {
-        throw new InvalidArgumentException('Invalid lookup table.');
-    }
-
-    $stmt = $pdo->prepare("SELECT id FROM {$table} WHERE code = :code LIMIT 1");
-    $stmt->execute(['code' => $code]);
-    $id = $stmt->fetchColumn();
-
-    return $id ? (int)$id : null;
-}
-
-function elevaro_start_quiz_session(int $userId, int $quizId): int
-{
     $pdo = elevaro_db();
 
     $stmt = $pdo->prepare("
@@ -150,40 +171,45 @@ function elevaro_start_quiz_session(int $userId, int $quizId): int
     $total = (int)$stmt->fetchColumn();
 
     $stmt = $pdo->prepare("
-        INSERT INTO user_quiz_sessions (user_id, quiz_id, total_questions)
-        VALUES (:user_id, :quiz_id, :total_questions)
+        INSERT INTO user_quiz_sessions (user_id, quiz_id, session_token, total_questions)
+        VALUES (:user_id, :quiz_id, :session_token, :total_questions)
     ");
     $stmt->execute([
         'user_id' => $userId,
         'quiz_id' => $quizId,
+        'session_token' => $sessionToken,
         'total_questions' => $total,
     ]);
 
     return (int)$pdo->lastInsertId();
 }
 
-function elevaro_record_user_answer(int $userId, int $quizId, int $questionId, string $selectedAnswer, string $correctAnswer, bool $isCorrect, ?int $sessionId = null, int $points = 0): array
+function elevaro_record_user_answer(int $userId, int $quizId, int $questionId, string $selectedAnswer, string $correctAnswer, bool $isCorrect, ?int $sessionId = null, int $points = 0, ?int $responseTimeMs = null): array
 {
-    $pdo = elevaro_db();
+    if (!elevaro_table_exists('user_question_progress') || !elevaro_table_exists('user_answer_events')) {
+        return elevaro_get_user_quiz_progress($userId, $quizId);
+    }
 
+    $pdo = elevaro_db();
     $pdo->beginTransaction();
 
     try {
         $stmt = $pdo->prepare("
             INSERT INTO user_answer_events
-              (user_id, quiz_id, question_id, quiz_session_id, selected_answer, correct_answer, is_correct, points)
+              (user_id, quiz_id, question_id, quiz_session_id, selected_answer, correct_answer, is_correct, points, response_time_ms)
             VALUES
-              (:user_id, :quiz_id, :question_id, :quiz_session_id, :selected_answer, :correct_answer, :is_correct, :points)
+              (:user_id, :quiz_id, :question_id, :quiz_session_id, :selected_answer, :correct_answer, :is_correct, :points, :response_time_ms)
         ");
         $stmt->execute([
             'user_id' => $userId,
             'quiz_id' => $quizId,
             'question_id' => $questionId,
-            'quiz_session_id' => $sessionId,
+            'quiz_session_id' => $sessionId ?: null,
             'selected_answer' => $selectedAnswer,
             'correct_answer' => $correctAnswer,
             'is_correct' => $isCorrect ? 1 : 0,
             'points' => $points,
+            'response_time_ms' => $responseTimeMs,
         ]);
 
         $stmt = $pdo->prepare("
@@ -215,12 +241,10 @@ function elevaro_record_user_answer(int $userId, int $quizId, int $questionId, s
                     $isMastered = 1;
                 }
             } else {
-                // First-time correct answer, or already clean: passed.
                 $isMastered = 1;
                 $consecutive = max($consecutive, 1);
             }
         } else {
-            // Once wrong, question must be answered correctly twice in a row.
             $needsRecovery = 1;
             $consecutive = 0;
             $isMastered = 0;
@@ -258,7 +282,7 @@ function elevaro_record_user_answer(int $userId, int $quizId, int $questionId, s
             'is_mastered' => $isMastered,
         ]);
 
-        if ($sessionId) {
+        if ($sessionId && elevaro_table_exists('user_quiz_sessions')) {
             $stmt = $pdo->prepare("
                 UPDATE user_quiz_sessions
                 SET answered_questions = answered_questions + 1,
@@ -278,12 +302,30 @@ function elevaro_record_user_answer(int $userId, int $quizId, int $questionId, s
         }
 
         $pdo->commit();
-
         return elevaro_get_user_quiz_progress($userId, $quizId);
     } catch (Throwable $e) {
         $pdo->rollBack();
         throw $e;
     }
+}
+
+function elevaro_complete_quiz_session(int $userId, int $sessionId): void
+{
+    if (!$sessionId || !elevaro_table_exists('user_quiz_sessions')) {
+        return;
+    }
+
+    $stmt = elevaro_db()->prepare("
+        UPDATE user_quiz_sessions
+        SET completed_at = NOW()
+        WHERE id = :session_id
+          AND user_id = :user_id
+          AND completed_at IS NULL
+    ");
+    $stmt->execute([
+        'session_id' => $sessionId,
+        'user_id' => $userId,
+    ]);
 }
 
 function elevaro_get_user_quiz_progress(int $userId, int $quizId): array
@@ -298,6 +340,16 @@ function elevaro_get_user_quiz_progress(int $userId, int $quizId): array
     ");
     $stmt->execute(['quiz_id' => $quizId]);
     $total = (int)$stmt->fetchColumn();
+
+    if (!elevaro_table_exists('user_question_progress')) {
+        return [
+            'progress_total' => $total,
+            'progress_passed' => 0,
+            'progress_failed' => 0,
+            'progress_unanswered' => $total,
+            'progress_attempted' => 0,
+        ];
+    }
 
     $stmt = $pdo->prepare("
         SELECT
@@ -317,13 +369,12 @@ function elevaro_get_user_quiz_progress(int $userId, int $quizId): array
     $mastered = (int)($row['mastered'] ?? 0);
     $failedPending = (int)($row['failed_pending'] ?? 0);
     $attempted = (int)($row['attempted'] ?? 0);
-    $unanswered = max($total - $mastered - $failedPending, 0);
 
     return [
         'progress_total' => $total,
         'progress_passed' => $mastered,
         'progress_failed' => $failedPending,
-        'progress_unanswered' => $unanswered,
+        'progress_unanswered' => max($total - $mastered - $failedPending, 0),
         'progress_attempted' => $attempted,
     ];
 }
