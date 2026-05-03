@@ -131,15 +131,23 @@ function elevaro_generate_listening_comprehension(array $quiz, int $questionCoun
 
 function elevaro_insert_listening_questions(PDO $pdo, int $quizId, array $questions): void
 {
-    $pdo->prepare("DELETE qo FROM question_options qo JOIN questions q ON q.id = qo.question_id WHERE q.quiz_id = :quiz_id AND q.source_context = 'listening_text'")
+    // Listening-Comprehension is a full quiz mode.
+    // Existing questions must be replaced completely, otherwise old general questions
+    // appear before the listening questions and have no relation to the audio text.
+    $pdo->prepare("
+        DELETE qo
+        FROM question_options qo
+        JOIN questions q ON q.id = qo.question_id
+        WHERE q.quiz_id = :quiz_id
+    ")->execute(['quiz_id' => $quizId]);
+
+    $pdo->prepare("DELETE FROM question_stats WHERE question_id NOT IN (SELECT id FROM questions)")
+        ->execute();
+
+    $pdo->prepare("DELETE FROM questions WHERE quiz_id = :quiz_id")
         ->execute(['quiz_id' => $quizId]);
 
-    $pdo->prepare("DELETE FROM questions WHERE quiz_id = :quiz_id AND source_context = 'listening_text'")
-        ->execute(['quiz_id' => $quizId]);
-
-    $stmtSort = $pdo->prepare("SELECT COALESCE(MAX(sort_order), 0) FROM questions WHERE quiz_id = :quiz_id");
-    $stmtSort->execute(['quiz_id' => $quizId]);
-    $sort = (int)$stmtSort->fetchColumn();
+    $sort = 0;
 
     foreach ($questions as $q) {
         $sort++;

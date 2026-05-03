@@ -174,6 +174,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$missing) {
             exit;
         }
 
+        if ($action === 'publish_listening_quiz') {
+            $pdo->prepare("UPDATE quizzes SET status='published', is_active=1, listening_mode=1 WHERE id=:id")
+                ->execute(['id' => $quizId]);
+            $pdo->prepare("UPDATE questions SET status='published' WHERE quiz_id=:id AND source_context='listening_text'")
+                ->execute(['id' => $quizId]);
+
+            header('Location: quiz_listening.php?quiz_id=' . $quizId . '&published=1');
+            exit;
+        }
+
         if ($action === 'disable_listening') {
             $pdo->prepare("UPDATE quizzes SET listening_mode = 0 WHERE id = :id")->execute(['id' => $quizId]);
             header('Location: quiz_listening.php?quiz_id=' . $quizId . '&disabled=1');
@@ -201,6 +211,7 @@ if (isset($_GET['saved'])) $notice = 'Listening-Einstellungen gespeichert.';
 if (isset($_GET['generated'])) $notice = 'Listening-Text und passende Fragen wurden generiert.';
 if (isset($_GET['audio'])) $notice = 'Audio wurde generiert.';
 if (isset($_GET['disabled'])) $notice = 'Listening-Modus deaktiviert.';
+if (isset($_GET['published'])) $notice = 'Listening-Quiz veröffentlicht.';
 
 $stmt = $pdo->prepare("
     SELECT COUNT(*)
@@ -210,6 +221,15 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute(['quiz_id' => $quizId]);
 $listeningQuestionCount = (int)$stmt->fetchColumn();
+
+$stmt = $pdo->prepare("
+    SELECT COUNT(*)
+    FROM questions
+    WHERE quiz_id = :quiz_id
+      AND COALESCE(source_context, 'general') <> 'listening_text'
+");
+$stmt->execute(['quiz_id' => $quizId]);
+$generalQuestionCount = (int)$stmt->fetchColumn();
 
 $config = [];
 try { $config = elevaro_elevenlabs_config(); } catch (Throwable $e) {}
@@ -224,7 +244,7 @@ admin_header('Listening-Comprehension', '3–4 Minuten Hörtext + darauf abgesti
   </div>
   <div class="d-flex gap-2 flex-wrap">
     <a class="btn btn-outline-secondary" href="quiz_questions.php?quiz_id=<?= (int)$quizId ?>">Fragen</a>
-    <a class="btn btn-light" target="_blank" href="../quiz.php?key=<?= admin_h($quiz['quiz_key']) ?>">Vorschau</a>
+    <a class="btn btn-light" target="_blank" href="../quiz.php?quiz_id=<?= (int)$quizId ?>&preview=1">Vorschau</a>
   </div>
 </div>
 
@@ -244,7 +264,15 @@ admin_header('Listening-Comprehension', '3–4 Minuten Hörtext + darauf abgesti
     <div class="card card-soft mb-4">
       <div class="card-body p-4">
         <h3 class="h5 fw-bold">KI-Generator</h3>
-        <p class="text-muted">Erzeugt einen 3–4-minütigen Infotext und ersetzt die bisherigen Listening-Fragen dieses Quiz.</p>
+        <p class="text-muted">Erzeugt einen 3–4-minütigen Infotext und darauf abgestimmte Fragen.</p>
+
+        <div class="alert alert-warning">
+          <strong>Wichtig:</strong> Dieses Quiz wird in ein Listening-Comprehension-Quiz umgewandelt.
+          Dabei werden alle bestehenden Fragen dieses Quiz ersetzt, damit keine Fragen ohne Bezug zum Hörtext erscheinen.
+          <?php if ($generalQuestionCount > 0): ?>
+            <br>Aktuell würden <strong><?= (int)$generalQuestionCount ?></strong> bestehende normale Fragen ersetzt.
+          <?php endif; ?>
+        </div>
 
         <form method="post" class="d-flex gap-2 align-items-end flex-wrap">
           <input type="hidden" name="action" value="generate_text_and_questions">
@@ -252,7 +280,7 @@ admin_header('Listening-Comprehension', '3–4 Minuten Hörtext + darauf abgesti
             <label class="form-label fw-bold">Anzahl Fragen</label>
             <input class="form-control" type="number" min="6" max="20" name="question_count" value="12" <?= $missing ? 'disabled' : '' ?>>
           </div>
-          <button class="btn btn-primary" <?= $missing ? 'disabled' : '' ?>>🎧 Listening-Quiz generieren</button>
+          <button class="btn btn-primary" <?= $missing ? 'disabled' : '' ?> onclick="return confirm('Dieses Listening-Quiz ersetzt alle bisherigen Fragen dieses Quiz. Fortfahren?')">🎧 Listening-Quiz generieren</button>
         </form>
       </div>
     </div>
@@ -289,6 +317,7 @@ admin_header('Listening-Comprehension', '3–4 Minuten Hörtext + darauf abgesti
           <div class="d-flex gap-2 mt-4 flex-wrap">
             <button class="btn btn-primary" <?= $missing ? 'disabled' : '' ?>>Speichern</button>
             <button class="btn btn-success" name="action" value="generate_audio" <?= $missing ? 'disabled' : '' ?>>🔊 Audio erzeugen</button>
+            <button class="btn btn-outline-primary" name="action" value="publish_listening_quiz" <?= $missing ? 'disabled' : '' ?>>Veröffentlichen</button>
             <button class="btn btn-outline-danger" name="action" value="disable_listening" <?= $missing ? 'disabled' : '' ?>>Modus deaktivieren</button>
           </div>
         </form>
