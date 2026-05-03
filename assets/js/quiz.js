@@ -55,6 +55,7 @@
 
     startQuizSession();
 
+    document.body.classList.add('quiz-is-playing');
     introCard.classList.add('d-none');
     if (introExtras) introExtras.classList.add('d-none');
     resultCard.classList.add('d-none');
@@ -263,6 +264,7 @@
   }
 
   function finishQuiz() {
+    document.body.classList.remove('quiz-is-playing');
     quizCard.classList.add('d-none');
     resultCard.classList.remove('d-none');
     resultCard.classList.add('quiz-pop-in');
