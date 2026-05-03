@@ -1,4 +1,32 @@
 (function () {
+  function shouldSkipOnboarding() {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.has('edit') || params.has('reset') || params.has('force')) {
+      return false;
+    }
+
+    try {
+      const profile = JSON.parse(localStorage.getItem('elevaro_profile') || 'null');
+      const values = profile && profile.values ? profile.values : null;
+
+      return !!(
+        values &&
+        values.state &&
+        values.school_type &&
+        values.grade &&
+        values.subject
+      );
+    } catch (error) {
+      return false;
+    }
+  }
+
+  if (shouldSkipOnboarding()) {
+    window.location.replace('recommendations.php');
+    return;
+  }
+
   const state = {
     step: 0,
     values: {
