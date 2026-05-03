@@ -1,4 +1,27 @@
 (function () {
+  function getSavedProfile() {
+    try {
+      return JSON.parse(localStorage.getItem('elevaro_profile') || 'null');
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function hasCompleteProfile(profile) {
+    const values = profile && profile.values ? profile.values : null;
+
+    if (!values) {
+      return false;
+    }
+
+    return Boolean(
+      values.state &&
+      values.school_type &&
+      values.grade &&
+      values.subject
+    );
+  }
+
   function shouldSkipOnboarding() {
     const params = new URLSearchParams(window.location.search);
 
@@ -6,20 +29,7 @@
       return false;
     }
 
-    try {
-      const profile = JSON.parse(localStorage.getItem('elevaro_profile') || 'null');
-      const values = profile && profile.values ? profile.values : null;
-
-      return !!(
-        values &&
-        values.state &&
-        values.school_type &&
-        values.grade &&
-        values.subject
-      );
-    } catch (error) {
-      return false;
-    }
+    return hasCompleteProfile(getSavedProfile());
   }
 
   if (shouldSkipOnboarding()) {

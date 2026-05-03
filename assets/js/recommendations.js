@@ -16,6 +16,12 @@
   };
 
   const profile = readProfile();
+
+  if (!hasCompleteProfile(profile)) {
+    localStorage.removeItem('elevaro_profile');
+    window.location.href = 'onboarding.php?reset=1';
+    return;
+  }
   if (!profile || !profile.values || !profile.values.grade) {
     window.location.href = 'onboarding.php';
     return;
@@ -28,6 +34,22 @@
     try { return JSON.parse(localStorage.getItem('elevaro_profile') || 'null'); }
     catch (e) { return null; }
   }
+
+  function hasCompleteProfile(profile) {
+    const values = profile && profile.values ? profile.values : null;
+
+    if (!values) {
+      return false;
+    }
+
+    return Boolean(
+      values.state &&
+      values.school_type &&
+      values.grade &&
+      values.subject
+    );
+  }
+
 
   function renderProfile(profile) {
     const labels = profile.labels || {};
