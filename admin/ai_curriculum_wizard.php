@@ -384,19 +384,12 @@ Allgemeine Regeln:
 
 Tag-Regeln:
 
-- Gib 2–5 abstrakte Tags für das gesamte Quiz zurück.
+- Gib 2 bis 5 abstrakte Tags für das gesamte Quiz zurück.
 - Tags sind breite Lernbereiche, keine einzelne Frage und kein zu enges Detail.
-- Beispiele:
-  → Ornithologie
-  → Vogelarten
-  → Bruchrechnen
-  → Simple Past
-  → Kartenkunde
-  → Demonstrativpronomen
-  → Geometrie
-- slug ist kleingeschrieben, ohne Leerzeichen, mit Bindestrichen, z. B. \"simple-past\" oder \"bruchrechnen\".
-- name ist die schöne Anzeigeform, z. B. "Simple Past" oder "Ornithologie".
-- Nutze keine Tags wie "Quiz", "Klasse 5" oder "leicht".
+- Gute Beispiele: Ornithologie, Vogelarten, Bruchrechnen, Simple Past, Kartenkunde, Demonstrativpronomen, Geometrie.
+- slug ist kleingeschrieben, ohne Leerzeichen, mit Bindestrichen, zum Beispiel simple-past oder bruchrechnen.
+- name ist die schöne Anzeigeform, zum Beispiel Simple Past oder Ornithologie.
+- Nutze keine Tags wie Quiz, Klasse 5 oder leicht.
 
 Medien-Regeln:
 
