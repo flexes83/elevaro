@@ -394,7 +394,7 @@ Tag-Regeln:
   → Kartenkunde
   → Demonstrativpronomen
   → Geometrie
-- slug ist kleingeschrieben, ohne Leerzeichen, mit Bindestrichen, z. B. "simple-past" oder "bruchrechnen".
+- slug ist kleingeschrieben, ohne Leerzeichen, mit Bindestrichen, z. B. \"simple-past\" oder \"bruchrechnen\".
 - name ist die schöne Anzeigeform, z. B. "Simple Past" oder "Ornithologie".
 - Nutze keine Tags wie "Quiz", "Klasse 5" oder "leicht".
 
