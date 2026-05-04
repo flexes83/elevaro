@@ -16,6 +16,21 @@ try {
             echo json_encode(['success' => true, 'items' => curriculum_school_types($_GET['state'] ?? '')], JSON_UNESCAPED_UNICODE);
             break;
 
+
+        case 'education_tracks':
+            echo json_encode([
+                'success' => true,
+                'items' => curriculum_education_tracks($_GET['state'] ?? '', $_GET['school_type'] ?? '')
+            ], JSON_UNESCAPED_UNICODE);
+            break;
+
+        case 'education_track_levels':
+            echo json_encode([
+                'success' => true,
+                'items' => curriculum_education_track_levels($_GET['state'] ?? '', $_GET['school_type'] ?? '', $_GET['track'] ?? '')
+            ], JSON_UNESCAPED_UNICODE);
+            break;
+
         case 'grades':
             echo json_encode(['success' => true, 'items' => curriculum_grades($_GET['state'] ?? '', $_GET['school_type'] ?? '')], JSON_UNESCAPED_UNICODE);
             break;

@@ -2,6 +2,27 @@
 
 require_once __DIR__ . '/db.php';
 
+
+function curriculum_column_exists(string $tableName, string $columnName): bool
+{
+    try {
+        $stmt = elevaro_db()->prepare("
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = :table_name
+              AND COLUMN_NAME = :column_name
+        ");
+        $stmt->execute([
+            'table_name' => $tableName,
+            'column_name' => $columnName,
+        ]);
+        return (int)$stmt->fetchColumn() > 0;
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
 function curriculum_states(): array
 {
     $stmt = elevaro_db()->query("
@@ -15,8 +36,11 @@ function curriculum_states(): array
 
 function curriculum_school_types(string $stateCode): array
 {
+    $hasCategory = curriculum_column_exists('school_types', 'school_category');
+    $categorySelect = $hasCategory ? "st.school_category" : "'general' AS school_category";
+
     $stmt = elevaro_db()->prepare("
-        SELECT st.code, st.name, sst.min_grade, sst.max_grade
+        SELECT st.code, st.name, {$categorySelect}, sst.min_grade, sst.max_grade
         FROM state_school_types sst
         JOIN states s ON s.id = sst.state_id
         JOIN school_types st ON st.id = sst.school_type_id
@@ -29,8 +53,89 @@ function curriculum_school_types(string $stateCode): array
     return $stmt->fetchAll();
 }
 
+function curriculum_is_vocational_school_type(string $stateCode, string $schoolTypeCode): bool
+{
+    if (!curriculum_column_exists('school_types', 'school_category')) {
+        return false;
+    }
+
+    $stmt = elevaro_db()->prepare("
+        SELECT st.school_category
+        FROM state_school_types sst
+        JOIN states s ON s.id = sst.state_id
+        JOIN school_types st ON st.id = sst.school_type_id
+        WHERE s.code = :state
+          AND st.code = :school_type
+        LIMIT 1
+    ");
+
+    $stmt->execute([
+        'state' => $stateCode,
+        'school_type' => $schoolTypeCode,
+    ]);
+
+    return (string)$stmt->fetchColumn() === 'vocational';
+}
+
+function curriculum_education_tracks(string $stateCode, string $schoolTypeCode): array
+{
+    if (!curriculum_table_exists('education_tracks')) {
+        return [];
+    }
+
+    $stmt = elevaro_db()->prepare("
+        SELECT et.code, et.name, et.min_level, et.max_level
+        FROM education_tracks et
+        JOIN states s ON s.id = et.state_id
+        JOIN school_types st ON st.id = et.school_type_id
+        WHERE s.code = :state
+          AND st.code = :school_type
+        ORDER BY et.sort_order ASC, et.name ASC
+    ");
+
+    $stmt->execute([
+        'state' => $stateCode,
+        'school_type' => $schoolTypeCode,
+    ]);
+
+    return $stmt->fetchAll();
+}
+
+function curriculum_education_track_levels(string $stateCode, string $schoolTypeCode, string $trackCode): array
+{
+    if (!curriculum_table_exists('education_tracks') || !curriculum_table_exists('education_track_levels')) {
+        return [];
+    }
+
+    $stmt = elevaro_db()->prepare("
+        SELECT etl.code, etl.name, etl.level_order
+        FROM education_track_levels etl
+        JOIN education_tracks et ON et.id = etl.track_id
+        JOIN states s ON s.id = et.state_id
+        JOIN school_types st ON st.id = et.school_type_id
+        WHERE s.code = :state
+          AND st.code = :school_type
+          AND et.code = :track
+        ORDER BY etl.level_order ASC, etl.name ASC
+    ");
+
+    $stmt->execute([
+        'state' => $stateCode,
+        'school_type' => $schoolTypeCode,
+        'track' => $trackCode,
+    ]);
+
+    return $stmt->fetchAll();
+}
+
 function curriculum_grades(string $stateCode, string $schoolTypeCode): array
 {
+    // Berufliche Schulen nutzen künftig Bildungsgang + Stufe statt normaler Klassen.
+    // Der bestehende allgemeinbildende Flow bleibt unverändert.
+    if (curriculum_is_vocational_school_type($stateCode, $schoolTypeCode)) {
+        return [];
+    }
+
     $stmt = elevaro_db()->prepare("
         SELECT sst.min_grade, sst.max_grade
         FROM state_school_types sst
