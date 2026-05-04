@@ -3,6 +3,7 @@ require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/../app/includes/image_tools.php';
 require_once __DIR__ . '/../app/includes/elevenlabs_client.php';
 require_once __DIR__ . '/../app/includes/listening_question_ai.php';
+require_once __DIR__ . '/../app/includes/quality_review.php';
 
 $pdo = admin_db();
 $quizId = (int)($_GET['quiz_id'] ?? 0);
@@ -46,6 +47,19 @@ function admin_question_audio_columns_ready(PDO $pdo): bool
     return (int)$stmt->fetchColumn() >= 3;
 }
 
+function admin_quality_columns_ready(PDO $pdo): bool
+{
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*)
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'questions'
+          AND COLUMN_NAME IN ('ai_validation_status','moderator_status','reports_count')
+    ");
+    $stmt->execute();
+    return (int)$stmt->fetchColumn() >= 3;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
@@ -53,6 +67,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->prepare("UPDATE quizzes SET status='published', is_active=1 WHERE id=:id")->execute(['id' => $quizId]);
         $pdo->prepare("UPDATE questions SET status='published' WHERE quiz_id=:id AND status='draft'")->execute(['id' => $quizId]);
         header('Location: quiz_questions.php?quiz_id=' . $quizId . '&published=1');
+        exit;
+    }
+
+    if ($action === 'validate_question_quality') {
+        $questionId = (int)($_POST['question_id'] ?? 0);
+        if ($questionId && admin_quality_columns_ready($pdo)) {
+            elevaro_validate_question_with_ai($pdo, $questionId);
+        }
+        header('Location: quiz_questions.php?quiz_id=' . $quizId . '&validated=1');
+        exit;
+    }
+
+    if ($action === 'validate_all_questions_quality') {
+        if (admin_quality_columns_ready($pdo)) {
+            $stmt = $pdo->prepare("
+                SELECT id
+                FROM questions
+                WHERE quiz_id = :quiz_id
+                  AND status IN ('draft','published')
+                ORDER BY sort_order, id
+            ");
+            $stmt->execute(['quiz_id' => $quizId]);
+            foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $questionId) {
+                elevaro_validate_question_with_ai($pdo, (int)$questionId);
+            }
+        }
+        header('Location: quiz_questions.php?quiz_id=' . $quizId . '&validated_all=1');
+        exit;
+    }
+
+    if ($action === 'approve_question_quality') {
+        $questionId = (int)($_POST['question_id'] ?? 0);
+        if ($questionId && admin_quality_columns_ready($pdo)) {
+            $pdo->prepare("
+                UPDATE questions
+                SET moderator_status = 'approved',
+                    status = CASE WHEN status IN ('draft','ai_checked','published') THEN 'published' ELSE status END,
+                    hidden_reason = NULL
+                WHERE id = :id
+            ")->execute(['id' => $questionId]);
+        }
+        header('Location: quiz_questions.php?quiz_id=' . $quizId . '&approved=1');
         exit;
     }
 
@@ -302,6 +358,10 @@ admin_header('Fragen Review', $quiz['title']);
 <?php if(isset($_GET['published'])): ?><div class="alert alert-success">Quiz veröffentlicht.</div><?php endif; ?>
 <?php if(isset($_GET['image_generated'])): ?><div class="alert alert-info">KI-Bild wurde generiert und eingetragen. Bitte prüfen.</div><?php endif; ?>
 
+<?php if(!admin_quality_columns_ready($pdo)): ?>
+  <div class="alert alert-warning">Qualitätsprüfung ist noch nicht aktiv. Bitte <code>database/schema_quality_v9.sql</code> ausführen.</div>
+<?php endif; ?>
+
 <div class="card-soft p-4 mb-4">
   <div class="d-flex justify-content-between gap-3 flex-wrap">
     <div>
@@ -310,6 +370,7 @@ admin_header('Fragen Review', $quiz['title']);
       <p class="text-muted mb-0"><?=admin_h($quiz['description'])?></p>
     </div>
     <div class="d-flex gap-2 align-items-start flex-wrap">
+      <button form="qualityBulkForm" class="btn btn-outline-primary" name="action" value="validate_all_questions_quality" <?= admin_quality_columns_ready($pdo)?'':'disabled' ?>>🔎 Alle KI-prüfen</button>
       <a class="btn btn-outline-primary" href="quiz_ai_generate.php?quiz_id=<?=$quizId?>">✨ Fragen generieren</a>
       <a class="btn btn-outline-secondary" href="quiz_visuals.php?quiz_id=<?=$quizId?>">🎨 Visuals</a>
       <a class="btn btn-outline-success" href="quiz_listening.php?quiz_id=<?=$quizId?>">🎧 Listening</a>
@@ -318,13 +379,20 @@ admin_header('Fragen Review', $quiz['title']);
   </div>
 </div>
 
+<form method="post" id="qualityBulkForm"></form>
+
 <form method="post">
 <?php foreach($questions as $q): ?>
   <div class="card-soft p-4 mb-3">
     <div class="d-flex justify-content-between gap-3 flex-wrap">
       <div>
-        <span class="badge <?= $q['status']==='published'?'text-bg-success':'text-bg-secondary' ?>"><?=admin_h($q['status'])?></span>
+        <span class="badge <?= $q['status']==='published'?'text-bg-success':($q['status']==='flagged'||$q['status']==='hidden'?'text-bg-danger':'text-bg-secondary') ?>"><?=admin_h($q['status'])?></span>
         <?php if((int)$q['ai_generated']===1):?> <span class="badge text-bg-primary">KI</span><?php endif;?>
+        <?php if(admin_quality_columns_ready($pdo)): ?>
+          <span class="badge <?= ($q['ai_validation_status']??'unchecked')==='valid'?'text-bg-success':(($q['ai_validation_status']??'unchecked')==='unchecked'?'text-bg-light text-dark':'text-bg-warning') ?>">Check: <?=admin_h($q['ai_validation_status'] ?? 'unchecked')?><?= !empty($q['ai_validation_confidence']) ? ' · '.admin_h((string)$q['ai_validation_confidence']) : '' ?></span>
+          <span class="badge <?= ($q['moderator_status']??'pending')==='approved'?'text-bg-success':'text-bg-light text-dark' ?>">Review: <?=admin_h($q['moderator_status'] ?? 'pending')?></span>
+          <?php if((int)($q['reports_count']??0)>0): ?><span class="badge text-bg-danger"><?= (int)$q['reports_count'] ?> Meld.</span><?php endif; ?>
+        <?php endif; ?>
         <span class="badge text-bg-light text-dark"><?= admin_h(media_label($q['media_recommendation'] ?? 'none')) ?></span>
       </div>
       <small class="text-muted"><?= (int)($q['times_correct']??0)?> richtig / <?= (int)($q['times_wrong']??0)?> falsch · Schwierigkeit <?=admin_h($q['calculated_difficulty']??$q['difficulty_calculated'])?></small>
@@ -477,6 +545,29 @@ admin_header('Fragen Review', $quiz['title']);
 
     <label class="form-label fw-bold mt-2">Erklärung</label>
     <textarea class="form-control mb-3" name="questions[<?=(int)$q['id']?>][explanation]"><?=admin_h($q['explanation'])?></textarea>
+
+    <?php if(admin_quality_columns_ready($pdo)): ?>
+      <div class="border rounded p-3 mb-3 bg-light">
+        <h6 class="fw-bold">KI-Prüfung / Moderation</h6>
+        <?php if(!empty($q['ai_validation_issues']) || !empty($q['ai_validation_suggestion'])): ?>
+          <div class="small mb-2">
+            <?php if(!empty($q['ai_validation_issues'])): ?>
+              <strong>Issues:</strong><br><?= nl2br(admin_h($q['ai_validation_issues'])) ?><br>
+            <?php endif; ?>
+            <?php if(!empty($q['ai_validation_suggestion'])): ?>
+              <strong>Vorschlag:</strong><br><?= nl2br(admin_h($q['ai_validation_suggestion'])) ?>
+            <?php endif; ?>
+          </div>
+        <?php else: ?>
+          <p class="text-muted small mb-2">Noch keine KI-Prüfung vorhanden.</p>
+        <?php endif; ?>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-sm btn-outline-primary" name="action" value="validate_question_quality" type="submit" onclick="this.form.question_id.value='<?=(int)$q['id']?>'">🔎 KI prüfen</button>
+          <button class="btn btn-sm btn-success" name="action" value="approve_question_quality" type="submit" onclick="this.form.question_id.value='<?=(int)$q['id']?>'">Freigeben</button>
+          <a class="btn btn-sm btn-outline-secondary" href="moderation.php">Review Queue</a>
+        </div>
+      </div>
+    <?php endif; ?>
 
     <label class="form-label fw-bold">Status</label>
     <select class="form-select" name="questions[<?=(int)$q['id']?>][status]">

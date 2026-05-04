@@ -1061,3 +1061,114 @@ body.quiz-is-playing .quiz-highscore-placeholder {
   width: 100%;
   display: block;
 }
+
+
+/* v9 question reporting */
+
+.question-report-wrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: .75rem;
+}
+
+.question-report-link {
+  border: 0;
+  background: transparent;
+  color: rgba(108,116,130,.82);
+  font-weight: 750;
+  font-size: .88rem;
+  text-decoration: underline;
+  text-underline-offset: .2rem;
+  cursor: pointer;
+}
+
+.question-report-link:hover {
+  color: var(--elevaro-primary);
+}
+
+.question-report-link:disabled {
+  cursor: default;
+  opacity: .65;
+}
+
+.report-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(23,32,51,.34);
+  backdrop-filter: blur(10px);
+}
+
+.report-modal {
+  position: relative;
+  width: min(560px, 100%);
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  background: #fff;
+  box-shadow: 0 1.5rem 5rem rgba(23,32,51,.24);
+}
+
+.report-modal h3 {
+  margin: 0 0 .65rem;
+  font-weight: 900;
+  letter-spacing: -.04em;
+}
+
+.report-modal p {
+  color: var(--elevaro-muted);
+  font-weight: 650;
+}
+
+.report-modal label {
+  display: block;
+  margin: .8rem 0 .35rem;
+  font-weight: 850;
+}
+
+.report-modal select,
+.report-modal textarea {
+  width: 100%;
+  border: 1px solid rgba(23,32,51,.16);
+  border-radius: 1rem;
+  padding: .75rem .9rem;
+  font: inherit;
+}
+
+.report-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: .6rem;
+  margin-top: 1rem;
+}
+
+.report-modal-close {
+  position: absolute;
+  right: .9rem;
+  top: .75rem;
+  border: 0;
+  background: transparent;
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--elevaro-muted);
+}
+
+.report-status {
+  margin-top: .8rem;
+  padding: .75rem .9rem;
+  border-radius: 1rem;
+  background: var(--elevaro-soft);
+  font-weight: 750;
+}
+
+.report-status.is-success {
+  background: rgba(0,184,148,.1);
+  color: #087f68;
+}
+
+.report-status.is-error {
+  background: rgba(255,118,117,.11);
+  color: #b33a3a;
+}

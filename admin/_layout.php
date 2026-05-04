@@ -19,6 +19,7 @@ function admin_header(string $title, string $subtitle = ''): void {
   <aside class="admin-sidebar">
     <a class="admin-brand" href="index.php">Elevaro</a>
     <nav class="admin-nav">
+    <a href="moderation.php">Qualitätsprüfung</a>
       <a class="<?= admin_active('index.php') ?>" href="index.php">🏠 Dashboard</a>
       <a class="<?= admin_active('ai_curriculum_wizard.php') ?>" href="ai_curriculum_wizard.php">✨ KI Wizard</a>
       <a class="<?= admin_active('ai_batches.php') ?>" href="ai_batches.php">📦 KI-Auswahlen</a>

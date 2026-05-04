@@ -10,6 +10,8 @@
   let currentStreak = 0;
   let bestStreak = 0;
   let totalPoints = 0;
+  let currentQuestion = null;
+  let lastSelectedAnswer = null;
 
   const name = localStorage.getItem('elevaro_profile_name');
   const sessionId = getOrCreateSessionId();
@@ -311,6 +313,7 @@
     if (selected) return;
     selected = true;
 
+    lastSelectedAnswer = answer;
     const isCorrect = answer === question.answer;
     const responseTimeMs = questionStartedAt ? Date.now() - questionStartedAt : null;
     const speedBonus = isCorrect && responseTimeMs && responseTimeMs < 5000 ? 5 : 0;
@@ -558,6 +561,114 @@
       window.setTimeout(() => el.remove(), 1300);
     }
   }
+
+
+  function renderReportLink(question) {
+    const old = document.getElementById('questionReportWrap');
+    if (old) old.remove();
+
+    if (!question || !question.id) return;
+
+    const wrap = document.createElement('div');
+    wrap.id = 'questionReportWrap';
+    wrap.className = 'question-report-wrap';
+    wrap.innerHTML = `<button type="button" class="question-report-link" id="questionReportBtn">Fehler melden</button>`;
+    answersEl.insertAdjacentElement('afterend', wrap);
+
+    const btn = document.getElementById('questionReportBtn');
+    btn.addEventListener('click', () => openReportModal(question));
+  }
+
+  function openReportModal(question) {
+    const existing = document.getElementById('reportModalBackdrop');
+    if (existing) existing.remove();
+
+    const backdrop = document.createElement('div');
+    backdrop.id = 'reportModalBackdrop';
+    backdrop.className = 'report-modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="report-modal" role="dialog" aria-modal="true">
+        <button type="button" class="report-modal-close" id="reportCloseBtn" aria-label="Schließen">×</button>
+        <h3>Fehler melden</h3>
+        <p>Unsere Quizze werden mithilfe von KI erstellt und danach nochmals geprüft. Sollte hier trotzdem etwas nicht stimmen, kannst du die Frage melden. Wir prüfen sie und blenden sie bei Bedarf bis zur Klärung aus.</p>
+        <label>Was ist dir aufgefallen?</label>
+        <select id="reportReason">
+          <option value="wrong_answer">Antwort ist falsch</option>
+          <option value="bad_explanation">Erklärung stimmt nicht</option>
+          <option value="typo">Tippfehler / Formulierung</option>
+          <option value="unclear">Frage ist unklar</option>
+          <option value="technical">Technisches Problem</option>
+          <option value="other">Sonstiges</option>
+        </select>
+        <label>Hinweis optional</label>
+        <textarea id="reportMessage" rows="4" placeholder="Was genau stimmt deiner Meinung nach nicht?"></textarea>
+        <div class="report-modal-actions">
+          <button type="button" class="btn btn-light" id="reportCancelBtn">Abbrechen</button>
+          <button type="button" class="btn btn-primary" id="reportSubmitBtn">Melden</button>
+        </div>
+        <div id="reportStatus" class="report-status d-none"></div>
+      </div>
+    `;
+    document.body.appendChild(backdrop);
+
+    document.getElementById('reportCloseBtn').addEventListener('click', () => backdrop.remove());
+    document.getElementById('reportCancelBtn').addEventListener('click', () => backdrop.remove());
+    backdrop.addEventListener('click', (event) => {
+      if (event.target === backdrop) backdrop.remove();
+    });
+
+    document.getElementById('reportSubmitBtn').addEventListener('click', () => submitQuestionReport(question));
+  }
+
+  function submitQuestionReport(question) {
+    const submitBtn = document.getElementById('reportSubmitBtn');
+    const statusEl = document.getElementById('reportStatus');
+    const reasonEl = document.getElementById('reportReason');
+    const messageEl = document.getElementById('reportMessage');
+
+    submitBtn.disabled = true;
+    statusEl.className = 'report-status';
+    statusEl.textContent = 'Meldung wird gesendet …';
+
+    fetch('api/report_question.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        quiz_id: window.ELEVARO_QUIZ.dbId,
+        question_id: question.id,
+        quiz_session_id: quizSessionId || null,
+        selected_answer: lastSelectedAnswer || null,
+        reason: reasonEl.value,
+        message: messageEl.value,
+        page_url: window.location.href
+      })
+    })
+      .then(response => response.json())
+      .then(data => {
+        if (!data.success) {
+          throw new Error(data.message || 'Meldung konnte nicht gespeichert werden.');
+        }
+
+        statusEl.className = 'report-status is-success';
+        statusEl.textContent = data.message || 'Danke, die Frage wurde gemeldet.';
+        const reportBtn = document.getElementById('questionReportBtn');
+        if (reportBtn) {
+          reportBtn.textContent = 'Fehler gemeldet';
+          reportBtn.disabled = true;
+        }
+        window.setTimeout(() => {
+          const backdrop = document.getElementById('reportModalBackdrop');
+          if (backdrop) backdrop.remove();
+        }, 1200);
+      })
+      .catch(error => {
+        submitBtn.disabled = false;
+        statusEl.className = 'report-status is-error';
+        statusEl.textContent = error.message;
+      });
+  }
+
 
   function hasImageMedia(media) {
     return media && media.type === 'image' && media.path;
