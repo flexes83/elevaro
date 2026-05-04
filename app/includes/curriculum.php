@@ -613,3 +613,24 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
 
     return $items;
 }
+
+
+function curriculum_levels(string $stateCode, string $schoolTypeCode): array
+{
+    $stmt = elevaro_db()->prepare("
+        SELECT l.code, l.name, l.numeric_grade
+        FROM school_type_levels l
+        JOIN states s ON s.id = l.state_id
+        JOIN school_types st ON st.id = l.school_type_id
+        WHERE s.code = :state
+          AND st.code = :school_type
+        ORDER BY l.sort_order ASC
+    ");
+
+    $stmt->execute([
+        'state' => $stateCode,
+        'school_type' => $schoolTypeCode,
+    ]);
+
+    return $stmt->fetchAll();
+}
