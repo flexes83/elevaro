@@ -57,6 +57,65 @@ function elevaro_frontend_header(string $variant = 'light', array $options = [])
         ? 'navbar navbar-expand-lg elevaro-topbar elevaro-topbar-glass fixed-top'
         : 'navbar navbar-expand-lg elevaro-topbar elevaro-topbar-light';
     ?>
+<?php
+
+require_once __DIR__ . '/auth.php';
+
+function elevaro_frontend_user(): ?array
+{
+    return auth_user();
+}
+
+function elevaro_frontend_initials(?array $user): string
+{
+    if (!$user) {
+        return '';
+    }
+
+    $name = trim((string)($user['display_name'] ?: $user['username'] ?: $user['email']));
+
+    if ($name === '') {
+        return '?';
+    }
+
+    $parts = preg_split('/\s+/', $name);
+    $first = mb_substr($parts[0] ?? '?', 0, 1, 'UTF-8');
+    $second = count($parts) > 1 ? mb_substr(end($parts), 0, 1, 'UTF-8') : '';
+
+    return mb_strtoupper($first . $second, 'UTF-8');
+}
+
+function elevaro_frontend_dashboard_url(?array $user = null): string
+{
+    $user = $user ?: auth_user();
+    $role = $user ? auth_effective_role() : null;
+
+    return match ($role) {
+        'admin' => '/admin/index.php',
+        'lehrer' => '/teacher_dashboard.php',
+        'schueler' => '/student_dashboard.php',
+        default => '/login.php',
+    };
+}
+
+function elevaro_frontend_header(string $variant = 'light', array $options = []): void
+{
+    $user = elevaro_frontend_user();
+    $effectiveRole = auth_effective_role();
+    $realRole = auth_real_role();
+
+    $name = $user ? trim((string)($user['display_name'] ?: $user['username'] ?: $user['email'])) : '';
+    $initials = elevaro_frontend_initials($user);
+
+    $showExamples = (bool)($options['show_examples'] ?? false);
+    $showChangeSelection = (bool)($options['show_change_selection'] ?? false);
+    $showQuizButton = (bool)($options['show_quiz_button'] ?? true);
+
+    $isGlass = $variant === 'glass';
+    $classes = $isGlass
+        ? 'navbar navbar-expand-lg elevaro-topbar elevaro-topbar-glass fixed-top'
+        : 'navbar navbar-expand-lg elevaro-topbar elevaro-topbar-light';
+    ?>
 <nav class="<?= auth_h($classes) ?>">
   <div class="container">
     <a class="navbar-brand fw-bold" href="/">Elevaro</a>
@@ -65,7 +124,7 @@ function elevaro_frontend_header(string $variant = 'light', array $options = [])
 
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
     <span class="navbar-toggler-icon"></span>
-  </button>
+    </button>
     <div class="collapse navbar-collapse" id="navbarSupportedContent">
       <a href="#">Für Schüler</a>
       <a href="#">Für Lehrer</a>
@@ -113,5 +172,6 @@ function elevaro_frontend_header(string $variant = 'light', array $options = [])
 
 
 </nav>
+
 <?php
 }
