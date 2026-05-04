@@ -49,11 +49,14 @@ $sleepSeconds = isset($options['sleep']) ? max(0, (int)$options['sleep']) : 1;
 $possibleConfigFiles = [
     $root . '/app/config.php',
     $root . '/config/config.php',
-    $root . '/config/database.php',
+    $root . '/config/db.php',
     $scriptDir . '/../app/config.php',
     $scriptDir . '/../config/config.php',
     $scriptDir . '/../config/database.php',
 ];
+
+require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../config/openai.php';
 
 foreach ($possibleConfigFiles as $file) {
     if (is_file($file)) {
