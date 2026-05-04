@@ -277,6 +277,29 @@ function curriculum_subjects(string $stateCode, string $schoolTypeCode, $levelOr
     $grade = (int)$ctx['numeric_grade'];
     $levelId = $ctx['level_id'];
 
+    if ($levelId && curriculum_table_exists('school_type_level_subjects')) {
+        $stmt = elevaro_db()->prepare("
+            SELECT DISTINCT sub.code, sub.name, sub.icon
+            FROM school_type_level_subjects map
+            JOIN states s ON s.id = map.state_id
+            JOIN subjects sub ON sub.id = map.subject_id
+            WHERE s.code = :state
+              AND map.school_type_level_id = :level_id
+            ORDER BY map.sort_order ASC, sub.sort_order ASC, sub.name ASC
+        ");
+
+        $stmt->execute([
+            'state' => $stateCode,
+            'level_id' => $levelId,
+        ]);
+
+        $subjects = $stmt->fetchAll();
+
+        if (!empty($subjects)) {
+            return $subjects;
+        }
+    }
+
     if ($levelId && curriculum_column_exists('curriculum_topics', 'school_type_level_id')) {
         $stmt = elevaro_db()->prepare("
             SELECT DISTINCT sub.code, sub.name, sub.icon
@@ -327,7 +350,7 @@ function curriculum_subjects(string $stateCode, string $schoolTypeCode, $levelOr
     }
 
     if ($ctx['is_vocational']) {
-        $codes = ['deutsch', 'mathe', 'englisch', 'wirtschaft', 'bwl', 'biologie', 'physik', 'chemie'];
+        $codes = ['deutsch', 'mathe', 'englisch', 'bwl', 'wirtschaft', 'rechnungswesen'];
     } elseif ($grade > 0 && $grade <= 4) {
         $codes = ['deutsch', 'mathe', 'sachunterricht'];
     } elseif ($grade > 0 && $grade <= 6) {

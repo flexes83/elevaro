@@ -20,6 +20,15 @@ $schoolTypeLevels = $pdo->query("
     ORDER BY s.sort_order, st.sort_order, l.sort_order, l.name
 ")->fetchAll();
 
+$levelSubjectMappings = $pdo->query("
+    SELECT
+      map.school_type_level_id,
+      sub.id AS subject_id
+    FROM school_type_level_subjects map
+    JOIN subjects sub ON sub.id = map.subject_id
+    ORDER BY map.school_type_level_id, map.sort_order, sub.sort_order
+")->fetchAll();
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         if ($action === 'generate_topics') {
@@ -835,7 +844,7 @@ admin_header('KI Curriculum Wizard', 'Themen werden gespeichert. Du kannst mehre
               <select class="form-select" name="subject_id" required>
                 <option value="">Bitte wählen</option>
                 <?php foreach ($subjects as $subject): ?>
-                  <option value="<?= (int)$subject['id'] ?>"><?= h(($subject['icon'] ?? '') . ' ' . $subject['name']) ?></option>
+                  <option value="<?= (int)$subject['id'] ?>" data-subject-id="<?= (int)$subject['id'] ?>"><?= h(($subject['icon'] ?? '') . ' ' . $subject['name']) ?></option>
                 <?php endforeach; ?>
               </select>
             </div>
@@ -931,11 +940,52 @@ admin_header('KI Curriculum Wizard', 'Themen werden gespeichert. Du kannst mehre
     <?php endif; ?>
 
 
+
+<script>
+window.ElevaroLevelSubjectMap = <?= json_encode(array_reduce($levelSubjectMappings, static function ($carry, $row) {
+  $levelId = (string)$row['school_type_level_id'];
+  if (!isset($carry[$levelId])) $carry[$levelId] = [];
+  $carry[$levelId][] = (string)$row['subject_id'];
+  return $carry;
+}, []), JSON_UNESCAPED_UNICODE) ?>;
+</script>
+
 <script>
 (function () {
   const stateSelect = document.querySelector('select[name="state_id"]');
   const schoolSelect = document.querySelector('select[name="school_type_id"]');
   const levelSelect = document.querySelector('select[name="school_type_level_id"]');
+  const subjectSelect = document.querySelector('select[name="subject_id"]');
+  const levelSubjectMap = window.ElevaroLevelSubjectMap || {};
+
+  function filterSubjectOptions() {
+    if (!levelSelect || !subjectSelect) return;
+
+    const allowed = levelSubjectMap[String(levelSelect.value)] || [];
+    let firstVisible = '';
+
+    Array.from(subjectSelect.options).forEach(option => {
+      if (!option.value) {
+        option.hidden = false;
+        return;
+      }
+
+      const matches = !allowed.length || allowed.includes(String(option.value));
+      option.hidden = !matches;
+
+      if (matches && !firstVisible) {
+        firstVisible = option.value;
+      }
+    });
+
+    if (subjectSelect.value && subjectSelect.selectedOptions[0] && subjectSelect.selectedOptions[0].hidden) {
+      subjectSelect.value = '';
+    }
+
+    if (!subjectSelect.value && firstVisible) {
+      subjectSelect.value = firstVisible;
+    }
+  }
 
   function filterLevelOptions() {
     if (!stateSelect || !schoolSelect || !levelSelect) return;
@@ -965,10 +1015,13 @@ admin_header('KI Curriculum Wizard', 'Themen werden gespeichert. Du kannst mehre
     if (!levelSelect.value && firstVisible) {
       levelSelect.value = firstVisible;
     }
+
+    filterSubjectOptions();
   }
 
   stateSelect?.addEventListener('change', filterLevelOptions);
   schoolSelect?.addEventListener('change', filterLevelOptions);
+  levelSelect?.addEventListener('change', filterSubjectOptions);
   filterLevelOptions();
 })();
 </script>
