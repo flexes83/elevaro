@@ -497,3 +497,71 @@ h1, h2, h3, h4, h5 {
     margin-bottom: .6rem;
   }
 }
+
+
+/* Final step layout fix: give summary/pricing the full card width */
+body[data-step="6"] .onboarding-card .row {
+  display: block;
+}
+
+body[data-step="6"] .onboarding-card .col-lg-4 {
+  display: none !important;
+}
+
+body[data-step="6"] .onboarding-card .col-lg-8 {
+  width: 100%;
+  max-width: 100%;
+  flex: 0 0 100%;
+}
+
+body[data-step="6"] .onboarding-summary-step {
+  width: 100%;
+  max-width: 100%;
+}
+
+body[data-step="6"] .onboarding-selection-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+body[data-step="6"] .onboarding-selection-row {
+  min-width: 0;
+}
+
+body[data-step="6"] .onboarding-selection-row strong {
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+body[data-step="6"] .onboarding-pricing-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.15rem;
+}
+
+body[data-step="6"] .onboarding-plan-card {
+  min-width: 0;
+}
+
+body[data-step="6"] .onboarding-plan-card li {
+  font-size: .92rem;
+  line-height: 1.32;
+}
+
+body[data-step="6"] .onboarding-plan-card h2 {
+  padding-right: 6rem;
+}
+
+@media (max-width: 991.98px) {
+  body[data-step="6"] .onboarding-selection-grid,
+  body[data-step="6"] .onboarding-pricing-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body[data-step="6"] .onboarding-plan-card h2 {
+    padding-right: 0;
+  }
+}
+
+.onboarding-plan-card li.is-negative::before {
+  content: "✕";
+  color: #ff4d4f; /* schönes Rot */
+}

@@ -281,9 +281,9 @@
             <ul>
               <li>Einzelne Quizze kostenlos spielen</li>
               <li>Passende Empfehlungen ansehen</li>
-              <li>Kein gespeicherter Fortschritt im Account</li>
-              <li>Kein gezieltes Training deiner falschen Aufgaben</li>
-              <li>Premium-Inhalte nur eingeschränkt nutzbar</li>
+              <li class="is-negative">Kein gespeicherter Fortschritt im Account</li>
+              <li class="is-negative">Kein gezieltes Training deiner falschen Aufgaben</li>
+              <li class="is-negative">Premium-Inhalte nur eingeschränkt nutzbar</li>
             </ul>
             <a class="btn btn-light btn-lg w-100" href="recommendations.php">Ohne Anmeldung starten</a>
             <small>Dein Fortschritt wird nicht dauerhaft gespeichert.</small>
