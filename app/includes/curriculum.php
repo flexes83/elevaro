@@ -617,6 +617,11 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
 
 function curriculum_levels(string $stateCode, string $schoolTypeCode): array
 {
+
+var_dump($stateCode, $schoolTypeCode);
+
+exit;
+
     if (!curriculum_table_exists('school_type_levels')) {
         return curriculum_grades($stateCode, $schoolTypeCode);
     }
@@ -638,9 +643,7 @@ function curriculum_levels(string $stateCode, string $schoolTypeCode): array
 
     $levels = $stmt->fetchAll();
 
-    var_dump($stateCode, $schoolTypeCode);
-
-exit;
+    
 
     if (!empty($levels)) {
         return array_map(static function (array $level): array {
