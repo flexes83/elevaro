@@ -1,61 +1,113 @@
 <?php
-require_once __DIR__ . '/app/includes/frontend_header.php'; ?>
-<!DOCTYPE html>
+require_once __DIR__ . '/app/includes/auth.php';
+require_once __DIR__ . '/app/includes/frontend_header.php';
+
+auth_start_session();
+
+$step = $_GET['step'] ?? 'role';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if ($step === 'role') {
+        $_SESSION['elevaro_onboarding_role'] = $_POST['role'] ?? 'schueler';
+        header('Location: /onboarding.php?step=basics');
+        exit;
+    }
+
+    if ($step === 'basics') {
+        $_SESSION['elevaro_onboarding_grade'] = trim($_POST['grade'] ?? '');
+        $_SESSION['elevaro_onboarding_school_type'] = trim($_POST['school_type'] ?? '');
+        $_SESSION['elevaro_onboarding_subject'] = trim($_POST['subject'] ?? '');
+        header('Location: /register.php?return=' . urlencode('/recommendations.php'));
+        exit;
+    }
+}
+
+function onb_h($value): string
+{
+    return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
+}
+
+$role = $_SESSION['elevaro_onboarding_role'] ?? 'schueler';
+?>
+<!doctype html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8">
+  <title>Loslegen – Elevaro</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Los geht’s – Elevaro</title>
-  <meta name="description" content="Finde Quizze, die zu deinem Bundesland, deiner Schulart und deiner Klasse passen.">
+  <meta name="description" content="Finde Quizze passend zu Klasse, Fach und Schulart.">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/onboarding.css">
   <link rel="stylesheet" href="/assets/css/frontend-header.css">
+  <link rel="stylesheet" href="/assets/css/onboarding-register.css">
 </head>
 <body>
-
 <?php elevaro_frontend_header('light', []); ?>
 
-<main class="onboarding-wrap">
-  <div class="container">
-    <div class="onboarding-shell mx-auto">
+<main class="elevaro-flow-page">
+  <section class="flow-shell">
+    <div class="flow-card">
 
-      <div class="progress mb-4" style="height: 10px;">
-        <div id="stepProgress" class="progress-bar" style="width: 0%"></div>
-      </div>
+      <?php if ($step === 'role'): ?>
+        <span class="flow-kicker">Schritt 1 von 2</span>
+        <h1>Für wen suchst du passende Quizze?</h1>
+        <p>Wir passen den Einstieg daran an, ob du selbst lernst, dein Kind unterstützt oder mit einer Klasse arbeitest.</p>
 
-      <div class="onboarding-card">
-        <div class="row g-4 align-items-center">
-          <div class="col-lg-4 text-center">
-            <div id="stepIllustration" class="step-illustration">🐼</div>
-            <div id="pandaHint" class="panda-hint">Ich suche dir passende Quizze raus.</div>
-          </div>
+        <form method="post" class="role-grid">
+          <button class="role-card" name="role" value="schueler">
+            <span>🎒</span>
+            <strong>Für Schüler</strong>
+            <small>Ich möchte selbst üben und besser werden.</small>
+          </button>
 
-          <div class="col-lg-8">
-            <div id="stepBadge" class="step-badge mb-2">Schritt 1</div>
-            <h1 id="stepTitle" class="fw-bold mb-2">Wie dürfen wir dich nennen?</h1>
-            <p id="stepText" class="text-muted mb-4">
-              Dein Vorname reicht völlig. Du kannst den Schritt auch überspringen.
-            </p>
+          <button class="role-card" name="role" value="eltern">
+            <span>👨‍👩‍👧</span>
+            <strong>Für Eltern</strong>
+            <small>Ich suche passende Übungen für mein Kind.</small>
+          </button>
 
-            <div id="choices" class="choice-grid"></div>
+          <button class="role-card" name="role" value="lehrer">
+            <span>🏫</span>
+            <strong>Für Lehrer</strong>
+            <small>Ich möchte Quizze für meine Klasse nutzen.</small>
+          </button>
+        </form>
 
-            <div id="emptyState" class="alert alert-light border d-none mt-3">
-              Für diese Auswahl haben wir noch keine passenden Inhalte. Du kannst trotzdem weitergehen – wir erweitern Elevaro Schritt für Schritt.
+      <?php else: ?>
+        <span class="flow-kicker">Schritt 2 von 2</span>
+        <h1>Was passt zu dir?</h1>
+        <p>Damit wir dir direkt sinnvollere Quizze zeigen können, brauchen wir nur ein paar grobe Angaben.</p>
+
+        <form method="post" class="flow-form">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label>Klasse</label>
+              <input name="grade" value="<?= onb_h($_SESSION['elevaro_onboarding_grade'] ?? '') ?>" placeholder="z. B. 7">
             </div>
 
-            <div class="d-flex justify-content-between gap-3 mt-4">
-              <button id="backBtn" class="btn btn-light" disabled>Zurück</button>
-              <button id="skipBtn" class="btn btn-outline-secondary">Überspringen</button>
+            <div class="col-md-4">
+              <label>Schulart</label>
+              <select name="school_type">
+                <option value="">Bitte wählen</option>
+                <option value="grundschule">Grundschule</option>
+                <option value="hauptschule">Hauptschule</option>
+                <option value="realschule">Realschule</option>
+                <option value="gymnasium">Gymnasium</option>
+                <option value="gemeinschaftsschule">Gemeinschaftsschule</option>
+              </select>
+            </div>
+
+            <div class="col-md-4">
+              <label>Fach / Thema</label>
+              <input name="subject" value="<?= onb_h($_SESSION['elevaro_onboarding_subject'] ?? '') ?>" placeholder="z. B. Englisch">
             </div>
           </div>
-        </div>
-      </div>
+
+          <button class="btn btn-primary btn-lg mt-4">Weiter</button>
+        </form>
+      <?php endif; ?>
 
     </div>
-  </div>
+  </section>
 </main>
-
-<script src="assets/js/onboarding.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

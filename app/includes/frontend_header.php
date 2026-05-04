@@ -137,7 +137,7 @@ function elevaro_frontend_header(string $variant = 'light', array $options = [])
             Login
           </a>
 
-          <a href="/register.php" class="btn btn-sm btn-primary">
+          <a href="/onboarding.php" class="btn btn-sm btn-primary">
             Jetzt loslegen
           </a>
 

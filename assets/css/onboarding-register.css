@@ -1,0 +1,208 @@
+/* Elevaro onboarding + register flow */
+
+.elevaro-flow-page {
+  min-height: 100vh;
+  padding: clamp(1.2rem, 4vw, 3rem);
+  background:
+    radial-gradient(circle at 12% 20%, rgba(0,206,201,.18), transparent 30rem),
+    radial-gradient(circle at 88% 10%, rgba(90,79,243,.22), transparent 34rem),
+    linear-gradient(135deg, #fff 0%, #f7f6ff 100%);
+}
+
+.flow-shell,
+.register-shell {
+  width: min(1080px, 100%);
+  margin: 0 auto;
+  padding-top: clamp(1rem, 4vw, 3rem);
+}
+
+.flow-card,
+.register-copy,
+.register-card {
+  border: 1px solid rgba(23,32,51,.07);
+  border-radius: 2rem;
+  background: rgba(255,255,255,.94);
+  box-shadow: 0 1.25rem 4rem rgba(23,32,51,.11);
+}
+
+.flow-card {
+  padding: clamp(1.4rem, 4vw, 3rem);
+}
+
+.flow-kicker {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: .35rem .7rem;
+  background: #f3f1ff;
+  color: #4037c9;
+  font-size: .84rem;
+  font-weight: 900;
+}
+
+.flow-card h1,
+.register-copy h1 {
+  margin: .8rem 0 .6rem;
+  font-size: clamp(2.2rem, 6vw, 4.7rem);
+  line-height: .9;
+  letter-spacing: -.075em;
+  font-weight: 950;
+}
+
+.flow-card p,
+.register-copy p {
+  color: #6c7482;
+  font-size: 1.08rem;
+  line-height: 1.5;
+  font-weight: 650;
+}
+
+.role-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .9rem;
+  margin-top: 1.4rem;
+}
+
+.role-card {
+  text-align: left;
+  border: 1px solid rgba(23,32,51,.09);
+  border-radius: 1.4rem;
+  padding: 1.1rem;
+  background: #fff;
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.role-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 .8rem 2rem rgba(23,32,51,.1);
+}
+
+.role-card span,
+.role-card strong,
+.role-card small {
+  display: block;
+}
+
+.role-card span {
+  font-size: 2rem;
+  margin-bottom: .5rem;
+}
+
+.role-card strong {
+  font-size: 1.05rem;
+  font-weight: 950;
+}
+
+.role-card small {
+  color: #6c7482;
+  font-weight: 650;
+  margin-top: .25rem;
+}
+
+.flow-form label {
+  display: block;
+  margin-bottom: .35rem;
+  font-weight: 850;
+}
+
+.flow-form input,
+.flow-form select {
+  width: 100%;
+  border: 1px solid rgba(23,32,51,.12);
+  border-radius: 1rem;
+  padding: .78rem .95rem;
+  background: #fff;
+  font: inherit;
+  font-weight: 750;
+}
+
+.register-shell {
+  display: grid;
+  grid-template-columns: minmax(0, .95fr) minmax(360px, .7fr);
+  gap: 1.2rem;
+  align-items: stretch;
+}
+
+.register-copy,
+.register-card {
+  padding: clamp(1.4rem, 4vw, 2.4rem);
+}
+
+.register-usp {
+  display: grid;
+  gap: .65rem;
+  margin-top: 1.2rem;
+}
+
+.register-usp div {
+  border-radius: 1rem;
+  padding: .85rem .95rem;
+  background: #f3f1ff;
+  font-weight: 800;
+}
+
+.onboarding-summary {
+  margin-top: 1.2rem;
+  border-radius: 1rem;
+  padding: .85rem .95rem;
+  background: linear-gradient(135deg, rgba(90,79,243,.1), rgba(0,206,201,.1));
+}
+
+.onboarding-summary strong,
+.onboarding-summary span {
+  display: block;
+}
+
+.onboarding-summary span {
+  color: #6c7482;
+  font-weight: 750;
+}
+
+.check-row {
+  display: flex !important;
+  gap: .55rem;
+  align-items: flex-start;
+  margin-top: .8rem;
+  color: #6c7482;
+  font-weight: 700 !important;
+}
+
+.check-row input {
+  width: auto;
+  margin-top: .25rem;
+}
+
+.register-skip,
+.register-code {
+  text-align: center;
+  margin-top: 1rem;
+}
+
+.register-skip a {
+  color: #6c7482;
+  font-weight: 850;
+  text-decoration: underline;
+  text-underline-offset: .2rem;
+}
+
+.register-skip span {
+  display: block;
+  margin-top: .25rem;
+  color: #9aa1ad;
+  font-size: .86rem;
+  font-weight: 700;
+}
+
+.register-code a {
+  color: #5a4ff3;
+  font-weight: 850;
+  text-decoration: none;
+}
+
+@media (max-width: 900px) {
+  .role-grid,
+  .register-shell {
+    grid-template-columns: 1fr;
+  }
+}
