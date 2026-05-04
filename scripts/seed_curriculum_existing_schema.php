@@ -19,7 +19,7 @@ error_reporting(E_ALL);
 set_time_limit(0);
 
 const SOURCE_URL_DEFAULT = 'https://www.bildungsserver.de/';
-const IMPORT_VERSION = '2026-05-05-fixed-02';
+const IMPORT_VERSION = '2026-05-05-subtopics-01';
 
 $options = parseCliOptions($argv);
 $dryRun = isset($options['dry-run']);
@@ -99,6 +99,10 @@ foreach ($jobs as $job) {
             println('  Domains: ' . count($data['domains']));
             foreach ($data['domains'] as $domain) {
                 println('  - ' . $domain['domain_title'] . ' (' . count($domain['topics']) . ' Themen)');
+                foreach ($domain['topics'] as $topic) {
+                    $subs = $topic['subtopics'] ?? [];
+                    println('    · ' . $topic['topic_title'] . ' (' . count($subs) . ' Subtopics)');
+                }
             }
             updateImportRun($pdo, $runId, 'dry_run', json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT), null);
             continue;
@@ -220,6 +224,39 @@ function ensureTables(PDO $pdo): void
         if (!$stmt->fetchColumn()) {
             fail("Tabelle {$table} existiert nicht. Bitte zuerst die bestehende Migration/SQL importieren.");
         }
+    }
+
+    // Bestehende Content-Tabelle um Topic-Metadaten erweitern, falls sie fehlen.
+    ensureColumn($pdo, 'curriculum_topics_content', 'domain_key', "VARCHAR(180) NULL AFTER subject_label");
+    ensureColumn($pdo, 'curriculum_topics_content', 'domain_title', "VARCHAR(255) NULL AFTER domain_key");
+    ensureColumn($pdo, 'curriculum_topics_content', 'learning_goal', "TEXT NULL AFTER topic_description");
+    ensureColumn($pdo, 'curriculum_topics_content', 'difficulty_level', "VARCHAR(20) NULL AFTER learning_goal");
+    ensureColumn($pdo, 'curriculum_topics_content', 'question_type_hint', "VARCHAR(255) NULL AFTER difficulty_level");
+
+    // Eigene Tabelle fuer echte Subtopics. curriculum_topics_content bleibt die Topic-Ebene.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS curriculum_topic_subtopics (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        curriculum_topic_content_id INT NOT NULL,
+        subtopic_key VARCHAR(180) NOT NULL,
+        subtopic_title VARCHAR(255) NOT NULL,
+        learning_goal TEXT NULL,
+        difficulty_level VARCHAR(20) NULL,
+        question_type_hint VARCHAR(255) NULL,
+        sort_order INT UNSIGNED NOT NULL DEFAULT 0,
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_curriculum_subtopic (curriculum_topic_content_id, subtopic_key),
+        KEY idx_curriculum_subtopic_topic (curriculum_topic_content_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+}
+
+function ensureColumn(PDO $pdo, string $table, string $column, string $definition): void
+{
+    $stmt = $pdo->prepare("SHOW COLUMNS FROM {$table} LIKE ?");
+    $stmt->execute([$column]);
+    if (!$stmt->fetchColumn()) {
+        $pdo->exec("ALTER TABLE {$table} ADD COLUMN {$column} {$definition}");
     }
 }
 
@@ -431,7 +468,7 @@ function buildPrompt(array $job): string
         . "Ziel: Die Daten sollen spaeter als Grundlage fuer qualitative Schueler-Quizzes dienen.\n"
         . "Bitte keine Fantasie-Faecher und keine Uni-Inhalte. Formuliere allgemein lehrplannah, aber nicht als laengliches offizielles Zitat.\n"
         . "Erzeuge 4 bis 7 fachlich sinnvolle Domains/Oberbereiche. Pro Domain 4 bis 8 konkrete Topics.\n"
-        . "Jedes Topic braucht eine klare Beschreibung, Kompetenzbereich, ein konkretes Lernziel und 3 bis 6 Subtopics als kurze Stichpunkte.\n"
+        . "Jedes Topic braucht eine klare Beschreibung, Kompetenzbereich, ein konkretes Lernziel, Schwierigkeit, Fragetyp-Hinweis und 3 bis 6 konkrete Subtopics. Jeder Subtopic braucht einen Titel und ein eigenes Lernziel.\n"
         . "Vermeide Copyright-nahe Uebernahmen offizieller Lehrplantexte. Nutze eigene, kurze Formulierungen.\n"
         . "Die Ausgabe muss exakt dem JSON-Schema entsprechen.";
 }
@@ -471,7 +508,18 @@ function callOpenAi(string $apiKey, string $model, string $prompt): array
                                         'type' => 'array',
                                         'minItems' => 2,
                                         'maxItems' => 8,
-                                        'items' => ['type' => 'string'],
+                                        'items' => [
+                                            'type' => 'object',
+                                            'additionalProperties' => false,
+                                            'properties' => [
+                                                'subtopic_key' => ['type' => 'string'],
+                                                'subtopic_title' => ['type' => 'string'],
+                                                'learning_goal' => ['type' => 'string'],
+                                                'difficulty_level' => ['type' => 'string', 'enum' => ['leicht', 'mittel', 'schwer']],
+                                                'question_type_hint' => ['type' => 'string'],
+                                            ],
+                                            'required' => ['subtopic_key', 'subtopic_title', 'learning_goal', 'difficulty_level', 'question_type_hint'],
+                                        ],
                                     ],
                                 ],
                                 'required' => ['topic_key', 'topic_title', 'topic_description', 'competence_area', 'learning_goal', 'difficulty_level', 'question_type_hint', 'subtopics'],
@@ -583,47 +631,51 @@ function validateResponse(array $data): void
                     throw new RuntimeException("Topic unvollstaendig: {$key} fehlt.");
                 }
             }
+            if (empty($topic['subtopics']) || !is_array($topic['subtopics'])) {
+                throw new RuntimeException('Topic ohne Subtopics.');
+            }
+            foreach ($topic['subtopics'] as $subtopic) {
+                foreach (['subtopic_title', 'learning_goal'] as $key) {
+                    if (empty($subtopic[$key])) {
+                        throw new RuntimeException("Subtopic unvollstaendig: {$key} fehlt.");
+                    }
+                }
+            }
         }
     }
 }
 
 function importCurriculumContent(PDO $pdo, array $job, array $data): int
 {
-    $count = 0;
+    $topicCount = 0;
+    $subtopicCount = 0;
     $sort = 1;
 
     foreach ($data['domains'] as $domain) {
+        $domainKey = normalizeKey($domain['domain_key'] ?: $domain['domain_title']);
+        $domainTitle = trim($domain['domain_title']);
+
         foreach ($domain['topics'] as $topic) {
             $topicKey = normalizeKey($topic['topic_key'] ?: $topic['topic_title']);
             if ($topicKey === '') {
-                $topicKey = normalizeKey($domain['domain_title'] . '-' . $topic['topic_title']);
+                $topicKey = normalizeKey($domainTitle . '-' . $topic['topic_title']);
             }
 
             $description = trim($topic['topic_description']);
             $learningGoal = trim($topic['learning_goal'] ?? '');
             $difficulty = trim($topic['difficulty_level'] ?? 'mittel');
             $questionTypes = trim($topic['question_type_hint'] ?? '');
-            $subtopics = isset($topic['subtopics']) && is_array($topic['subtopics']) ? $topic['subtopics'] : [];
-
-            $fullDescription = $description;
-            if ($learningGoal !== '') {
-                $fullDescription .= "\n\nLernziel: " . $learningGoal;
-            }
-            if (!empty($subtopics)) {
-                $fullDescription .= "\n\nSubtopics: " . implode('; ', array_map('trim', $subtopics));
-            }
-            if ($difficulty !== '') {
-                $fullDescription .= "\n\nSchwierigkeit: " . $difficulty;
-            }
-            if ($questionTypes !== '') {
-                $fullDescription .= "\n\nFragetypen: " . $questionTypes;
-            }
 
             $existingId = findExistingContentId($pdo, $job, $topicKey);
             if ($existingId) {
                 $stmt = $pdo->prepare("UPDATE curriculum_topics_content SET
+                    domain_key = ?,
+                    domain_title = ?,
                     topic_title = ?,
                     topic_description = ?,
+                    learning_goal = ?,
+                    difficulty_level = ?,
+                    question_type_hint = ?,
                     competence_area = ?,
                     source_name = ?,
                     source_url = ?,
@@ -632,19 +684,26 @@ function importCurriculumContent(PDO $pdo, array $job, array $data): int
                     updated_at = NOW()
                     WHERE id = ?");
                 $stmt->execute([
+                    $domainKey,
+                    $domainTitle,
                     trim($topic['topic_title']),
-                    $fullDescription,
+                    $description,
+                    $learningGoal,
+                    $difficulty,
+                    $questionTypes,
                     trim($topic['competence_area']),
                     sourceNameForState($job['state_label']),
                     SOURCE_URL_DEFAULT,
                     $sort,
                     $existingId,
                 ]);
+                $contentId = (int)$existingId;
             } else {
                 $stmt = $pdo->prepare("INSERT INTO curriculum_topics_content
                     (state_code, school_type_key, grade_key, grade_from, grade_to, subject_key, subject_label,
-                     topic_key, topic_title, topic_description, competence_area, source_name, source_url, sort_order, is_active, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())");
+                     domain_key, domain_title, topic_key, topic_title, topic_description, learning_goal, difficulty_level, question_type_hint,
+                     competence_area, source_name, source_url, sort_order, is_active, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())");
                 $stmt->execute([
                     $job['state_code'],
                     $job['school_type_key'],
@@ -653,21 +712,59 @@ function importCurriculumContent(PDO $pdo, array $job, array $data): int
                     $job['grade_to'],
                     $job['subject_key'],
                     $job['subject_label'],
+                    $domainKey,
+                    $domainTitle,
                     $topicKey,
                     trim($topic['topic_title']),
-                    $fullDescription,
+                    $description,
+                    $learningGoal,
+                    $difficulty,
+                    $questionTypes,
                     trim($topic['competence_area']),
                     sourceNameForState($job['state_label']),
                     SOURCE_URL_DEFAULT,
                     $sort,
                 ]);
+                $contentId = (int)$pdo->lastInsertId();
             }
+
+            $subSort = 1;
+            foreach (($topic['subtopics'] ?? []) as $subtopic) {
+                $subtopicKey = normalizeKey(($subtopic['subtopic_key'] ?? '') ?: ($subtopic['subtopic_title'] ?? ''));
+                if ($subtopicKey === '') {
+                    continue;
+                }
+
+                $stmt = $pdo->prepare("INSERT INTO curriculum_topic_subtopics
+                    (curriculum_topic_content_id, subtopic_key, subtopic_title, learning_goal, difficulty_level, question_type_hint, sort_order, is_active, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 1, NOW())
+                    ON DUPLICATE KEY UPDATE
+                        subtopic_title = VALUES(subtopic_title),
+                        learning_goal = VALUES(learning_goal),
+                        difficulty_level = VALUES(difficulty_level),
+                        question_type_hint = VALUES(question_type_hint),
+                        sort_order = VALUES(sort_order),
+                        is_active = 1,
+                        updated_at = NOW()");
+                $stmt->execute([
+                    $contentId,
+                    $subtopicKey,
+                    trim($subtopic['subtopic_title'] ?? ''),
+                    trim($subtopic['learning_goal'] ?? ''),
+                    trim($subtopic['difficulty_level'] ?? $difficulty),
+                    trim($subtopic['question_type_hint'] ?? $questionTypes),
+                    $subSort,
+                ]);
+                $subSort++;
+                $subtopicCount++;
+            }
+
             $sort++;
-            $count++;
+            $topicCount++;
         }
     }
 
-    return $count;
+    return $topicCount;
 }
 
 function findExistingContentId(PDO $pdo, array $job, string $topicKey): ?int
