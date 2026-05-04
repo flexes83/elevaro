@@ -19,7 +19,7 @@ error_reporting(E_ALL);
 set_time_limit(0);
 
 const SOURCE_URL_DEFAULT = 'https://www.bildungsserver.de/';
-const IMPORT_VERSION = '2026-05-05-fixed-01';
+const IMPORT_VERSION = '2026-05-05-fixed-02';
 
 $options = parseCliOptions($argv);
 $dryRun = isset($options['dry-run']);
@@ -148,13 +148,45 @@ function createPdo(array $config): PDO
     }
 
     $charset = $config['charset'] ?? 'utf8mb4';
-    $dsn = sprintf('mysql:host=%s;dbname=%s;charset=%s', $config['host'], $config['database'], $charset);
-
-    return new PDO($dsn, $config['username'], $config['password'], [
+    $options = [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES {$charset}",
-    ]);
+    ];
+
+    // Wenn explizit ein Socket in config/db.php gesetzt ist, diesen nutzen.
+    if (!empty($config['unix_socket'])) {
+        $dsn = sprintf(
+            'mysql:unix_socket=%s;dbname=%s;charset=%s',
+            $config['unix_socket'],
+            $config['database'],
+            $charset
+        );
+        return new PDO($dsn, $config['username'], $config['password'], $options);
+    }
+
+    $host = (string)$config['host'];
+    $port = isset($config['port']) ? (int)$config['port'] : null;
+
+    $buildDsn = static function (string $dsnHost) use ($config, $charset, $port): string {
+        $dsn = sprintf('mysql:host=%s;', $dsnHost);
+        if ($port) {
+            $dsn .= 'port=' . $port . ';';
+        }
+        $dsn .= sprintf('dbname=%s;charset=%s', $config['database'], $charset);
+        return $dsn;
+    };
+
+    try {
+        return new PDO($buildDsn($host), $config['username'], $config['password'], $options);
+    } catch (PDOException $e) {
+        // Plesk/MySQL: localhost versucht oft Socket. Wenn dieser nicht gefunden wird, per TCP versuchen.
+        if ($host === 'localhost' && str_contains($e->getMessage(), 'No such file or directory')) {
+            return new PDO($buildDsn('127.0.0.1'), $config['username'], $config['password'], $options);
+        }
+
+        throw $e;
+    }
 }
 
 function ensureTables(PDO $pdo): void
