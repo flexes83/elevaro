@@ -61,23 +61,19 @@ function elevaro_frontend_header(string $variant = 'light', array $options = [])
   <div class="container">
     <a class="navbar-brand fw-bold" href="/">Elevaro</a>
 
-    <div class="ms-auto d-flex align-items-center gap-2">
+    <div class="ms-5 d-flex align-items-center gap-2">
 
 
       <a href="#">Für Schüler</a>
       <a href="#">Für Lehrer</a>
      
 
-      <?php if ($showExamples): ?>
-        <a href="#showcase">Beispiele</a>
-      <?php endif; ?>
-
       <?php if ($showChangeSelection): ?>
         <a href="/onboarding.php?edit=1" class="btn btn-sm btn-outline-primary d-none d-md-inline-flex">Auswahl ändern</a>
       <?php endif; ?>
 
       <?php if ($showQuizButton): ?>
-        <a href="/recommendations.php" class="btn btn-sm <?= $isGlass ? 'btn-light' : 'btn-primary' ?>">Quizze finden</a>
+        <a class="me-auto" href="/recommendations.php">Quizze finden</a>
       <?php endif; ?>
 
       <?php if ($user): ?>
@@ -105,7 +101,9 @@ function elevaro_frontend_header(string $variant = 'light', array $options = [])
           </ul>
         </div>
       <?php else: ?>
+        
         <a href="/login.php" class="btn btn-sm <?= $isGlass ? 'btn-outline-light' : 'btn-outline-primary' ?>">Login</a>
+        <a href="/paywall.php" class="btn btn-sm btn-primary">Jetzt loslegen</a>
       <?php endif; ?>
     </div>
   </div>
