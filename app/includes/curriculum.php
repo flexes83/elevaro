@@ -255,13 +255,19 @@ function curriculum_topics(string $stateCode, string $schoolTypeCode, int $grade
 function curriculum_table_exists(string $tableName): bool
 {
     try {
-        $stmt = elevaro_db()->prepare("SHOW TABLES LIKE :table_name");
+        $stmt = elevaro_db()->prepare("
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = :table_name
+        ");
         $stmt->execute(['table_name' => $tableName]);
-        return (bool)$stmt->fetchColumn();
+        return (int)$stmt->fetchColumn() > 0;
     } catch (Throwable $e) {
         return false;
     }
 }
+
 
 function curriculum_learning_areas(string $stateCode, string $schoolTypeCode, int $grade, string $subjectCode): array
 {
@@ -617,45 +623,44 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
 
 function curriculum_levels(string $stateCode, string $schoolTypeCode): array
 {
+    try {
+        $stmt = elevaro_db()->prepare("
+            SELECT
+                l.id,
+                l.code,
+                l.name,
+                l.numeric_grade
+            FROM school_type_levels l
+            JOIN states s ON s.id = l.state_id
+            JOIN school_types st ON st.id = l.school_type_id
+            WHERE s.code = :state
+              AND st.code = :school_type
+            ORDER BY l.sort_order ASC, l.name ASC
+        ");
 
-var_dump($stateCode, $schoolTypeCode);
+        $stmt->execute([
+            'state' => $stateCode,
+            'school_type' => $schoolTypeCode,
+        ]);
 
-exit;
+        $levels = $stmt->fetchAll();
 
-    if (!curriculum_table_exists('school_type_levels')) {
-        return curriculum_grades($stateCode, $schoolTypeCode);
-    }
-
-    $stmt = elevaro_db()->prepare("
-        SELECT l.id, l.code, l.name, l.numeric_grade
-        FROM school_type_levels l
-        JOIN states s ON s.id = l.state_id
-        JOIN school_types st ON st.id = l.school_type_id
-        WHERE s.code = :state
-          AND st.code = :school_type
-        ORDER BY l.sort_order ASC, l.name ASC
-    ");
-
-    $stmt->execute([
-        'state' => $stateCode,
-        'school_type' => $schoolTypeCode,
-    ]);
-
-    $levels = $stmt->fetchAll();
-
-    
-
-    if (!empty($levels)) {
-        return array_map(static function (array $level): array {
-            return [
-                'id' => $level['id'],
-                'code' => $level['code'],
-                'name' => $level['name'],
-                'numeric_grade' => $level['numeric_grade'],
-                'grade' => $level['numeric_grade'],
-            ];
-        }, $levels);
+        if (!empty($levels)) {
+            return array_map(static function (array $level): array {
+                return [
+                    'id' => $level['id'],
+                    'code' => $level['code'],
+                    'name' => $level['name'],
+                    'numeric_grade' => $level['numeric_grade'],
+                    // Compatibility: existing onboarding stores the selected code in values.grade.
+                    'grade' => $level['numeric_grade'],
+                ];
+            }, $levels);
+        }
+    } catch (Throwable $e) {
+        // Fall back below for older databases without school_type_levels.
     }
 
     return curriculum_grades($stateCode, $schoolTypeCode);
 }
+

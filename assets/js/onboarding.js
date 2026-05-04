@@ -296,7 +296,10 @@
     const selectionRows = [
       ['Bundesland', state.labels.state || state.values.state || 'Nicht gewählt'],
       ['Schulart', state.labels.school_type || state.values.school_type || 'Nicht gewählt'],
-      ['Klasse', state.labels.grade || (state.values.grade ? `${state.values.grade}. Klasse` : 'Nicht gewählt')],
+      [
+        (String(state.values.school_type || '').startsWith('beruf') || String(state.labels.school_type || '').toLowerCase().startsWith('beruf')) ? 'Stufe' : 'Klasse',
+        state.labels.grade || (state.values.grade ? `${state.values.grade}. Klasse` : 'Nicht gewählt')
+      ],
       ['Fach', state.labels.subject || state.values.subject || 'Nicht gewählt']
     ];
 
