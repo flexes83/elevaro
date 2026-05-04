@@ -1,0 +1,199 @@
+:root {
+  --elevaro-primary: #5a4ff3;
+  --elevaro-primary-dark: #4037c9;
+  --elevaro-soft: #f3f1ff;
+  --elevaro-text: #172033;
+  --elevaro-muted: #6c7482;
+}
+
+body {
+  min-height: 100vh;
+  color: var(--elevaro-text);
+  background:
+    radial-gradient(circle at 12% 20%, rgba(0,206,201,.18), transparent 30rem),
+    radial-gradient(circle at 88% 10%, rgba(90,79,243,.22), transparent 34rem),
+    linear-gradient(135deg, #fff 0%, #f7f6ff 100%);
+}
+
+.register-page {
+  padding: clamp(1.4rem, 4vw, 4rem);
+}
+
+.register-shell {
+  width: min(1160px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(380px, .78fr);
+  gap: 1.35rem;
+  align-items: stretch;
+}
+
+.register-copy,
+.register-card {
+  border: 1px solid rgba(23,32,51,.07);
+  border-radius: 2rem;
+  background: rgba(255,255,255,.94);
+  box-shadow: 0 1.25rem 4rem rgba(23,32,51,.11);
+  padding: clamp(1.4rem, 4vw, 2.7rem);
+}
+
+.register-copy {
+  position: relative;
+  overflow: hidden;
+}
+
+.register-copy::after {
+  content: "";
+  position: absolute;
+  right: -5rem;
+  bottom: -6rem;
+  width: 18rem;
+  height: 18rem;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.9), transparent 3rem),
+              linear-gradient(135deg, rgba(90,79,243,.18), rgba(0,206,201,.18));
+  pointer-events: none;
+}
+
+.register-visual {
+  width: 7.2rem;
+  height: 7.2rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  margin-bottom: 1.2rem;
+  font-size: 3.4rem;
+  background:
+    radial-gradient(circle at 30% 22%, rgba(255,255,255,.9), transparent 2.2rem),
+    linear-gradient(135deg, rgba(90,79,243,.98), rgba(0,206,201,.9));
+  box-shadow: 0 1rem 2.8rem rgba(90,79,243,.22);
+}
+
+.register-kicker {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: .35rem .7rem;
+  background: var(--elevaro-soft);
+  color: var(--elevaro-primary-dark);
+  font-size: .84rem;
+  font-weight: 900;
+}
+
+.register-copy h1 {
+  margin: .8rem 0 .6rem;
+  font-size: clamp(2.6rem, 7vw, 5rem);
+  line-height: .88;
+  letter-spacing: -.075em;
+  font-weight: 950;
+}
+
+.register-copy p,
+.register-card-head p {
+  color: var(--elevaro-muted);
+  font-size: 1.05rem;
+  line-height: 1.45;
+  font-weight: 700;
+}
+
+.register-price-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.25rem 0;
+  border-radius: 1.35rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, rgba(90,79,243,.12), rgba(0,206,201,.1));
+}
+
+.register-price-card strong,
+.register-price-card span,
+.register-price-card small {
+  display: block;
+}
+
+.register-price-card strong {
+  font-size: 1rem;
+  font-weight: 950;
+}
+
+.register-price-card span {
+  font-size: 1.45rem;
+  font-weight: 950;
+  letter-spacing: -.05em;
+}
+
+.register-price-card small {
+  color: var(--elevaro-muted);
+  font-weight: 850;
+}
+
+.register-usp {
+  display: grid;
+  gap: .65rem;
+}
+
+.register-usp div {
+  border-radius: 1rem;
+  padding: .9rem 1rem;
+  background: var(--elevaro-soft);
+  font-weight: 850;
+}
+
+.register-card-head {
+  margin-bottom: 1.15rem;
+}
+
+.register-card-head h2 {
+  margin: 0 0 .35rem;
+  font-size: 1.6rem;
+  font-weight: 950;
+  letter-spacing: -.05em;
+}
+
+.register-form label {
+  display: block;
+  margin: .75rem 0 .35rem;
+  font-weight: 900;
+}
+
+.register-form input:not([type="checkbox"]) {
+  width: 100%;
+  border: 1px solid rgba(23,32,51,.12);
+  border-radius: 1.15rem;
+  padding: .85rem 1rem;
+  background: #fff;
+  font: inherit;
+  font-weight: 750;
+}
+
+.check-row {
+  display: flex !important;
+  gap: .55rem;
+  align-items: flex-start;
+  color: var(--elevaro-muted);
+  font-weight: 800 !important;
+}
+
+.check-row input {
+  margin-top: .28rem;
+}
+
+.btn-primary {
+  background: var(--elevaro-primary);
+  border-color: var(--elevaro-primary);
+  border-radius: 1rem;
+  font-weight: 900;
+  padding: .9rem 1.2rem;
+}
+
+.btn-primary:hover {
+  background: var(--elevaro-primary-dark);
+  border-color: var(--elevaro-primary-dark);
+}
+
+@media (max-width: 900px) {
+  .register-shell {
+    grid-template-columns: 1fr;
+  }
+}

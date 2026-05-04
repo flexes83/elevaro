@@ -71,6 +71,26 @@ function auth_find_user_by_login(string $login): ?array
     return $stmt->fetch() ?: null;
 }
 
+function auth_column_exists(string $table, string $column): bool
+{
+    try {
+        $stmt = elevaro_db()->prepare("
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = :table_name
+              AND COLUMN_NAME = :column_name
+        ");
+        $stmt->execute([
+            'table_name' => $table,
+            'column_name' => $column,
+        ]);
+        return (int)$stmt->fetchColumn() > 0;
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
 function auth_create_user(array $data): int
 {
     auth_start_session();
@@ -103,50 +123,72 @@ function auth_create_user(array $data): int
     $pdo = elevaro_db();
     $candidate = $username;
     $i = 2;
+
     while (auth_find_user_by_login($candidate)) {
         $candidate = $username . $i;
         $i++;
     }
+
     $username = $candidate;
 
-    $stmt = $pdo->prepare("
-        INSERT INTO auth_users
-          (email, username, password_hash, display_name, role, status, has_active_access,
-           billing_name, billing_email, billing_address_line1, billing_address_line2,
-           billing_postal_code, billing_city, billing_country, billing_tax_id,
-           accepted_terms_at, accepted_privacy_at, marketing_consent_at,
-           plan)
-        VALUES
-          (:email, :username, :password_hash, :display_name, :role, 'active', 1,
-           :billing_name, :billing_email, :billing_address_line1, :billing_address_line2,
-           :billing_postal_code, :billing_city, :billing_country, :billing_tax_id,
-           NOW(), NOW(), :marketing_consent_at,
-           'free')
-    ");
-
-    $stmt->execute([
+    $fields = [
         'email' => $email,
         'username' => $username,
         'password_hash' => password_hash($password, PASSWORD_DEFAULT),
         'display_name' => $displayName !== '' ? $displayName : $email,
         'role' => $role,
-        'billing_name' => trim((string)($data['billing_name'] ?? '')) ?: ($displayName ?: $email),
-        'billing_email' => trim((string)($data['billing_email'] ?? '')) ?: $email,
-        'billing_address_line1' => trim((string)($data['billing_address_line1'] ?? '')) ?: null,
-        'billing_address_line2' => trim((string)($data['billing_address_line2'] ?? '')) ?: null,
-        'billing_postal_code' => trim((string)($data['billing_postal_code'] ?? '')) ?: null,
-        'billing_city' => trim((string)($data['billing_city'] ?? '')) ?: null,
-        'billing_country' => strtoupper(substr(trim((string)($data['billing_country'] ?? 'DE')), 0, 2)) ?: 'DE',
-        'billing_tax_id' => trim((string)($data['billing_tax_id'] ?? '')) ?: null,
-        'marketing_consent_at' => !empty($data['marketing_consent']) ? date('Y-m-d H:i:s') : null,
-    ]);
+        'status' => 'active',
+    ];
+
+    if (auth_column_exists('auth_users', 'has_active_access')) {
+        $fields['has_active_access'] = 1;
+    }
+
+    if (auth_column_exists('auth_users', 'plan')) {
+        $fields['plan'] = 'free';
+    }
+
+    if (auth_column_exists('auth_users', 'accepted_terms_at')) {
+        $fields['accepted_terms_at'] = date('Y-m-d H:i:s');
+    }
+
+    if (auth_column_exists('auth_users', 'accepted_privacy_at')) {
+        $fields['accepted_privacy_at'] = date('Y-m-d H:i:s');
+    }
+
+    if (auth_column_exists('auth_users', 'marketing_consent_at')) {
+        $fields['marketing_consent_at'] = !empty($data['marketing_consent']) ? date('Y-m-d H:i:s') : null;
+    }
+
+    // Billing fields are optional. Schüler-Registrierung braucht keine Rechnungsadresse.
+    // If columns exist, only basic invoice fallback values are saved. Address/Tax-ID stay empty.
+    if (auth_column_exists('auth_users', 'billing_name')) {
+        $fields['billing_name'] = trim((string)($data['billing_name'] ?? '')) ?: ($displayName ?: $email);
+    }
+
+    if (auth_column_exists('auth_users', 'billing_email')) {
+        $fields['billing_email'] = trim((string)($data['billing_email'] ?? '')) ?: $email;
+    }
+
+    if (auth_column_exists('auth_users', 'billing_country')) {
+        $fields['billing_country'] = strtoupper(substr(trim((string)($data['billing_country'] ?? 'DE')), 0, 2)) ?: 'DE';
+    }
+
+    $columns = array_keys($fields);
+    $placeholders = array_map(static fn($column) => ':' . $column, $columns);
+
+    $stmt = $pdo->prepare("
+        INSERT INTO auth_users (" . implode(', ', $columns) . ")
+        VALUES (" . implode(', ', $placeholders) . ")
+    ");
+
+    $stmt->execute($fields);
 
     $userId = (int)$pdo->lastInsertId();
     $_SESSION[ELEVARO_AUTH_SESSION_KEY] = $userId;
 
     return $userId;
 }
-
 
 function auth_login(string $login, string $password): bool
 {

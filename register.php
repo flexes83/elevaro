@@ -48,10 +48,6 @@ function reg_h($value): string
 {
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 }
-
-$grade = $_SESSION['elevaro_onboarding_grade'] ?? '';
-$schoolType = $_SESSION['elevaro_onboarding_school_type'] ?? '';
-$subject = $_SESSION['elevaro_onboarding_subject'] ?? '';
 ?>
 <!doctype html>
 <html lang="de">
@@ -62,38 +58,45 @@ $subject = $_SESSION['elevaro_onboarding_subject'] ?? '';
   <meta name="description" content="Speichere deinen Fortschritt und übe passende Aufgaben.">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="/assets/css/frontend-header.css">
-  <link rel="stylesheet" href="/assets/css/onboarding-register.css">
+  <link rel="stylesheet" href="/assets/css/register.css">
 </head>
 <body>
 <?php elevaro_frontend_header('light', []); ?>
 
-<main class="elevaro-flow-page">
+<main class="register-page">
   <section class="register-shell">
-    <div class="register-copy">
-      <span class="flow-kicker">Fast geschafft</span>
+    <aside class="register-copy">
+      <div class="register-visual">🚀</div>
+      <span class="register-kicker">Fast geschafft</span>
       <h1>Dein Lernzugang</h1>
       <p>Speichere deinen Fortschritt, übe passende Aufgaben und bleib dran – Schritt für Schritt.</p>
 
-      <div class="register-usp">
-        <div>✓ Übe genau die Aufgaben, die noch nicht sitzen</div>
-        <div>✓ Sieh, was du schon sicher kannst</div>
-        <div>✓ Finde Quizze passend zu Klasse, Fach und Schulart</div>
+      <div class="register-price-card">
+        <div>
+          <strong>Premium</strong>
+          <span>4,99 € / Monat</span>
+        </div>
+        <small>monatlich kündbar</small>
       </div>
 
-      <?php if ($grade || $schoolType || $subject): ?>
-        <div class="onboarding-summary">
-          <strong>Deine Auswahl</strong>
-          <span><?= reg_h(trim($schoolType . ' · Klasse ' . $grade . ' · ' . $subject, ' ·')) ?></span>
-        </div>
-      <?php endif; ?>
-    </div>
+      <div class="register-usp">
+        <div>✓ Aufgaben üben, die noch nicht sitzen</div>
+        <div>✓ Fortschritt, Statistiken und Serien speichern</div>
+        <div>✓ Premium-Inhalte wie Listenings und Comprehension</div>
+      </div>
+    </aside>
 
-    <div class="register-card">
+    <section class="register-card">
+      <div class="register-card-head">
+        <h2>Account erstellen</h2>
+        <p>Danach kannst du direkt mit deinen passenden Quizzen starten.</p>
+      </div>
+
       <?php if ($error): ?>
         <div class="alert alert-danger"><?= reg_h($error) ?></div>
       <?php endif; ?>
 
-      <form method="post" class="flow-form">
+      <form method="post" class="register-form">
         <label>Dein Name</label>
         <input name="display_name" value="<?= reg_h($values['display_name']) ?>" placeholder="z. B. Felix" required>
 
@@ -118,16 +121,7 @@ $subject = $_SESSION['elevaro_onboarding_subject'] ?? '';
 
         <button class="btn btn-primary btn-lg w-100 mt-3">Jetzt loslegen</button>
       </form>
-
-      <div class="register-skip">
-        <a href="/recommendations.php">Ohne Anmeldung fortfahren</a>
-        <span>Dein Fortschritt und deine Ergebnisse gehen verloren.</span>
-      </div>
-
-      <div class="register-code">
-        <a href="/redeem_code.php">Ich habe einen Code</a>
-      </div>
-    </div>
+    </section>
   </section>
 </main>
 </body>
