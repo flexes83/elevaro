@@ -6,7 +6,10 @@ require_once __DIR__ . '/../app/includes/auth.php';
 require_once __DIR__ . '/../app/includes/access.php';
 require_once __DIR__ . '/../app/includes/stripe_client.php';
 
-auth_require_login();
+if (!auth_is_logged_in()) {
+    header('Location: /register.php?mode=premium&return=' . urlencode('/api/create_checkout_session.php'));
+    exit;
+}
 
 $user = auth_user();
 

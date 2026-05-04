@@ -80,7 +80,11 @@ function elevaro_create_student_checkout_session(array $user): string
         'line_items[0][quantity]' => 1,
         'metadata[user_id]' => (string)$user['id'],
         'client_reference_id' => (string)$user['id'],
-        'customer_email' => $user['email'] ?? '',
+        'customer_email' => $user['billing_email'] ?? $user['email'] ?? '',
+        'billing_address_collection' => 'required',
+        'tax_id_collection[enabled]' => 'true',
+        'customer_update[address]' => 'auto',
+        'customer_update[name]' => 'auto',
         'subscription_data[metadata][user_id]' => (string)$user['id'],
         'allow_promotion_codes' => 'true',
     ];

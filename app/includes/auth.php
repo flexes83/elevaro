@@ -57,6 +57,97 @@ function auth_user(): ?array
     }
 }
 
+
+function auth_find_user_by_login(string $login): ?array
+{
+    $pdo = elevaro_db();
+    $stmt = $pdo->prepare("
+        SELECT *
+        FROM auth_users
+        WHERE email = :login OR username = :login
+        LIMIT 1
+    ");
+    $stmt->execute(['login' => trim($login)]);
+    return $stmt->fetch() ?: null;
+}
+
+function auth_create_user(array $data): int
+{
+    auth_start_session();
+
+    $email = trim((string)($data['email'] ?? ''));
+    $password = (string)($data['password'] ?? '');
+    $displayName = trim((string)($data['display_name'] ?? ''));
+    $role = (string)($data['role'] ?? 'schueler');
+
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        throw new RuntimeException('Bitte eine gültige E-Mail-Adresse eingeben.');
+    }
+
+    if (mb_strlen($password, 'UTF-8') < 8) {
+        throw new RuntimeException('Das Passwort muss mindestens 8 Zeichen lang sein.');
+    }
+
+    if (!in_array($role, auth_roles(), true) || $role === 'admin') {
+        $role = 'schueler';
+    }
+
+    if (auth_find_user_by_login($email)) {
+        throw new RuntimeException('Für diese E-Mail-Adresse existiert bereits ein Account.');
+    }
+
+    $usernameBase = explode('@', $email)[0] ?: 'user';
+    $username = preg_replace('/[^a-z0-9._-]+/i', '.', $usernameBase);
+    $username = trim((string)$username, '.-_') ?: 'user';
+
+    $pdo = elevaro_db();
+    $candidate = $username;
+    $i = 2;
+    while (auth_find_user_by_login($candidate)) {
+        $candidate = $username . $i;
+        $i++;
+    }
+    $username = $candidate;
+
+    $stmt = $pdo->prepare("
+        INSERT INTO auth_users
+          (email, username, password_hash, display_name, role, status, has_active_access,
+           billing_name, billing_email, billing_address_line1, billing_address_line2,
+           billing_postal_code, billing_city, billing_country, billing_tax_id,
+           accepted_terms_at, accepted_privacy_at, marketing_consent_at,
+           plan)
+        VALUES
+          (:email, :username, :password_hash, :display_name, :role, 'active', 1,
+           :billing_name, :billing_email, :billing_address_line1, :billing_address_line2,
+           :billing_postal_code, :billing_city, :billing_country, :billing_tax_id,
+           NOW(), NOW(), :marketing_consent_at,
+           'free')
+    ");
+
+    $stmt->execute([
+        'email' => $email,
+        'username' => $username,
+        'password_hash' => password_hash($password, PASSWORD_DEFAULT),
+        'display_name' => $displayName !== '' ? $displayName : $email,
+        'role' => $role,
+        'billing_name' => trim((string)($data['billing_name'] ?? '')) ?: ($displayName ?: $email),
+        'billing_email' => trim((string)($data['billing_email'] ?? '')) ?: $email,
+        'billing_address_line1' => trim((string)($data['billing_address_line1'] ?? '')) ?: null,
+        'billing_address_line2' => trim((string)($data['billing_address_line2'] ?? '')) ?: null,
+        'billing_postal_code' => trim((string)($data['billing_postal_code'] ?? '')) ?: null,
+        'billing_city' => trim((string)($data['billing_city'] ?? '')) ?: null,
+        'billing_country' => strtoupper(substr(trim((string)($data['billing_country'] ?? 'DE')), 0, 2)) ?: 'DE',
+        'billing_tax_id' => trim((string)($data['billing_tax_id'] ?? '')) ?: null,
+        'marketing_consent_at' => !empty($data['marketing_consent']) ? date('Y-m-d H:i:s') : null,
+    ]);
+
+    $userId = (int)$pdo->lastInsertId();
+    $_SESSION[ELEVARO_AUTH_SESSION_KEY] = $userId;
+
+    return $userId;
+}
+
+
 function auth_login(string $login, string $password): bool
 {
     auth_start_session();

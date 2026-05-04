@@ -3,7 +3,10 @@
 require_once __DIR__ . '/app/includes/auth.php';
 require_once __DIR__ . '/app/includes/access.php';
 
-auth_require_login();
+if (!auth_is_logged_in()) {
+    header('Location: /register.php?return=' . urlencode('/redeem_code.php'));
+    exit;
+}
 
 $error = null;
 $success = null;

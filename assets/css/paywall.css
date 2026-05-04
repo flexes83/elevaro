@@ -241,3 +241,94 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* v11 signup + billing */
+
+.paywall-button-note,
+.code-login-note {
+  margin-top: .6rem;
+  color: var(--elevaro-muted);
+  font-size: .9rem;
+  font-weight: 700;
+}
+
+.signup-shell {
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.signup-card {
+  border: 1px solid rgba(23,32,51,.07);
+  border-radius: 2rem;
+  background: rgba(255,255,255,.94);
+  box-shadow: 0 1.25rem 4rem rgba(23,32,51,.11);
+  padding: clamp(1.4rem, 4vw, 2.6rem);
+}
+
+.signup-card h1 {
+  margin: .85rem 0 .65rem;
+  font-size: clamp(2.2rem, 6vw, 4.4rem);
+  line-height: .92;
+  letter-spacing: -.075em;
+  font-weight: 950;
+}
+
+.signup-form {
+  display: grid;
+  gap: 1.2rem;
+}
+
+.signup-section {
+  border-radius: 1.4rem;
+  padding: 1.1rem;
+  background: rgba(243,241,255,.55);
+}
+
+.signup-section h2 {
+  margin: 0 0 .25rem;
+  font-size: 1.05rem;
+  font-weight: 950;
+}
+
+.signup-section p {
+  margin: 0 0 .9rem;
+  color: var(--elevaro-muted);
+  font-weight: 650;
+}
+
+.signup-form label {
+  display: block;
+  margin-bottom: .35rem;
+  font-weight: 850;
+}
+
+.signup-form input:not([type="checkbox"]),
+.signup-form select {
+  width: 100%;
+  border: 1px solid rgba(23,32,51,.12);
+  border-radius: 1rem;
+  padding: .75rem .9rem;
+  background: #fff;
+  font: inherit;
+  font-weight: 750;
+}
+
+.signup-checks {
+  display: grid;
+  gap: .45rem;
+  color: var(--elevaro-muted);
+  font-weight: 700;
+}
+
+.signup-checks label {
+  display: flex;
+  gap: .5rem;
+  align-items: flex-start;
+}
+
+.signup-login-hint {
+  margin: 0;
+  color: var(--elevaro-muted);
+  font-weight: 700;
+}

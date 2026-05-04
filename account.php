@@ -69,6 +69,21 @@ $name = trim((string)($user['display_name'] ?: $user['username'] ?: $user['email
   </div>
 </div>
 
+
+<div class="card mt-4">
+  <div class="card-body">
+    <h2 class="h5 fw-bold">Rechnungsdaten</h2>
+    <p class="text-muted mb-2">Diese Daten werden für Stripe und Rechnungen verwendet.</p>
+    <div class="row g-2 small">
+      <div class="col-md-6"><strong>Name:</strong> <?= htmlspecialchars((string)($user['billing_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?: '–' ?></div>
+      <div class="col-md-6"><strong>E-Mail:</strong> <?= htmlspecialchars((string)($user['billing_email'] ?? $user['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+      <div class="col-md-12"><strong>Adresse:</strong>
+        <?= htmlspecialchars(trim((string)($user['billing_address_line1'] ?? '') . ' ' . (string)($user['billing_address_line2'] ?? '') . ', ' . (string)($user['billing_postal_code'] ?? '') . ' ' . (string)($user['billing_city'] ?? '')), ENT_QUOTES, 'UTF-8') ?: '–' ?>
+      </div>
+    </div>
+  </div>
+</div>
+
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

@@ -51,11 +51,12 @@ $return = $_GET['return'] ?? '/recommendations.php';
         <?php if ($isPremium): ?>
           <a class="btn btn-success btn-lg" href="<?= htmlspecialchars($return, ENT_QUOTES, 'UTF-8') ?>">Du hast Premium</a>
         <?php elseif ($user): ?>
-          <a class="btn btn-primary btn-lg" href="/api/create_checkout_session.php">Jetzt weiterlernen</a>
+          <a class="btn btn-primary btn-lg" href="/api/create_checkout_session.php">Premium freischalten</a>
         <?php else: ?>
-          <a class="btn btn-primary btn-lg" href="/login.php?return=<?= urlencode('/paywall.php?return=' . $return) ?>">Kostenlos starten</a>
+          <a class="btn btn-primary btn-lg" href="/login.php?return=<?= urlencode('/paywall.php?return=' . $return) ?>">Premium freischalten</a>
         <?php endif; ?>
       </div>
+      <div class="paywall-button-note">4,99 € / Monat · monatlich kündbar · Zahlung über Stripe</div>
 
       <p class="paywall-trust">Öffentliche Quizze bleiben spielbar. Premium ist für gezieltes Weiterlernen, Fortschritt und unbegrenztes Training.</p>
     </div>
@@ -85,7 +86,8 @@ $return = $_GET['return'] ?? '/recommendations.php';
         <button class="btn btn-outline-primary">Code einlösen</button>
       </form>
     <?php else: ?>
-      <a class="btn btn-outline-primary" href="/login.php?return=<?= urlencode('/paywall.php') ?>">Einloggen und Code einlösen</a>
+      <a class="btn btn-outline-primary" href="/register.php?return=<?= urlencode('/redeem_code.php') ?>">Code einlösen</a>
+      <p class="code-login-note">Login oder Registrierung erfolgt im nächsten Schritt.</p>
     <?php endif; ?>
   </section>
 </main>
