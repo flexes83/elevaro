@@ -34,7 +34,7 @@ require_once __DIR__ . '/app/includes/frontend_header.php'; ?>
             <div id="stepBadge" class="step-badge mb-2">Schritt 1</div>
             <h1 id="stepTitle" class="fw-bold mb-2">Wie dürfen wir dich nennen?</h1>
             <p id="stepText" class="text-muted mb-4">
-              Dein Vorname reicht völlig. Du kannst den Schritt auch überspringen.
+              Dein Vorname reicht völlig. 
             </p>
 
             <div id="choices" class="choice-grid"></div>
