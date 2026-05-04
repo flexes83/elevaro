@@ -158,3 +158,18 @@
   font-size: 0.9rem;
   font-weight: 600;
 }
+
+.register-skip {
+  margin-top: 1.5rem;
+  text-align: center;
+  font-size: 0.9rem;
+}
+.register-skip a {
+  color: #666;
+  text-decoration: underline;
+}
+.register-warning {
+  margin-top: 0.3rem;
+  color: #999;
+  font-size: 0.8rem;
+}

@@ -170,7 +170,16 @@ function rv(string $key, array $values): string {
           Du hast schon einen Account?
           <a href="/login.php?return=<?= urlencode($return) ?>">Einloggen</a>
         </p>
-      </form>
+      
+</form>
+
+<div class="register-skip">
+  <a href="/recommendations.php">Ohne Anmeldung fortfahren</a>
+  <div class="register-warning">
+    Dein Fortschritt und deine Ergebnisse gehen verloren.
+  </div>
+</div>
+
     </div>
   </section>
 </main>
