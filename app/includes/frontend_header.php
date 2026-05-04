@@ -62,8 +62,14 @@ function elevaro_frontend_header(string $variant = 'light', array $options = [])
     <a class="navbar-brand fw-bold" href="/">Elevaro</a>
 
     <div class="ms-auto d-flex align-items-center gap-2">
+
+
+      <a href="#">Für Schüler</a>
+      <a href="#">Für Lehrer</a>
+     
+
       <?php if ($showExamples): ?>
-        <a href="#showcase" class="btn btn-sm btn-ghost d-none d-md-inline-flex">Beispiele</a>
+        <a href="#showcase">Beispiele</a>
       <?php endif; ?>
 
       <?php if ($showChangeSelection): ?>
@@ -105,13 +111,6 @@ function elevaro_frontend_header(string $variant = 'light', array $options = [])
   </div>
 
 
-<div class="header-actions">
-  <?php if (!auth_is_logged_in()): ?>
-    <a href="/login.php" class="header-login">Login</a>
-  <?php endif; ?>
-
-  <a href="/paywall.php" class="header-premium">⭐ Premium</a>
-</div>
 </nav>
 <?php
 }
