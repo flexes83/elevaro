@@ -1,0 +1,32 @@
+app/includes/access.php
+No syntax errors detected in /mnt/data/elevaro_v10_paywall_work/elevaro_mvp/app/includes/access.php
+
+app/includes/stripe_client.php
+No syntax errors detected in /mnt/data/elevaro_v10_paywall_work/elevaro_mvp/app/includes/stripe_client.php
+
+app/includes/auth.php
+No syntax errors detected in /mnt/data/elevaro_v10_paywall_work/elevaro_mvp/app/includes/auth.php
+
+api/create_checkout_session.php
+No syntax errors detected in /mnt/data/elevaro_v10_paywall_work/elevaro_mvp/api/create_checkout_session.php
+
+api/stripe_webhook.php
+No syntax errors detected in /mnt/data/elevaro_v10_paywall_work/elevaro_mvp/api/stripe_webhook.php
+
+api/quiz_session.php
+No syntax errors detected in /mnt/data/elevaro_v10_paywall_work/elevaro_mvp/api/quiz_session.php
+
+paywall.php
+No syntax errors detected in /mnt/data/elevaro_v10_paywall_work/elevaro_mvp/paywall.php
+
+redeem_code.php
+No syntax errors detected in /mnt/data/elevaro_v10_paywall_work/elevaro_mvp/redeem_code.php
+
+billing_success.php
+No syntax errors detected in /mnt/data/elevaro_v10_paywall_work/elevaro_mvp/billing_success.php
+
+quiz.php
+No syntax errors detected in /mnt/data/elevaro_v10_paywall_work/elevaro_mvp/quiz.php
+
+account.php
+No syntax errors detected in /mnt/data/elevaro_v10_paywall_work/elevaro_mvp/account.php

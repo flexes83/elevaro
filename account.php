@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/app/includes/auth.php';
+require_once __DIR__ . '/app/includes/access.php';
 require_once __DIR__ . '/app/includes/frontend_header.php';
 
 auth_require_login();
@@ -54,6 +55,20 @@ $name = trim((string)($user['display_name'] ?: $user['username'] ?: $user['email
       <a class="btn btn-outline-danger" href="/logout.php">Logout</a>
     </section>
   </div>
+
+<div class="card mt-4">
+  <div class="card-body">
+    <h2 class="h5 fw-bold">Quizz dich zu besseren Noten</h2>
+    <p class="text-muted mb-3">Premium speichert deinen Fortschritt, schaltet Fehlertraining frei und entfernt Tageslimits.</p>
+    <?php if (elevaro_user_is_premium(auth_user())): ?>
+      <span class="badge text-bg-success">Premium aktiv</span>
+    <?php else: ?>
+      <a class="btn btn-primary" href="/paywall.php">Premium ansehen</a>
+      <a class="btn btn-outline-primary" href="/redeem_code.php">Code einlösen</a>
+    <?php endif; ?>
+  </div>
+</div>
+
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

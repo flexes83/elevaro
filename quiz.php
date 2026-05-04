@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/app/includes/quiz_repository.php';
+require_once __DIR__ . '/app/includes/access.php';
 
 $quizKey = $_GET['key'] ?? 'mathe_klasse5_bruchrechnen';
 $quiz = elevaro_get_quiz_payload($quizKey);
@@ -9,6 +10,10 @@ if (!$quiz) {
     echo 'Quiz nicht gefunden.';
     exit;
 }
+
+$currentUser = auth_user();
+$userIsPremium = elevaro_user_is_premium($currentUser);
+$userCanContinue = elevaro_can_start_additional_quiz($currentUser);
 
 if (empty($quiz['questions'])) {
     http_response_code(404);
@@ -236,6 +241,24 @@ $hasListeningAudio = $listeningMode && $listeningAudioPath !== '';
           <ul id="weakList" class="mb-0"></ul>
         </div>
 
+        <div id="resultConversionCard" class="result-conversion-card text-start">
+          <span class="conversion-kicker">Dein nächster Schritt</span>
+          <h3>Quizz dich zu besseren Noten</h3>
+          <p>Lerne mit kurzen Quizzen, wiederhole deine Fehler und werde Schritt für Schritt besser.</p>
+          <div class="conversion-actions">
+            <?php if (!$currentUser): ?>
+              <a class="btn btn-primary" href="/login.php?return=<?= urlencode($_SERVER['REQUEST_URI'] ?? '/recommendations.php') ?>">Fortschritt speichern</a>
+              <a class="btn btn-light" href="/onboarding.php">Passende Quizze finden</a>
+            <?php elseif (!$userIsPremium): ?>
+              <a class="btn btn-primary" href="/paywall.php?return=<?= urlencode($_SERVER['REQUEST_URI'] ?? '/recommendations.php') ?>">Jetzt weiterlernen</a>
+              <a class="btn btn-light" href="/redeem_code.php">Code einlösen</a>
+            <?php else: ?>
+              <a class="btn btn-primary" href="/recommendations.php">Weitere Quizze</a>
+              <button id="premiumWeakBtn" class="btn btn-light" type="button">Fehler gezielt üben</button>
+            <?php endif; ?>
+          </div>
+        </div>
+
         <div class="d-flex justify-content-center gap-3 flex-wrap mt-4">
           <button id="restartBtn" class="btn btn-primary">Nochmal spielen</button>
           <button id="weakBtn" class="btn btn-outline-primary d-none">Wackelkandidaten üben</button>
@@ -261,7 +284,10 @@ window.ELEVARO_QUIZ = {
   introAudioPath: <?= json_encode($introAudioPath, JSON_UNESCAPED_UNICODE) ?>,
   listeningMode: <?= $listeningMode ? 'true' : 'false' ?>,
   hasListeningAudio: <?= $hasListeningAudio ? 'true' : 'false' ?>,
-  listeningAudioPath: <?= json_encode($listeningAudioPath, JSON_UNESCAPED_UNICODE) ?>
+  listeningAudioPath: <?= json_encode($listeningAudioPath, JSON_UNESCAPED_UNICODE) ?>,
+  userLoggedIn: <?= $currentUser ? 'true' : 'false' ?>,
+  userIsPremium: <?= $userIsPremium ? 'true' : 'false' ?>,
+  userCanContinue: <?= $userCanContinue ? 'true' : 'false' ?>
 };
 </script>
 <script src="assets/js/quiz.js?v=<?= filemtime(__DIR__ . '/assets/js/quiz.js') ?>"></script>

@@ -1172,3 +1172,47 @@ body.quiz-is-playing .quiz-highscore-placeholder {
   background: rgba(255,118,117,.11);
   color: #b33a3a;
 }
+
+
+/* v10 result conversion */
+
+.result-conversion-card {
+  margin: 1.25rem 0 0;
+  padding: 1.15rem;
+  border-radius: 1.5rem;
+  background:
+    radial-gradient(circle at top right, rgba(0,206,201,.12), transparent 14rem),
+    linear-gradient(135deg, rgba(90,79,243,.1), rgba(255,255,255,.92));
+  border: 1px solid rgba(90,79,243,.13);
+}
+
+.conversion-kicker {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: .28rem .6rem;
+  background: #fff;
+  color: var(--elevaro-primary-dark);
+  font-size: .78rem;
+  font-weight: 900;
+}
+
+.result-conversion-card h3 {
+  margin: .55rem 0 .35rem;
+  font-size: clamp(1.55rem, 4vw, 2.35rem);
+  line-height: .95;
+  font-weight: 950;
+  letter-spacing: -.06em;
+}
+
+.result-conversion-card p,
+.result-microcopy {
+  color: var(--elevaro-muted);
+  font-weight: 700;
+}
+
+.conversion-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .65rem;
+  margin-top: .9rem;
+}

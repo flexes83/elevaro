@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../app/includes/user_data.php';
+require_once __DIR__ . '/../app/includes/access.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -22,6 +23,8 @@ try {
     if (!$quizId) {
         throw new RuntimeException('quiz_id fehlt.');
     }
+
+    elevaro_track_quiz_start($userId);
 
     echo json_encode([
         'success' => true,

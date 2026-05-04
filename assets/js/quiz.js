@@ -30,6 +30,7 @@
   const nextBtn = document.getElementById('nextBtn');
   const restartBtn = document.getElementById('restartBtn');
   const weakBtn = document.getElementById('weakBtn');
+  const premiumWeakBtn = document.getElementById('premiumWeakBtn');
 
   const questionEl = document.getElementById('question');
   const answersEl = document.getElementById('answers');
@@ -45,6 +46,19 @@
   const weakBox = document.getElementById('weakBox');
   const weakList = document.getElementById('weakList');
   const resultPanda = document.getElementById('resultPanda');
+
+
+  function redirectToPaywall() {
+    window.location.href = '/paywall.php?return=' + encodeURIComponent(window.location.pathname + window.location.search);
+  }
+
+  function requirePremiumForRepeat() {
+    if (window.ELEVARO_QUIZ.userIsPremium || window.ELEVARO_QUIZ.userCanContinue) {
+      return true;
+    }
+    redirectToPaywall();
+    return false;
+  }
 
   function setupIntroAudioGate() {
     if (!window.ELEVARO_QUIZ.requiresIntroAudio || !introAudio || !startBtn) {
@@ -382,17 +396,17 @@
     if (percent >= 90) {
       resultPanda.textContent = '🏆';
       resultHeadline.textContent = name ? `Stark, ${name}!` : 'Stark!';
-      resultText.innerHTML = `Du hast ${score} von ${total} Fragen richtig beantwortet.<br><b>${totalPoints} Punkte</b> · beste Serie: <b>${bestStreak}</b> 🔥`;
+      resultText.innerHTML = `Du hast ${score} von ${total} Fragen richtig beantwortet.<br><b>${totalPoints} Punkte</b> · beste Serie: <b>${bestStreak}</b> 🔥<br><span class="result-microcopy">Speichere deinen Fortschritt und bleib dran.</span>`;
       celebrateResult('confetti');
     } else if (percent >= 60) {
       resultPanda.textContent = '🌟';
       resultHeadline.textContent = name ? `Gut gemacht, ${name}.` : 'Gut gemacht.';
-      resultText.innerHTML = `Du hast ${score} von ${total} Fragen richtig beantwortet.<br><b>${totalPoints} Punkte</b> · beste Serie: <b>${bestStreak}</b> ✨`;
+      resultText.innerHTML = `Du hast ${score} von ${total} Fragen richtig beantwortet.<br><b>${totalPoints} Punkte</b> · beste Serie: <b>${bestStreak}</b> ✨<br><span class="result-microcopy">Mit gezieltem Fehlertraining holst du schnell noch mehr raus.</span>`;
       celebrateResult('spark');
     } else {
       resultPanda.textContent = '💪';
       resultHeadline.textContent = name ? `Dranbleiben, ${name}.` : 'Dranbleiben.';
-      resultText.innerHTML = `Du hast ${score} von ${total} Fragen richtig beantwortet.<br><b>${totalPoints} Punkte</b>. Übe die Wackelkandidaten und versuch es nochmal.`;
+      resultText.innerHTML = `Du hast ${score} von ${total} Fragen richtig beantwortet.<br><b>${totalPoints} Punkte</b>.<br><span class="result-microcopy">Die Wackelkandidaten sind dein schnellster Weg zu besseren Noten.</span>`;
     }
 
     localStorage.setItem('elevaro_progress_' + window.ELEVARO_QUIZ.id, JSON.stringify({
@@ -714,6 +728,17 @@
     }
   });
 
-  restartBtn.addEventListener('click', () => startQuiz(false));
-  weakBtn.addEventListener('click', () => startQuiz(true));
+  restartBtn.addEventListener('click', () => {
+    if (requirePremiumForRepeat()) startQuiz(false);
+  });
+  weakBtn.addEventListener('click', () => {
+    if (window.ELEVARO_QUIZ.userIsPremium) startQuiz(true);
+    else redirectToPaywall();
+  });
+  if (premiumWeakBtn) {
+    premiumWeakBtn.addEventListener('click', () => {
+      if (window.ELEVARO_QUIZ.userIsPremium) startQuiz(true);
+      else redirectToPaywall();
+    });
+  }
 })();

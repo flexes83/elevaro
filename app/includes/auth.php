@@ -42,7 +42,7 @@ function auth_user(): ?array
     try {
         $pdo = elevaro_db();
         $stmt = $pdo->prepare("
-            SELECT id, email, username, display_name, role, status, created_at, last_login_at
+            SELECT *
             FROM auth_users
             WHERE id = :id
               AND status = 'active'
