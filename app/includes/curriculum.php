@@ -638,6 +638,10 @@ function curriculum_levels(string $stateCode, string $schoolTypeCode): array
 
     $levels = $stmt->fetchAll();
 
+    var_dump($stateCode, $schoolTypeCode);
+
+exit;
+
     if (!empty($levels)) {
         return array_map(static function (array $level): array {
             return [
