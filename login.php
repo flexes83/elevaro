@@ -123,6 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       <button class="btn btn-primary btn-lg w-100">Einloggen</button>
     </form>
+    <p class="text-center mt-3 mb-0"><a href="/forgot_password.php">Passwort vergessen?</a></p>
 <p class="text-center mt-3">Noch keinen Account? <a href="/register.php?return=<?= urlencode($_GET['return'] ?? '/recommendations.php') ?>">Kostenlos registrieren</a></p>
   </main>
 </body>

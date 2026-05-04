@@ -30,14 +30,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new RuntimeException('Die Passwörter stimmen nicht überein.');
         }
 
-        auth_create_user([
+        require_once __DIR__ . '/app/includes/auth_tokens.php';
+
+        $userId = auth_create_user([
             'email' => $values['email'],
             'password' => (string)($_POST['password'] ?? ''),
             'display_name' => $values['display_name'],
             'role' => 'schueler',
-        ]);
+            'status' => 'pending',
+        ], false);
 
-        header('Location: ' . $return);
+        $user = auth_get_user_by_id_any_status($userId);
+        $token = auth_create_email_verification_token($userId, $return);
+        auth_send_verification_mail($user, $token, $return);
+
+        header('Location: /verify_notice.php?email=' . urlencode($values['email']) . '&return=' . urlencode($return));
         exit;
     } catch (Throwable $e) {
         $error = $e->getMessage();
@@ -119,7 +126,7 @@ function reg_h($value): string
           <span>Ich habe die Datenschutzhinweise gelesen.</span>
         </label>
 
-        <button class="btn btn-primary btn-lg w-100 mt-3">Jetzt loslegen</button>
+        <button class="btn btn-primary btn-lg w-100 mt-3">E-Mail bestätigen & loslegen</button>
       </form>
     </section>
   </section>

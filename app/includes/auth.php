@@ -94,7 +94,7 @@ function auth_user_column_exists(string $column): bool
     }
 }
 
-function auth_create_user(array $data): int
+function auth_create_user(array $data, bool $autoLogin = true): int
 {
     auth_start_session();
 
@@ -102,6 +102,7 @@ function auth_create_user(array $data): int
     $password = (string)($data['password'] ?? '');
     $displayName = trim((string)($data['display_name'] ?? ''));
     $role = (string)($data['role'] ?? 'schueler');
+    $status = (string)($data['status'] ?? 'active');
 
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         throw new RuntimeException('Bitte eine gültige E-Mail-Adresse eingeben.');
@@ -115,6 +116,10 @@ function auth_create_user(array $data): int
         $role = 'schueler';
     }
 
+    if (!in_array($status, ['active', 'pending'], true)) {
+        $status = 'active';
+    }
+
     if (auth_find_user_by_login($email)) {
         throw new RuntimeException('Für diese E-Mail-Adresse existiert bereits ein Account.');
     }
@@ -126,12 +131,10 @@ function auth_create_user(array $data): int
     $pdo = elevaro_db();
     $candidate = $username;
     $i = 2;
-
     while (auth_find_user_by_login($candidate)) {
         $candidate = $username . $i;
         $i++;
     }
-
     $username = $candidate;
 
     $fields = [
@@ -140,38 +143,31 @@ function auth_create_user(array $data): int
         'password_hash' => password_hash($password, PASSWORD_DEFAULT),
         'display_name' => $displayName !== '' ? $displayName : $email,
         'role' => $role,
-        'status' => 'active',
+        'status' => $status,
     ];
 
-    if (auth_user_column_exists('has_active_access')) {
+    if (function_exists('auth_user_column_exists') && auth_user_column_exists('has_active_access')) {
         $fields['has_active_access'] = 1;
     }
-
-    if (auth_user_column_exists('plan')) {
+    if (function_exists('auth_user_column_exists') && auth_user_column_exists('plan')) {
         $fields['plan'] = 'free';
     }
-
-    if (auth_user_column_exists('accepted_terms_at')) {
+    if (function_exists('auth_user_column_exists') && auth_user_column_exists('accepted_terms_at')) {
         $fields['accepted_terms_at'] = date('Y-m-d H:i:s');
     }
-
-    if (auth_user_column_exists('accepted_privacy_at')) {
+    if (function_exists('auth_user_column_exists') && auth_user_column_exists('accepted_privacy_at')) {
         $fields['accepted_privacy_at'] = date('Y-m-d H:i:s');
     }
-
-    if (auth_user_column_exists('marketing_consent_at')) {
+    if (function_exists('auth_user_column_exists') && auth_user_column_exists('marketing_consent_at')) {
         $fields['marketing_consent_at'] = !empty($data['marketing_consent']) ? date('Y-m-d H:i:s') : null;
     }
-
-    if (auth_user_column_exists('billing_name')) {
+    if (function_exists('auth_user_column_exists') && auth_user_column_exists('billing_name')) {
         $fields['billing_name'] = trim((string)($data['billing_name'] ?? '')) ?: ($displayName ?: $email);
     }
-
-    if (auth_user_column_exists('billing_email')) {
+    if (function_exists('auth_user_column_exists') && auth_user_column_exists('billing_email')) {
         $fields['billing_email'] = trim((string)($data['billing_email'] ?? '')) ?: $email;
     }
-
-    if (auth_user_column_exists('billing_country')) {
+    if (function_exists('auth_user_column_exists') && auth_user_column_exists('billing_country')) {
         $fields['billing_country'] = strtoupper(substr(trim((string)($data['billing_country'] ?? 'DE')), 0, 2)) ?: 'DE';
     }
 
@@ -185,10 +181,34 @@ function auth_create_user(array $data): int
     $stmt->execute($fields);
 
     $userId = (int)$pdo->lastInsertId();
-    $_SESSION[ELEVARO_AUTH_SESSION_KEY] = $userId;
+
+    if ($autoLogin && $status === 'active') {
+        $_SESSION[ELEVARO_AUTH_SESSION_KEY] = $userId;
+    }
 
     return $userId;
 }
+
+function auth_set_user_active(int $userId): void
+{
+    elevaro_db()->prepare("UPDATE auth_users SET status = 'active' WHERE id = :id")->execute(['id' => $userId]);
+}
+
+function auth_get_user_by_id_any_status(int $userId): ?array
+{
+    $stmt = elevaro_db()->prepare("SELECT * FROM auth_users WHERE id = :id LIMIT 1");
+    $stmt->execute(['id' => $userId]);
+    return $stmt->fetch() ?: null;
+}
+
+function auth_force_login_user_id(int $userId): void
+{
+    auth_start_session();
+    session_regenerate_id(true);
+    $_SESSION[ELEVARO_AUTH_SESSION_KEY] = $userId;
+    unset($_SESSION[ELEVARO_EFFECTIVE_ROLE_KEY]);
+}
+
 function auth_login(string $login, string $password): bool
 {
     auth_start_session();
