@@ -135,7 +135,11 @@
   }
 
   function itemMeta(item, key) {
-    if (key === 'school_type') return `Klasse ${item.min_grade} bis ${item.max_grade}`;
+    if (key === 'school_type') {
+      const isVocational = (item.school_category || '').toLowerCase() === 'vocational';
+      if (isVocational) return 'Stufen statt Klassen';
+      return `Klasse ${item.min_grade} bis ${item.max_grade}`;
+    }
     if (key === 'subject') return item.icon ? item.icon + ' Fach auswählen' : 'Fach auswählen';
     if (key === 'topic') {
       const count = item.quiz_count ? ` · ${item.quiz_count} Quiz${Number(item.quiz_count) === 1 ? '' : 'ze'}` : '';
@@ -193,7 +197,21 @@
   }
 
   async function render() {
-    const step = steps[state.step];
+    const step = { ...steps[state.step] };
+
+    if (step.key === 'grade' && state.values.school_type) {
+      const isVocational = (
+        String(state.values.school_type || '').startsWith('beruf') ||
+        String(state.labels.school_type || '').toLowerCase().startsWith('beruf')
+      );
+
+      if (isVocational) {
+        step.title = 'In welcher Stufe bist du?';
+        step.text = 'Wähle deine Stufe, z. B. BK1, J1 oder Lehrjahr.';
+        step.hint = 'Ein Schritt näher an passenden Inhalten.';
+      }
+    }
+
     document.body.dataset.step = String(state.step);
 
     els.progress.style.width = `${((state.step + 1) / steps.length) * 100}%`;

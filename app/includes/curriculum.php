@@ -645,7 +645,6 @@ function curriculum_levels(string $stateCode, string $schoolTypeCode): array
                 'code' => $level['code'],
                 'name' => $level['name'],
                 'numeric_grade' => $level['numeric_grade'],
-                // Compatibility: frontend still stores selected value in values.grade.
                 'grade' => $level['numeric_grade'],
             ];
         }, $levels);
@@ -653,4 +652,3 @@ function curriculum_levels(string $stateCode, string $schoolTypeCode): array
 
     return curriculum_grades($stateCode, $schoolTypeCode);
 }
-
