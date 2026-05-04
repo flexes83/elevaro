@@ -55,7 +55,7 @@
     { key: 'name', type: 'name', title: 'Wie dürfen wir dich nennen?', text: 'Dein Vorname reicht völlig. So fühlt sich Elevaro persönlicher an – du kannst den Schritt aber auch überspringen.', hint: 'Dein Lernkompass startet.', illustration: '✨' },
     { key: 'state', title: 'Wo gehst du zur Schule?', text: 'Wähle dein Bundesland. So können wir später Inhalte passend zum Lehrplan vorschlagen.', hint: 'Wir richten die Inhalte auf deinen Lernort aus.', illustration: '🗺️', action: 'states' },
     { key: 'school_type', title: 'Welche Schulart passt zu dir?', text: 'Je nach Bundesland gibt es unterschiedliche Schularten. Wir zeigen dir nur passende Optionen.', hint: 'Damit die Vorschläge wirklich passen.', illustration: '🏫', action: 'school_types' },
-    { key: 'grade', title: 'In welcher Klasse bist du?', text: 'Davon hängt ab, welche Fächer und Themen für dich wirklich relevant sind.', hint: 'Ein Schritt näher an passenden Quizzen.', illustration: '🎒', action: 'grades' },
+    { key: 'grade', title: 'In welcher Klasse bist du?', text: 'Davon hängt ab, welche Fächer und Themen für dich wirklich relevant sind.', hint: 'Ein Schritt näher an passenden Quizzen.', illustration: '🎒', action: 'levels' },
     { key: 'subject', title: 'Was möchtest du üben?', text: 'Wir zeigen dir nur Fächer, die für deine Klasse sinnvoll sind.', hint: 'Jetzt wird aus Schule ein Lernziel.', illustration: '📚', action: 'subjects' },
   ];
 

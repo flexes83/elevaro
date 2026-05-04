@@ -617,14 +617,18 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
 
 function curriculum_levels(string $stateCode, string $schoolTypeCode): array
 {
+    if (!curriculum_table_exists('school_type_levels')) {
+        return curriculum_grades($stateCode, $schoolTypeCode);
+    }
+
     $stmt = elevaro_db()->prepare("
-        SELECT l.code, l.name, l.numeric_grade
+        SELECT l.id, l.code, l.name, l.numeric_grade
         FROM school_type_levels l
         JOIN states s ON s.id = l.state_id
         JOIN school_types st ON st.id = l.school_type_id
         WHERE s.code = :state
           AND st.code = :school_type
-        ORDER BY l.sort_order ASC
+        ORDER BY l.sort_order ASC, l.name ASC
     ");
 
     $stmt->execute([
@@ -632,5 +636,21 @@ function curriculum_levels(string $stateCode, string $schoolTypeCode): array
         'school_type' => $schoolTypeCode,
     ]);
 
-    return $stmt->fetchAll();
+    $levels = $stmt->fetchAll();
+
+    if (!empty($levels)) {
+        return array_map(static function (array $level): array {
+            return [
+                'id' => $level['id'],
+                'code' => $level['code'],
+                'name' => $level['name'],
+                'numeric_grade' => $level['numeric_grade'],
+                // Compatibility: frontend still stores selected value in values.grade.
+                'grade' => $level['numeric_grade'],
+            ];
+        }, $levels);
+    }
+
+    return curriculum_grades($stateCode, $schoolTypeCode);
 }
+
