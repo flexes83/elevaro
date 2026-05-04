@@ -63,7 +63,10 @@ function elevaro_frontend_header(string $variant = 'light', array $options = [])
 
     <div class="ms-5 d-flex align-items-center gap-2">
 
-
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
       <a href="#">Für Schüler</a>
       <a href="#">Für Lehrer</a>
      
@@ -73,6 +76,8 @@ function elevaro_frontend_header(string $variant = 'light', array $options = [])
       <?php if ($showQuizButton): ?>
         <a class="me-auto" href="/recommendations.php">Quizze finden</a>
       <?php endif; ?>
+
+      </div>
 
       <?php if ($user): ?>
         <div class="dropdown elevaro-user-menu">
