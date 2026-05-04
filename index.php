@@ -202,6 +202,11 @@ require_once __DIR__ . '/app/includes/frontend_header.php';
       </div>
     </div>
   </section>
+
+<div class="hero-cta text-center mt-5">
+  <a href="/paywall.php" class="btn-premium-main">🚀 Premium freischalten</a>
+  <div class="cta-sub">4,99 € / Monat · jederzeit kündbar</div>
+</div>
 </main>
 
 <footer class="footer">

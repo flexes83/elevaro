@@ -103,7 +103,15 @@ function elevaro_frontend_header(string $variant = 'light', array $options = [])
       <?php endif; ?>
     </div>
   </div>
-<a href="/paywall.php" class="nav-link">Premium</a>
+
+
+<div class="header-actions">
+  <?php if (!auth_is_logged_in()): ?>
+    <a href="/login.php" class="header-login">Login</a>
+  <?php endif; ?>
+
+  <a href="/paywall.php" class="header-premium">⭐ Premium</a>
+</div>
 </nav>
 <?php
 }
