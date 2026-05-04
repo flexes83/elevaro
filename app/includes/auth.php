@@ -61,30 +61,33 @@ function auth_user(): ?array
 function auth_find_user_by_login(string $login): ?array
 {
     $pdo = elevaro_db();
+    $login = trim($login);
+
     $stmt = $pdo->prepare("
         SELECT *
         FROM auth_users
-        WHERE email = :login OR username = :login
+        WHERE email = :email_login OR username = :username_login
         LIMIT 1
     ");
-    $stmt->execute(['login' => trim($login)]);
+    $stmt->execute([
+        'email_login' => $login,
+        'username_login' => $login,
+    ]);
+
     return $stmt->fetch() ?: null;
 }
 
-function auth_column_exists(string $table, string $column): bool
+function auth_user_column_exists(string $column): bool
 {
     try {
         $stmt = elevaro_db()->prepare("
             SELECT COUNT(*)
             FROM INFORMATION_SCHEMA.COLUMNS
             WHERE TABLE_SCHEMA = DATABASE()
-              AND TABLE_NAME = :table_name
+              AND TABLE_NAME = 'auth_users'
               AND COLUMN_NAME = :column_name
         ");
-        $stmt->execute([
-            'table_name' => $table,
-            'column_name' => $column,
-        ]);
+        $stmt->execute(['column_name' => $column]);
         return (int)$stmt->fetchColumn() > 0;
     } catch (Throwable $e) {
         return false;
@@ -140,37 +143,35 @@ function auth_create_user(array $data): int
         'status' => 'active',
     ];
 
-    if (auth_column_exists('auth_users', 'has_active_access')) {
+    if (auth_user_column_exists('has_active_access')) {
         $fields['has_active_access'] = 1;
     }
 
-    if (auth_column_exists('auth_users', 'plan')) {
+    if (auth_user_column_exists('plan')) {
         $fields['plan'] = 'free';
     }
 
-    if (auth_column_exists('auth_users', 'accepted_terms_at')) {
+    if (auth_user_column_exists('accepted_terms_at')) {
         $fields['accepted_terms_at'] = date('Y-m-d H:i:s');
     }
 
-    if (auth_column_exists('auth_users', 'accepted_privacy_at')) {
+    if (auth_user_column_exists('accepted_privacy_at')) {
         $fields['accepted_privacy_at'] = date('Y-m-d H:i:s');
     }
 
-    if (auth_column_exists('auth_users', 'marketing_consent_at')) {
+    if (auth_user_column_exists('marketing_consent_at')) {
         $fields['marketing_consent_at'] = !empty($data['marketing_consent']) ? date('Y-m-d H:i:s') : null;
     }
 
-    // Billing fields are optional. Schüler-Registrierung braucht keine Rechnungsadresse.
-    // If columns exist, only basic invoice fallback values are saved. Address/Tax-ID stay empty.
-    if (auth_column_exists('auth_users', 'billing_name')) {
+    if (auth_user_column_exists('billing_name')) {
         $fields['billing_name'] = trim((string)($data['billing_name'] ?? '')) ?: ($displayName ?: $email);
     }
 
-    if (auth_column_exists('auth_users', 'billing_email')) {
+    if (auth_user_column_exists('billing_email')) {
         $fields['billing_email'] = trim((string)($data['billing_email'] ?? '')) ?: $email;
     }
 
-    if (auth_column_exists('auth_users', 'billing_country')) {
+    if (auth_user_column_exists('billing_country')) {
         $fields['billing_country'] = strtoupper(substr(trim((string)($data['billing_country'] ?? 'DE')), 0, 2)) ?: 'DE';
     }
 
@@ -181,7 +182,6 @@ function auth_create_user(array $data): int
         INSERT INTO auth_users (" . implode(', ', $columns) . ")
         VALUES (" . implode(', ', $placeholders) . ")
     ");
-
     $stmt->execute($fields);
 
     $userId = (int)$pdo->lastInsertId();
@@ -189,7 +189,6 @@ function auth_create_user(array $data): int
 
     return $userId;
 }
-
 function auth_login(string $login, string $password): bool
 {
     auth_start_session();
