@@ -68,9 +68,7 @@ function elevaro_frontend_header(string $variant = 'light', array $options = [])
       <a href="#">Für Lehrer</a>
      
 
-      <?php if ($showChangeSelection): ?>
-        <a href="/onboarding.php?edit=1" class="btn btn-sm btn-outline-primary d-none d-md-inline-flex">Auswahl ändern</a>
-      <?php endif; ?>
+     
 
       <?php if ($showQuizButton): ?>
         <a class="me-auto" href="/recommendations.php">Quizze finden</a>
