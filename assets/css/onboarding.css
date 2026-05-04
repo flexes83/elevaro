@@ -549,3 +549,81 @@ body[data-step="6"] .onboarding-plan-card li.is-negative::before {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Berufliche Schulen im Schulart-Schritt bewusst nachrangig anzeigen */
+.vocational-school-group {
+  grid-column: 1 / -1;
+  margin-top: .3rem;
+  border: 1px solid rgba(23,32,51,.08);
+  border-radius: 1.25rem;
+  background: rgba(255,255,255,.55);
+  overflow: hidden;
+}
+
+.vocational-school-group summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .8rem;
+  padding: .95rem 1rem;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 900;
+  color: var(--elevaro-text);
+}
+
+.vocational-school-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.vocational-school-group summary::after {
+  content: "+";
+  width: 1.9rem;
+  height: 1.9rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--elevaro-soft);
+  color: var(--elevaro-primary);
+  font-weight: 950;
+  flex: 0 0 auto;
+}
+
+.vocational-school-group[open] summary::after {
+  content: "–";
+}
+
+.vocational-school-group summary span,
+.vocational-school-group summary small {
+  display: block;
+}
+
+.vocational-school-group summary small {
+  margin-top: .12rem;
+  color: var(--elevaro-muted);
+  font-size: .86rem;
+  font-weight: 750;
+}
+
+.vocational-school-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .75rem;
+  padding: 0 1rem 1rem;
+}
+
+.vocational-school-grid .choice-btn {
+  background: rgba(243,241,255,.72);
+}
+
+@media (max-width: 767.98px) {
+  .vocational-school-group summary {
+    align-items: flex-start;
+  }
+
+  .vocational-school-grid {
+    grid-template-columns: 1fr;
+  }
+}

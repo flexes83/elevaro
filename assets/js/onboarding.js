@@ -150,6 +150,48 @@
     return [item.code || item.slug].filter(Boolean).map(String);
   }
 
+  function renderChoiceButton(item, step) {
+    const code = itemCode(item, step.key);
+    const label = itemLabel(item, step.key);
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.type = 'button';
+    btn.innerHTML = `<span class="choice-title">${escapeHtml(label)}</span><span class="choice-meta">${escapeHtml(itemMeta(item, step.key))}</span>`;
+    btn.addEventListener('click', () => choose(code, label, item));
+    return btn;
+  }
+
+  function renderSchoolTypeChoices(items, step) {
+    const generalItems = items.filter(item => (item.school_category || 'general') !== 'vocational');
+    const vocationalItems = items.filter(item => (item.school_category || 'general') === 'vocational');
+
+    generalItems.forEach(item => {
+      els.choices.appendChild(renderChoiceButton(item, step));
+    });
+
+    if (!vocationalItems.length) {
+      return;
+    }
+
+    const details = document.createElement('details');
+    details.className = 'vocational-school-group';
+    details.innerHTML = `
+      <summary>
+        <span>Berufliche Schulen</span>
+        <small>Berufskolleg, Berufsschule, Berufliches Gymnasium …</small>
+      </summary>
+      <div class="vocational-school-grid"></div>
+    `;
+
+    const grid = details.querySelector('.vocational-school-grid');
+
+    vocationalItems.forEach(item => {
+      grid.appendChild(renderChoiceButton(item, step));
+    });
+
+    els.choices.appendChild(details);
+  }
+
   async function render() {
     const step = steps[state.step];
     document.body.dataset.step = String(state.step);
@@ -179,16 +221,13 @@
       const items = await api(step.action);
       if (!items.length) els.empty.classList.remove('d-none');
 
-      items.forEach(item => {
-        const code = itemCode(item, step.key);
-        const label = itemLabel(item, step.key);
-        const btn = document.createElement('button');
-        btn.className = 'choice-btn';
-        btn.type = 'button';
-        btn.innerHTML = `<span class="choice-title">${escapeHtml(label)}</span><span class="choice-meta">${escapeHtml(itemMeta(item, step.key))}</span>`;
-        btn.addEventListener('click', () => choose(code, label, item));
-        els.choices.appendChild(btn);
-      });
+      if (step.key === 'school_type') {
+        renderSchoolTypeChoices(items, step);
+      } else {
+        items.forEach(item => {
+          els.choices.appendChild(renderChoiceButton(item, step));
+        });
+      }
     } catch (err) {
       els.empty.textContent = 'Die Auswahl konnte gerade nicht geladen werden.';
       els.empty.classList.remove('d-none');
