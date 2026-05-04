@@ -57,7 +57,6 @@
     { key: 'school_type', title: 'Welche Schulart passt zu dir?', text: 'Je nach Bundesland gibt es unterschiedliche Schularten. Wir zeigen dir nur passende Optionen.', hint: 'Damit die Vorschläge wirklich passen.', illustration: '🏫', action: 'school_types' },
     { key: 'grade', title: 'In welcher Klasse bist du?', text: 'Davon hängt ab, welche Fächer und Themen für dich wirklich relevant sind.', hint: 'Ein Schritt näher an passenden Quizzen.', illustration: '🎒', action: 'grades' },
     { key: 'subject', title: 'Was möchtest du üben?', text: 'Wir zeigen dir nur Fächer, die für deine Klasse sinnvoll sind.', hint: 'Jetzt wird aus Schule ein Lernziel.', illustration: '📚', action: 'subjects' },
-    { key: 'topic', title: 'Womit willst du starten?', text: 'Wähle einen Lernbereich. Danach zeigen wir dir passende Quiz-Empfehlungen.', hint: 'Such dir den besten Einstieg aus.', illustration: '🎯', action: 'topics' }
   ];
 
   const els = {
@@ -174,7 +173,7 @@
       return;
     }
 
-    els.skip.textContent = state.step === steps.length - 1 ? 'Später auswählen' : 'Überspringen';
+    els.skip.textContent = 'Überspringen';
 
     try {
       const items = await api(step.action);
@@ -202,19 +201,9 @@
     state.values[step.key] = code;
     state.labels[step.key] = label;
 
-    if (step.key === 'topic') {
-      state.values.focus_tags = focusTagsFromArea(item);
-      state.labels.focus = label;
-    }
-
     for (let i = state.step + 1; i < steps.length; i++) {
       state.values[steps[i].key] = null;
       delete state.labels[steps[i].key];
-    }
-
-    if (step.key !== 'topic') {
-      state.values.focus_tags = [];
-      delete state.labels.focus;
     }
 
     if (state.step < steps.length - 1) {
@@ -239,19 +228,69 @@
 
     document.body.dataset.step = String(steps.length);
     els.progress.style.width = '100%';
-    els.illustration.textContent = '🏆';
+    els.illustration.textContent = '🚀';
     els.illustration.classList.add('success-pop');
-    els.hint.textContent = name ? `Perfekt, ${name}. Ich habe etwas Passendes gefunden.` : 'Perfekt. Ich habe etwas Passendes gefunden.';
+    els.hint.textContent = name ? `Alles bereit, ${name}.` : 'Alles bereit.';
     els.badge.textContent = 'Bereit';
-    els.title.textContent = name ? `Dein Lernweg ist vorbereitet, ${name}.` : 'Dein Lernweg ist vorbereitet.';
-    els.text.textContent = 'Wir zeigen dir jetzt passende Quiz-Empfehlungen auf Basis deiner Auswahl.';
+    els.title.textContent = 'Dein Lernbereich ist bereit';
+    els.text.textContent = 'Wir haben deine Auswahl gespeichert und können dir jetzt passende Quizze für deinen Lernstand anzeigen.';
     els.choices.innerHTML = '';
 
-    const start = document.createElement('a');
-    start.href = 'recommendations.php';
-    start.className = 'btn btn-primary btn-lg';
-    start.textContent = 'Empfehlungen ansehen';
-    els.choices.appendChild(start);
+    const selectionRows = [
+      ['Bundesland', state.labels.state || state.values.state || 'Nicht gewählt'],
+      ['Schulart', state.labels.school_type || state.values.school_type || 'Nicht gewählt'],
+      ['Klasse', state.labels.grade || (state.values.grade ? `${state.values.grade}. Klasse` : 'Nicht gewählt')],
+      ['Fach', state.labels.subject || state.values.subject || 'Nicht gewählt']
+    ];
+
+    const selectionHtml = selectionRows.map(([label, value]) => `
+      <div class="onboarding-selection-row">
+        <span>${escapeHtml(label)}</span>
+        <strong>${escapeHtml(value)}</strong>
+      </div>
+    `).join('');
+
+    els.choices.innerHTML = `
+      <div class="onboarding-summary-step">
+        <div class="onboarding-selection-card">
+          <h2>Deine Auswahl</h2>
+          <div class="onboarding-selection-grid">
+            ${selectionHtml}
+          </div>
+        </div>
+
+        <div class="onboarding-pricing-grid">
+          <article class="onboarding-plan-card is-premium">
+            <div class="plan-badge">Empfohlen</div>
+            <h2>Premium</h2>
+            <p class="plan-subline">Gezielt besser werden</p>
+            <ul>
+              <li>Unbegrenzt Quizze spielen</li>
+              <li>Aufgaben üben, die noch nicht sitzen</li>
+              <li>Fortschritt, Statistiken und Serien speichern</li>
+              <li>Passende Empfehlungen für Klasse, Fach und Schulart</li>
+              <li>Premium-Inhalte wie Listenings und Comprehension-Übungen</li>
+            </ul>
+            <a class="btn btn-primary btn-lg w-100" href="/register.php?mode=premium&return=${encodeURIComponent('/api/create_checkout_session.php')}">Premium freischalten</a>
+            <small>4,99 € / Monat · monatlich kündbar</small>
+          </article>
+
+          <article class="onboarding-plan-card">
+            <h2>Free</h2>
+            <p class="plan-subline">Erstmal ausprobieren</p>
+            <ul>
+              <li>Einzelne Quizze kostenlos spielen</li>
+              <li>Passende Empfehlungen ansehen</li>
+              <li>Kein gespeicherter Fortschritt im Account</li>
+              <li>Kein gezieltes Training deiner falschen Aufgaben</li>
+              <li>Premium-Inhalte nur eingeschränkt nutzbar</li>
+            </ul>
+            <a class="btn btn-light btn-lg w-100" href="recommendations.php">Ohne Anmeldung starten</a>
+            <small>Dein Fortschritt wird nicht dauerhaft gespeichert.</small>
+          </article>
+        </div>
+      </div>
+    `;
 
     els.back.disabled = true;
     els.skip.classList.add('d-none');
