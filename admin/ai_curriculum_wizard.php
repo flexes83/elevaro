@@ -832,8 +832,9 @@ admin_header('KI Curriculum Wizard', 'Themen werden gespeichert. Du kannst mehre
                     value="<?= (int)$level['id'] ?>"
                     data-state-id="<?= (int)$level['state_id'] ?>"
                     data-school-type-id="<?= (int)$level['school_type_id'] ?>"
+                    data-label="<?= h($level['name']) ?>"
                   >
-                    <?= h($level['state_name'] . ' · ' . $level['school_type_name'] . ' · ' . $level['name']) ?>
+                    <?= h($level['name']) ?>
                   </option>
                 <?php endforeach; ?>
               </select>
@@ -844,7 +845,7 @@ admin_header('KI Curriculum Wizard', 'Themen werden gespeichert. Du kannst mehre
               <select class="form-select" name="subject_id" required>
                 <option value="">Bitte wählen</option>
                 <?php foreach ($subjects as $subject): ?>
-                  <option value="<?= (int)$subject['id'] ?>" data-subject-id="<?= (int)$subject['id'] ?>"><?= h(($subject['icon'] ?? '') . ' ' . $subject['name']) ?></option>
+                  <option value="<?= (int)$subject['id'] ?>" data-subject-id="<?= (int)$subject['id'] ?>" data-label="<?= h(($subject['icon'] ?? '') . ' ' . $subject['name']) ?>"><?= h(($subject['icon'] ?? '') . ' ' . $subject['name']) ?></option>
                 <?php endforeach; ?>
               </select>
             </div>
@@ -950,6 +951,9 @@ window.ElevaroLevelSubjectMap = <?= json_encode(array_reduce($levelSubjectMappin
 }, []), JSON_UNESCAPED_UNICODE) ?>;
 </script>
 
+
+
+
 <script>
 (function () {
   const stateSelect = document.querySelector('select[name="state_id"]');
@@ -958,71 +962,79 @@ window.ElevaroLevelSubjectMap = <?= json_encode(array_reduce($levelSubjectMappin
   const subjectSelect = document.querySelector('select[name="subject_id"]');
   const levelSubjectMap = window.ElevaroLevelSubjectMap || {};
 
-  function filterSubjectOptions() {
-    if (!levelSelect || !subjectSelect) return;
+  if (!stateSelect || !schoolSelect || !levelSelect || !subjectSelect) return;
 
-    const allowed = levelSubjectMap[String(levelSelect.value)] || [];
-    let firstVisible = '';
+  const allLevelOptions = Array.from(levelSelect.options)
+    .filter(option => option.value)
+    .map(option => ({
+      value: option.value,
+      label: option.dataset.label || option.textContent.trim(),
+      stateId: option.dataset.stateId,
+      schoolTypeId: option.dataset.schoolTypeId
+    }));
 
-    Array.from(subjectSelect.options).forEach(option => {
-      if (!option.value) {
-        option.hidden = false;
-        return;
-      }
+  const allSubjectOptions = Array.from(subjectSelect.options)
+    .filter(option => option.value)
+    .map(option => ({
+      value: option.value,
+      label: option.dataset.label || option.textContent.trim(),
+      subjectId: option.dataset.subjectId || option.value
+    }));
 
-      const matches = !allowed.length || allowed.includes(String(option.value));
-      option.hidden = !matches;
+  function rebuildSelect(select, options, placeholder) {
+    const previous = select.value;
+    select.innerHTML = '';
 
-      if (matches && !firstVisible) {
-        firstVisible = option.value;
-      }
+    const placeholderOption = document.createElement('option');
+    placeholderOption.value = '';
+    placeholderOption.textContent = placeholder;
+    select.appendChild(placeholderOption);
+
+    options.forEach(item => {
+      const option = document.createElement('option');
+      option.value = item.value;
+      option.textContent = item.label;
+      if (item.stateId) option.dataset.stateId = item.stateId;
+      if (item.schoolTypeId) option.dataset.schoolTypeId = item.schoolTypeId;
+      if (item.subjectId) option.dataset.subjectId = item.subjectId;
+      select.appendChild(option);
     });
 
-    if (subjectSelect.value && subjectSelect.selectedOptions[0] && subjectSelect.selectedOptions[0].hidden) {
-      subjectSelect.value = '';
-    }
-
-    if (!subjectSelect.value && firstVisible) {
-      subjectSelect.value = firstVisible;
+    if (options.some(item => item.value === previous)) {
+      select.value = previous;
+    } else if (options.length) {
+      select.value = options[0].value;
+    } else {
+      select.value = '';
     }
   }
 
-  function filterLevelOptions() {
-    if (!stateSelect || !schoolSelect || !levelSelect) return;
+  function filterSubjects() {
+    const allowed = levelSubjectMap[String(levelSelect.value)] || [];
+    const subjectOptions = allowed.length
+      ? allSubjectOptions.filter(item => allowed.includes(String(item.subjectId)))
+      : allSubjectOptions;
 
+    rebuildSelect(subjectSelect, subjectOptions, 'Bitte wählen');
+  }
+
+  function filterLevels() {
     const stateId = stateSelect.value;
     const schoolTypeId = schoolSelect.value;
-    let firstVisible = '';
 
-    Array.from(levelSelect.options).forEach(option => {
-      if (!option.value) {
-        option.hidden = false;
-        return;
-      }
+    const levelOptions = allLevelOptions.filter(item =>
+      item.stateId === stateId && item.schoolTypeId === schoolTypeId
+    );
 
-      const matches = option.dataset.stateId === stateId && option.dataset.schoolTypeId === schoolTypeId;
-      option.hidden = !matches;
-
-      if (matches && !firstVisible) {
-        firstVisible = option.value;
-      }
-    });
-
-    if (levelSelect.value && levelSelect.selectedOptions[0] && levelSelect.selectedOptions[0].hidden) {
-      levelSelect.value = '';
-    }
-
-    if (!levelSelect.value && firstVisible) {
-      levelSelect.value = firstVisible;
-    }
-
-    filterSubjectOptions();
+    rebuildSelect(levelSelect, levelOptions, 'Bitte wählen');
+    filterSubjects();
   }
 
-  stateSelect?.addEventListener('change', filterLevelOptions);
-  schoolSelect?.addEventListener('change', filterLevelOptions);
-  levelSelect?.addEventListener('change', filterSubjectOptions);
-  filterLevelOptions();
+  stateSelect.addEventListener('change', filterLevels);
+  schoolSelect.addEventListener('change', filterLevels);
+  levelSelect.addEventListener('change', filterSubjects);
+
+  filterLevels();
 })();
 </script>
 
