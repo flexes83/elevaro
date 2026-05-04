@@ -185,6 +185,7 @@ function curriculum_resolve_level(string $stateCode, string $schoolTypeCode, $le
         'state' => $stateCode,
         'school_type' => $schoolTypeCode,
         'level_code' => $raw,
+        'level_code_order' => $raw,
     ];
 
     $numericWhere = '';
@@ -206,7 +207,7 @@ function curriculum_resolve_level(string $stateCode, string $schoolTypeCode, $le
         WHERE s.code = :state
           AND st.code = :school_type
           AND (l.code = :level_code{$numericWhere})
-        ORDER BY CASE WHEN l.code = :level_code THEN 0 ELSE 1 END, l.sort_order ASC
+        ORDER BY CASE WHEN l.code = :level_code_order THEN 0 ELSE 1 END, l.sort_order ASC
         LIMIT 1
     ");
 
