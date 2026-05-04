@@ -56,7 +56,12 @@
     const values = profile.values || {};
     if (els.state) els.state.textContent = labels.state || values.state || '–';
     if (els.schoolType) els.schoolType.textContent = labels.school_type || values.school_type || '–';
-    if (els.grade) els.grade.textContent = labels.grade || (values.grade ? `${values.grade}. Klasse` : '–');
+    if (els.grade) {
+      const isVocational = String(values.school_type || '').startsWith('beruf') || String(labels.school_type || '').toLowerCase().startsWith('beruf');
+      els.grade.textContent = labels.grade || (values.grade ? (isVocational ? values.grade : `${values.grade}. Klasse`) : '–');
+      const gradeCaption = document.querySelector('.profile-strip div:nth-child(3) span');
+      if (gradeCaption) gradeCaption.textContent = isVocational ? 'Stufe' : 'Klasse';
+    }
     if (els.subject) els.subject.textContent = labels.subject || values.subject || '–';
 
     const name = localStorage.getItem('elevaro_profile_name') || labels.name || values.name;

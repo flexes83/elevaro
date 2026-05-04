@@ -9,11 +9,11 @@ header('Content-Type: application/json; charset=utf-8');
 try {
     $state = $_GET['state'] ?? '';
     $schoolType = $_GET['school_type'] ?? '';
-    $grade = (int)($_GET['grade'] ?? 0);
+    $grade = $_GET['grade'] ?? '';
     $subject = $_GET['subject'] ?? null;
     $topic = $_GET['topic'] ?? null;
     $tags = $_GET['tags'] ?? null;
-    if (!$grade) throw new RuntimeException('Klasse fehlt.');
+    if ($grade === '') throw new RuntimeException('Klasse/Stufe fehlt.');
     $items = curriculum_recommendations($state, $schoolType, $grade, $subject ?: null, $topic ?: null, $tags ?: null);
     $canEdit = auth_is_admin();
     $userId = elevaro_current_user_id();

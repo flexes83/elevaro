@@ -48,7 +48,7 @@ require_once __DIR__ . '/app/includes/frontend_header.php';
         <strong id="schoolTypeLabel">–</strong>
       </div>
       <div>
-        <span>Klasse</span>
+        <span>Klasse/Stufe</span>
         <strong id="gradeLabel">–</strong>
       </div>
       <div>

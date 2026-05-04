@@ -42,7 +42,7 @@ try {
         case 'subjects':
             echo json_encode([
                 'success' => true,
-                'items' => curriculum_subjects($_GET['state'] ?? '', $_GET['school_type'] ?? '', (int)($_GET['grade'] ?? 0))
+                'items' => curriculum_subjects($_GET['state'] ?? '', $_GET['school_type'] ?? '', $_GET['grade'] ?? '')
             ], JSON_UNESCAPED_UNICODE);
             break;
 
@@ -52,7 +52,7 @@ try {
                 'items' => curriculum_learning_areas(
                     $_GET['state'] ?? '',
                     $_GET['school_type'] ?? '',
-                    (int)($_GET['grade'] ?? 0),
+                    $_GET['grade'] ?? '',
                     $_GET['subject'] ?? ''
                 )
             ], JSON_UNESCAPED_UNICODE);

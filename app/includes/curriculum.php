@@ -169,37 +169,167 @@ function curriculum_grades(string $stateCode, string $schoolTypeCode): array
     return $grades;
 }
 
-function curriculum_subjects(string $stateCode, string $schoolTypeCode, int $grade): array
+
+function curriculum_resolve_level(string $stateCode, string $schoolTypeCode, $levelOrGrade): ?array
 {
-    // Prefer subjects with existing curriculum topics.
-    $stmt = elevaro_db()->prepare("
-        SELECT DISTINCT sub.code, sub.name, sub.icon
-        FROM curriculum_topics t
-        JOIN states s ON s.id = t.state_id
-        JOIN school_types st ON st.id = t.school_type_id
-        JOIN subjects sub ON sub.id = t.subject_id
-        WHERE s.code = :state
-          AND st.code = :school_type
-          AND t.grade = :grade
-        ORDER BY sub.sort_order ASC, sub.name ASC
-    ");
-
-    $stmt->execute([
-        'state' => $stateCode,
-        'school_type' => $schoolTypeCode,
-        'grade' => $grade
-    ]);
-
-    $subjects = $stmt->fetchAll();
-
-    if (!empty($subjects)) {
-        return $subjects;
+    if (!curriculum_table_exists('school_type_levels')) {
+        return null;
     }
 
-    // Fallback by grade until all curricula are imported.
-    if ($grade <= 4) {
+    $raw = trim((string)$levelOrGrade);
+    if ($raw === '') {
+        return null;
+    }
+
+    $params = [
+        'state' => $stateCode,
+        'school_type' => $schoolTypeCode,
+        'level_code' => $raw,
+    ];
+
+    $numericWhere = '';
+    if (ctype_digit($raw)) {
+        $numericWhere = ' OR l.numeric_grade = :numeric_grade';
+        $params['numeric_grade'] = (int)$raw;
+    }
+
+    $stmt = elevaro_db()->prepare("
+        SELECT
+            l.id,
+            l.code,
+            l.name,
+            l.numeric_grade,
+            st.school_category
+        FROM school_type_levels l
+        JOIN states s ON s.id = l.state_id
+        JOIN school_types st ON st.id = l.school_type_id
+        WHERE s.code = :state
+          AND st.code = :school_type
+          AND (l.code = :level_code{$numericWhere})
+        ORDER BY CASE WHEN l.code = :level_code THEN 0 ELSE 1 END, l.sort_order ASC
+        LIMIT 1
+    ");
+
+    $stmt->execute($params);
+    $level = $stmt->fetch();
+
+    return $level ?: null;
+}
+
+function curriculum_context_from_level(string $stateCode, string $schoolTypeCode, $levelOrGrade): array
+{
+    $level = curriculum_resolve_level($stateCode, $schoolTypeCode, $levelOrGrade);
+    $raw = trim((string)$levelOrGrade);
+
+    return [
+        'level' => $level,
+        'level_id' => $level ? (int)$level['id'] : null,
+        'level_code' => $level['code'] ?? ($raw !== '' ? $raw : null),
+        'level_name' => $level['name'] ?? null,
+        'numeric_grade' => $level && $level['numeric_grade'] !== null ? (int)$level['numeric_grade'] : (ctype_digit($raw) ? (int)$raw : 0),
+        'is_vocational' => (($level['school_category'] ?? '') === 'vocational') || curriculum_is_vocational_school_type($stateCode, $schoolTypeCode),
+    ];
+}
+
+function curriculum_levels(string $stateCode, string $schoolTypeCode): array
+{
+    try {
+        $stmt = elevaro_db()->prepare("
+            SELECT l.id, l.code, l.name, l.numeric_grade
+            FROM school_type_levels l
+            JOIN states s ON s.id = l.state_id
+            JOIN school_types st ON st.id = l.school_type_id
+            WHERE s.code = :state
+              AND st.code = :school_type
+            ORDER BY l.sort_order ASC, l.name ASC
+        ");
+
+        $stmt->execute([
+            'state' => $stateCode,
+            'school_type' => $schoolTypeCode,
+        ]);
+
+        $levels = $stmt->fetchAll();
+
+        if (!empty($levels)) {
+            return array_map(static function (array $level): array {
+                return [
+                    'id' => $level['id'],
+                    'code' => $level['code'],
+                    'name' => $level['name'],
+                    'numeric_grade' => $level['numeric_grade'],
+                    'grade' => $level['numeric_grade'],
+                ];
+            }, $levels);
+        }
+    } catch (Throwable $e) {
+        // Fall back below for older DBs.
+    }
+
+    return curriculum_grades($stateCode, $schoolTypeCode);
+}
+
+
+function curriculum_subjects(string $stateCode, string $schoolTypeCode, $levelOrGrade): array
+{
+    $ctx = curriculum_context_from_level($stateCode, $schoolTypeCode, $levelOrGrade);
+    $grade = (int)$ctx['numeric_grade'];
+    $levelId = $ctx['level_id'];
+
+    if ($levelId && curriculum_column_exists('curriculum_topics', 'school_type_level_id')) {
+        $stmt = elevaro_db()->prepare("
+            SELECT DISTINCT sub.code, sub.name, sub.icon
+            FROM curriculum_topics t
+            JOIN states s ON s.id = t.state_id
+            JOIN school_types st ON st.id = t.school_type_id
+            JOIN subjects sub ON sub.id = t.subject_id
+            WHERE s.code = :state
+              AND st.code = :school_type
+              AND t.school_type_level_id = :level_id
+            ORDER BY sub.sort_order ASC, sub.name ASC
+        ");
+        $stmt->execute([
+            'state' => $stateCode,
+            'school_type' => $schoolTypeCode,
+            'level_id' => $levelId,
+        ]);
+        $subjects = $stmt->fetchAll();
+        if (!empty($subjects)) {
+            return $subjects;
+        }
+    }
+
+    if ($grade > 0) {
+        $stmt = elevaro_db()->prepare("
+            SELECT DISTINCT sub.code, sub.name, sub.icon
+            FROM curriculum_topics t
+            JOIN states s ON s.id = t.state_id
+            JOIN school_types st ON st.id = t.school_type_id
+            JOIN subjects sub ON sub.id = t.subject_id
+            WHERE s.code = :state
+              AND st.code = :school_type
+              AND t.grade = :grade
+            ORDER BY sub.sort_order ASC, sub.name ASC
+        ");
+
+        $stmt->execute([
+            'state' => $stateCode,
+            'school_type' => $schoolTypeCode,
+            'grade' => $grade
+        ]);
+
+        $subjects = $stmt->fetchAll();
+
+        if (!empty($subjects)) {
+            return $subjects;
+        }
+    }
+
+    if ($ctx['is_vocational']) {
+        $codes = ['deutsch', 'mathe', 'englisch', 'wirtschaft', 'bwl', 'biologie', 'physik', 'chemie'];
+    } elseif ($grade > 0 && $grade <= 4) {
         $codes = ['deutsch', 'mathe', 'sachunterricht'];
-    } elseif ($grade <= 6) {
+    } elseif ($grade > 0 && $grade <= 6) {
         $codes = ['deutsch', 'mathe', 'englisch'];
     } else {
         $codes = ['deutsch', 'mathe', 'englisch', 'biologie', 'physik', 'chemie', 'geschichte', 'geographie'];
@@ -219,8 +349,30 @@ function curriculum_subjects(string $stateCode, string $schoolTypeCode, int $gra
     return $stmt->fetchAll();
 }
 
-function curriculum_topics(string $stateCode, string $schoolTypeCode, int $grade, string $subjectCode): array
+
+function curriculum_topics(string $stateCode, string $schoolTypeCode, $levelOrGrade, string $subjectCode): array
 {
+    $ctx = curriculum_context_from_level($stateCode, $schoolTypeCode, $levelOrGrade);
+    $grade = (int)$ctx['numeric_grade'];
+    $levelId = $ctx['level_id'];
+
+    $levelWhere = '';
+    $params = [
+        'state' => $stateCode,
+        'school_type' => $schoolTypeCode,
+        'subject' => $subjectCode,
+    ];
+
+    if ($levelId && curriculum_column_exists('curriculum_topics', 'school_type_level_id')) {
+        $levelWhere = 'AND t.school_type_level_id = :level_id';
+        $params['level_id'] = $levelId;
+    } elseif ($grade > 0) {
+        $levelWhere = 'AND t.grade = :grade';
+        $params['grade'] = $grade;
+    } else {
+        return [];
+    }
+
     $stmt = elevaro_db()->prepare("
         SELECT
             t.code,
@@ -237,20 +389,16 @@ function curriculum_topics(string $stateCode, string $schoolTypeCode, int $grade
         LEFT JOIN quizzes q ON q.id = qtm.quiz_id AND q.is_active = 1
         WHERE s.code = :state
           AND st.code = :school_type
-          AND t.grade = :grade
+          {$levelWhere}
           AND sub.code = :subject
         ORDER BY t.sort_order ASC, t.title ASC
     ");
 
-    $stmt->execute([
-        'state' => $stateCode,
-        'school_type' => $schoolTypeCode,
-        'grade' => $grade,
-        'subject' => $subjectCode
-    ]);
+    $stmt->execute($params);
 
     return $stmt->fetchAll();
 }
+
 
 function curriculum_table_exists(string $tableName): bool
 {
@@ -269,9 +417,12 @@ function curriculum_table_exists(string $tableName): bool
 }
 
 
-function curriculum_learning_areas(string $stateCode, string $schoolTypeCode, int $grade, string $subjectCode): array
+function curriculum_learning_areas(string $stateCode, string $schoolTypeCode, $levelOrGrade, string $subjectCode): array
 {
     $pdo = elevaro_db();
+    $ctx = curriculum_context_from_level($stateCode, $schoolTypeCode, $levelOrGrade);
+    $grade = (int)$ctx['numeric_grade'];
+    $levelId = $ctx['level_id'];
 
     // Prefer real quiz tags. This is the desired model: broad tags like Ornithologie, Bruchrechnen, Simple Past.
     if (curriculum_table_exists('tags') && curriculum_table_exists('quiz_tag_map')) {
@@ -330,7 +481,7 @@ function curriculum_learning_areas(string $stateCode, string $schoolTypeCode, in
     }
 
     // Fallback while older quizzes have no tags yet: group fine curriculum topics into broad learning areas.
-    $topics = curriculum_topics($stateCode, $schoolTypeCode, $grade, $subjectCode);
+    $topics = curriculum_topics($stateCode, $schoolTypeCode, $levelOrGrade, $subjectCode);
     $groups = [];
 
     foreach ($topics as $topic) {
@@ -442,9 +593,12 @@ function curriculum_area_from_topic(array $topic, string $subjectCode): array
     ];
 }
 
-function curriculum_recommendations(string $stateCode, string $schoolTypeCode, int $grade, ?string $subjectCode = null, ?string $topicCode = null, ?string $tagsCsv = null): array
+function curriculum_recommendations(string $stateCode, string $schoolTypeCode, $levelOrGrade, ?string $subjectCode = null, ?string $topicCode = null, ?string $tagsCsv = null): array
 {
     $pdo = elevaro_db();
+    $ctx = curriculum_context_from_level($stateCode, $schoolTypeCode, $levelOrGrade);
+    $grade = (int)$ctx['numeric_grade'];
+    $levelId = $ctx['level_id'];
 
     $tags = array_values(array_filter(array_map(static function ($tag) {
         $tag = trim(mb_strtolower($tag, 'UTF-8'));
@@ -453,9 +607,21 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
         return trim($tag, '-');
     }, explode(',', (string)$tagsCsv))));
 
+    $quizLevelFilter = '';
+    $quizParams = [];
+
+    if ($levelId && curriculum_column_exists('quizzes', 'school_type_level_id')) {
+        $quizLevelFilter = 'AND (q.school_type_level_id = :quiz_level_id OR (q.school_type_level_id IS NULL' . ($grade > 0 ? ' AND q.grade = :grade_fallback' : '') . '))';
+        $quizParams['quiz_level_id'] = $levelId;
+        if ($grade > 0) $quizParams['grade_fallback'] = $grade;
+    } elseif ($grade > 0) {
+        $quizLevelFilter = 'AND q.grade = :grade_fallback';
+        $quizParams['grade_fallback'] = $grade;
+    }
+
     if (!empty($tags) && curriculum_table_exists('tags') && curriculum_table_exists('quiz_tag_map')) {
         try {
-            $params = ['grade' => $grade];
+            $params = $quizParams;
             $subjectWhere = '';
 
             if ($subjectCode) {
@@ -495,7 +661,8 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
                 JOIN tags tag ON tag.id = qtag.tag_id
                 LEFT JOIN quiz_topic_map qtm ON qtm.quiz_id = q.id
                 LEFT JOIN curriculum_topics t ON t.id = qtm.topic_id
-                WHERE q.grade = :grade
+                WHERE 1=1
+                  {$quizLevelFilter}
                   {$subjectWhere}
                   AND q.is_active = 1
                   AND (q.status = 'published' OR q.status = 'draft' OR q.status IS NULL OR q.status = '')
@@ -512,15 +679,25 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
                 return $items;
             }
         } catch (Throwable $e) {
-            // Fall through to topic/fach fallback.
+            // Fall through.
         }
     }
 
     $params = [
         'state' => $stateCode,
         'school_type' => $schoolTypeCode,
-        'grade' => $grade
     ];
+
+    $levelWhere = '';
+    if ($levelId && curriculum_column_exists('curriculum_topics', 'school_type_level_id')) {
+        $levelWhere = 'AND t.school_type_level_id = :level_id';
+        $params['level_id'] = $levelId;
+    } elseif ($grade > 0) {
+        $levelWhere = 'AND t.grade = :grade';
+        $params['grade'] = $grade;
+    } else {
+        $levelWhere = 'AND 1 = 0';
+    }
 
     $subjectWhere = '';
     if ($subjectCode) {
@@ -551,7 +728,7 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
             q.theme_emoji,
             q.image_path,
             q.image_status,
-                    (SELECT COUNT(*) FROM questions qq WHERE qq.quiz_id = q.id AND qq.status IN ('published','draft')) AS question_count
+            (SELECT COUNT(*) FROM questions qq WHERE qq.quiz_id = q.id AND qq.status IN ('published','draft')) AS question_count
         FROM curriculum_topics t
         JOIN states s ON s.id = t.state_id
         JOIN school_types st ON st.id = t.school_type_id
@@ -563,7 +740,7 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
          AND (q.status = 'published' OR q.status = 'draft' OR q.status IS NULL OR q.status = '')
         WHERE s.code = :state
           AND st.code = :school_type
-          AND t.grade = :grade
+          {$levelWhere}
           {$subjectWhere}
           {$topicWhere}
         ORDER BY CASE WHEN q.quiz_key IS NULL THEN 1 ELSE 0 END, t.sort_order ASC, q.title ASC
@@ -572,19 +749,14 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
     $stmt->execute($params);
     $items = $stmt->fetchAll();
 
-    $hasUsableQuiz = false;
     foreach ($items as $item) {
         if (!empty($item['quiz_key'])) {
-            $hasUsableQuiz = true;
-            break;
+            return $items;
         }
     }
 
-    if ($hasUsableQuiz) {
-        return $items;
-    }
-
     if ($subjectCode) {
+        $params = ['subject' => $subjectCode] + $quizParams;
         $stmt = $pdo->prepare("
             SELECT
                 NULL AS topic_code,
@@ -602,65 +774,20 @@ function curriculum_recommendations(string $stateCode, string $schoolTypeCode, i
                 q.theme_emoji,
                 q.image_path,
                 q.image_status,
-                    (SELECT COUNT(*) FROM questions qq WHERE qq.quiz_id = q.id AND qq.status IN ('published','draft')) AS question_count
+                (SELECT COUNT(*) FROM questions qq WHERE qq.quiz_id = q.id AND qq.status IN ('published','draft')) AS question_count
             FROM quizzes q
             JOIN subjects sub ON sub.id = q.subject_id
             WHERE sub.code = :subject
-              AND q.grade = :grade
+              {$quizLevelFilter}
               AND q.is_active = 1
               AND (q.status = 'published' OR q.status = 'draft' OR q.status IS NULL OR q.status = '')
             ORDER BY q.title ASC
             LIMIT 12
         ");
 
-        $stmt->execute(['subject' => $subjectCode, 'grade' => $grade]);
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
     return $items;
 }
-
-
-function curriculum_levels(string $stateCode, string $schoolTypeCode): array
-{
-    try {
-        $stmt = elevaro_db()->prepare("
-            SELECT
-                l.id,
-                l.code,
-                l.name,
-                l.numeric_grade
-            FROM school_type_levels l
-            JOIN states s ON s.id = l.state_id
-            JOIN school_types st ON st.id = l.school_type_id
-            WHERE s.code = :state
-              AND st.code = :school_type
-            ORDER BY l.sort_order ASC, l.name ASC
-        ");
-
-        $stmt->execute([
-            'state' => $stateCode,
-            'school_type' => $schoolTypeCode,
-        ]);
-
-        $levels = $stmt->fetchAll();
-
-        if (!empty($levels)) {
-            return array_map(static function (array $level): array {
-                return [
-                    'id' => $level['id'],
-                    'code' => $level['code'],
-                    'name' => $level['name'],
-                    'numeric_grade' => $level['numeric_grade'],
-                    // Compatibility: existing onboarding stores the selected code in values.grade.
-                    'grade' => $level['numeric_grade'],
-                ];
-            }, $levels);
-        }
-    } catch (Throwable $e) {
-        // Fall back below for older databases without school_type_levels.
-    }
-
-    return curriculum_grades($stateCode, $schoolTypeCode);
-}
-
