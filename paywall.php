@@ -51,7 +51,7 @@ $return = $_GET['return'] ?? '/recommendations.php';
         <?php if ($isPremium): ?>
           <a class="btn btn-success btn-lg" href="<?= htmlspecialchars($return, ENT_QUOTES, 'UTF-8') ?>">Du hast Premium</a>
         <?php elseif ($user): ?>
-          <a class="btn btn-primary btn-lg" href="/api/create_checkout_session.php">Premium freischalten</a>
+          <a class="btn btn-primary btn-lg" href="/register.php?mode=premium&return=/api/create_checkout_session.php">Premium freischalten</a>
         <?php else: ?>
           <a class="btn btn-primary btn-lg" href="/login.php?return=<?= urlencode('/paywall.php?return=' . $return) ?>">Premium freischalten</a>
         <?php endif; ?>

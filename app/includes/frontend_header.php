@@ -103,6 +103,7 @@ function elevaro_frontend_header(string $variant = 'light', array $options = [])
       <?php endif; ?>
     </div>
   </div>
+<a href="/paywall.php" class="nav-link">Premium</a>
 </nav>
 <?php
 }

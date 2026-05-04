@@ -268,7 +268,9 @@ $hasListeningAudio = $listeningMode && $listeningAudioPath !== '';
 
     </div>
   </div>
-</main>
+<div class="result-cta text-center mt-4">
+<a class="btn btn-primary" href="/paywall.php">Premium freischalten</a>
+</div></main>
 
 <script>
 window.ELEVARO_QUIZ = {
