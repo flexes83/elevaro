@@ -1,5 +1,6 @@
 (function () {
   const originalQuestions = window.ELEVARO_QUIZ.questions || [];
+  const userIsPremium = !!window.ELEVARO_QUIZ.userIsPremium;
   let questions = [...originalQuestions];
   let index = 0;
   let score = 0;
@@ -119,7 +120,7 @@
   }
 
   function startQuiz(useWeak = false) {
-    questions = useWeak ? [...weakQuestions] : [...originalQuestions];
+    questions = (useWeak && userIsPremium) ? [...weakQuestions] : [...originalQuestions];
     index = 0;
     score = 0;
     selected = false;
@@ -139,6 +140,11 @@
     resultCard.classList.add('d-none');
     quizCard.classList.remove('d-none');
     quizCard.classList.add('quiz-pop-in');
+
+    if (!questions.length) {
+      alert('Für diese Runde sind keine Fragen verfügbar.');
+      return;
+    }
 
     renderQuestion();
   }
@@ -426,6 +432,12 @@
   function renderWeakQuestions() {
     weakList.innerHTML = '';
 
+    if (!userIsPremium) {
+      weakBox.classList.add('d-none');
+      weakBtn.classList.add('d-none');
+      return;
+    }
+
     if (!weakQuestions.length) {
       weakBox.classList.add('d-none');
       weakBtn.classList.add('d-none');
@@ -481,7 +493,8 @@
       credentials: 'same-origin',
       body: JSON.stringify({
         quiz_id: window.ELEVARO_QUIZ.dbId,
-        session_token: sessionId
+        session_token: sessionId,
+        question_count: questions.length
       })
     })
       .then(response => {

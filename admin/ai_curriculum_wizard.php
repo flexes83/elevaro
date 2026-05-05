@@ -324,8 +324,8 @@ function generateQuestionsForIdea(array $idea): array
             ],
             'questions' => [
                 'type' => 'array',
-                'minItems' => 15,
-                'maxItems' => 15,
+                'minItems' => 36,
+                'maxItems' => 36,
                 'items' => [
                     'type' => 'object',
                     'additionalProperties' => false,
@@ -386,7 +386,7 @@ function buildQuestionPrompt(array $idea): string
     $levelLabel = $idea['school_type_level_name'] ?: $idea['grade'];
 
     return trim("
-Erstelle 15 Multiple-Choice-Fragen für ein Elevaro-Quiz.
+Erstelle 36 Multiple-Choice-Fragen für ein Elevaro-Quiz.
 
 Kontext:
 - Bundesland: {$idea['state_name']}
@@ -922,7 +922,7 @@ admin_header('KI Curriculum Wizard', 'Themen werden gespeichert. Du kannst mehre
                         <form method="post">
                           <input type="hidden" name="action" value="create_quiz_from_idea">
                           <input type="hidden" name="quiz_idea_id" value="<?= (int)$idea['id'] ?>">
-                          <button class="btn btn-primary">Quiz erstellen & 15 Fragen generieren</button>
+                          <button class="btn btn-primary">Quiz erstellen & Fragenpool generieren</button>
                         </form>
                       <?php endif; ?>
                     </div>

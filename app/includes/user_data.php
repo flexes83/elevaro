@@ -63,7 +63,7 @@ function elevaro_user_has_active_access(?array $user = null): bool
     return (int)($user['has_active_access'] ?? 1) === 1;
 }
 
-function elevaro_start_quiz_session(int $userId, int $quizId, ?string $sessionToken = null): int
+function elevaro_start_quiz_session(int $userId, int $quizId, ?string $sessionToken = null, ?int $roundQuestionCount = null): int
 {
     if (!elevaro_table_exists('user_quiz_sessions')) {
         error_log('Elevaro stats: user_quiz_sessions table missing');
@@ -72,14 +72,18 @@ function elevaro_start_quiz_session(int $userId, int $quizId, ?string $sessionTo
 
     $pdo = elevaro_db();
 
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*)
-        FROM questions
-        WHERE quiz_id = :quiz_id
-          AND status = 'published'
-    ");
-    $stmt->execute(['quiz_id' => $quizId]);
-    $total = (int)$stmt->fetchColumn();
+    if ($roundQuestionCount !== null && $roundQuestionCount > 0) {
+        $total = $roundQuestionCount;
+    } else {
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*)
+            FROM questions
+            WHERE quiz_id = :quiz_id
+              AND status = 'published'
+        ");
+        $stmt->execute(['quiz_id' => $quizId]);
+        $total = (int)$stmt->fetchColumn();
+    }
 
     $hasSessionToken = elevaro_column_exists('user_quiz_sessions', 'session_token');
 
@@ -278,14 +282,18 @@ function elevaro_get_user_quiz_progress(int $userId, int $quizId): array
 {
     $pdo = elevaro_db();
 
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*)
-        FROM questions
-        WHERE quiz_id = :quiz_id
-          AND status = 'published'
-    ");
-    $stmt->execute(['quiz_id' => $quizId]);
-    $total = (int)$stmt->fetchColumn();
+    if ($roundQuestionCount !== null && $roundQuestionCount > 0) {
+        $total = $roundQuestionCount;
+    } else {
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*)
+            FROM questions
+            WHERE quiz_id = :quiz_id
+              AND status = 'published'
+        ");
+        $stmt->execute(['quiz_id' => $quizId]);
+        $total = (int)$stmt->fetchColumn();
+    }
 
     if (!elevaro_table_exists('user_question_progress')) {
         return [

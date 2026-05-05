@@ -3,6 +3,7 @@
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/user_data.php';
+require_once __DIR__ . '/access.php';
 
 function elevaro_get_quiz_by_key(string $quizKey): ?array
 {
@@ -112,34 +113,72 @@ function elevaro_get_quiz_intro_progress(int $quizId): array
 }
 
 
-function elevaro_get_questions_for_quiz(int $quizId, bool $adaptiveOrder = true): array
+function elevaro_quiz_round_length(): int
 {
+    return 15;
+}
+
+function elevaro_question_pool_target_count(): int
+{
+    return 36;
+}
+
+function elevaro_get_questions_for_quiz(int $quizId, bool $adaptiveOrder = true, ?int $limit = null, ?int $userId = null, ?bool $isPremium = null): array
+{
+    $pdo = elevaro_db();
+    $limit = $limit ?: elevaro_quiz_round_length();
+    $userId = $userId ?: (function_exists('elevaro_current_user_id') ? elevaro_current_user_id() : null);
+
+    if ($isPremium === null) {
+        $isPremium = function_exists('elevaro_user_is_premium') ? elevaro_user_is_premium(auth_user()) : false;
+    }
+
     $orderSql = $adaptiveOrder
         ? "COALESCE(q.difficulty_manual, qs.calculated_difficulty, q.difficulty_calculated) ASC, q.sort_order ASC, q.id ASC"
         : "q.sort_order ASC, q.id ASC";
 
-    $stmt = elevaro_db()->prepare("
+    $stmt = $pdo->prepare("
         SELECT
             q.*,
-            COALESCE(q.difficulty_manual, qs.calculated_difficulty, q.difficulty_calculated) AS difficulty
+            COALESCE(q.difficulty_manual, qs.calculated_difficulty, q.difficulty_calculated) AS difficulty,
+            uqp.answered_count,
+            uqp.correct_count,
+            uqp.wrong_count,
+            uqp.needs_recovery,
+            uqp.is_mastered,
+            uqp.last_answer_correct,
+            uqp.last_answered_at
         FROM questions q
         LEFT JOIN question_stats qs ON qs.question_id = q.id
+        LEFT JOIN user_question_progress uqp
+          ON uqp.question_id = q.id
+         AND uqp.quiz_id = q.quiz_id
+         AND uqp.user_id = :user_id
         WHERE q.quiz_id = :quiz_id
           AND q.status = 'published'
         ORDER BY {$orderSql}
     ");
 
-    $stmt->execute(['quiz_id' => $quizId]);
+    $stmt->execute([
+        'quiz_id' => $quizId,
+        'user_id' => $userId ?: 0,
+    ]);
     $questions = $stmt->fetchAll();
 
     if (!$questions) {
         return [];
     }
 
+    if ($isPremium) {
+        $questions = elevaro_select_premium_question_round($questions, $limit);
+    } else {
+        $questions = array_slice($questions, 0, $limit);
+    }
+
     $ids = array_column($questions, 'id');
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
 
-    $optionsStmt = elevaro_db()->prepare("
+    $optionsStmt = $pdo->prepare("
         SELECT *
         FROM question_options
         WHERE question_id IN ({$placeholders})
@@ -211,10 +250,71 @@ function elevaro_get_questions_for_quiz(int $quizId, bool $adaptiveOrder = true)
             'source_context' => $question['source_context'] ?? 'general',
             'source_excerpt' => $question['source_excerpt'] ?? null,
             'reports_count' => (int)($question['reports_count'] ?? 0),
+            'progress_state' => [
+                'answered_count' => (int)($question['answered_count'] ?? 0),
+                'correct_count' => (int)($question['correct_count'] ?? 0),
+                'wrong_count' => (int)($question['wrong_count'] ?? 0),
+                'needs_recovery' => (int)($question['needs_recovery'] ?? 0),
+                'is_mastered' => (int)($question['is_mastered'] ?? 0),
+            ],
         ];
     }
 
     return $payload;
+}
+
+function elevaro_select_premium_question_round(array $questions, int $limit): array
+{
+    $bucketRecovery = [];
+    $bucketNew = [];
+    $bucketLearning = [];
+    $bucketMastered = [];
+
+    foreach ($questions as $question) {
+        $answered = (int)($question['answered_count'] ?? 0);
+        $needsRecovery = (int)($question['needs_recovery'] ?? 0) === 1;
+        $mastered = (int)($question['is_mastered'] ?? 0) === 1;
+
+        if ($needsRecovery) {
+            $bucketRecovery[] = $question;
+        } elseif ($answered === 0) {
+            $bucketNew[] = $question;
+        } elseif (!$mastered) {
+            $bucketLearning[] = $question;
+        } else {
+            $bucketMastered[] = $question;
+        }
+    }
+
+    $sortByDifficulty = static function (array $a, array $b): int {
+        $difficulty = ((float)($a['difficulty'] ?? 0.3)) <=> ((float)($b['difficulty'] ?? 0.3));
+        return $difficulty ?: ((int)$a['sort_order'] <=> (int)$b['sort_order']) ?: ((int)$a['id'] <=> (int)$b['id']);
+    };
+
+    usort($bucketRecovery, $sortByDifficulty);
+    usort($bucketNew, $sortByDifficulty);
+    usort($bucketLearning, $sortByDifficulty);
+    usort($bucketMastered, $sortByDifficulty);
+
+    $selected = [];
+    $seen = [];
+    $add = static function (array $items, int $max) use (&$selected, &$seen, $limit): void {
+        foreach ($items as $item) {
+            if (count($selected) >= $limit || count($selected) >= $max) break;
+            $id = (int)$item['id'];
+            if (isset($seen[$id])) continue;
+            $seen[$id] = true;
+            $selected[] = $item;
+        }
+    };
+
+    // Falsche Fragen zuerst, dann neue/leichtere Fragen, danach Lernfragen, sichere Fragen nur zum Auffüllen.
+    $add($bucketRecovery, min($limit, 6));
+    $add($bucketNew, min($limit, 11));
+    $add($bucketLearning, min($limit, 13));
+    $add($bucketMastered, $limit);
+
+    return array_slice($selected, 0, $limit);
 }
 
 function elevaro_get_quiz_payload(string $quizKey): ?array
@@ -225,7 +325,10 @@ function elevaro_get_quiz_payload(string $quizKey): ?array
         return null;
     }
 
-    $quiz['questions'] = elevaro_get_questions_for_quiz((int)$quiz['id']);
+    $userId = function_exists('elevaro_current_user_id') ? elevaro_current_user_id() : null;
+    $isPremium = function_exists('elevaro_user_is_premium') ? elevaro_user_is_premium(auth_user()) : false;
+    $quiz['questions'] = elevaro_get_questions_for_quiz((int)$quiz['id'], true, elevaro_quiz_round_length(), $userId, $isPremium);
+    $quiz['round_question_count'] = count($quiz['questions']);
 
     return $quiz;
 }

@@ -52,7 +52,7 @@ $percent = $total > 0 ? round(($passed / $total) * 100) : 0;
 
 $subjectLabel = $quiz['subject_name'] ?? '';
 $schoolLabel = $quiz['school_type_name'] ?? '';
-$gradeLabel = !empty($quiz['grade']) ? ((int)$quiz['grade'] . '. Klasse') : '';
+$gradeLabel = !empty($quiz['school_type_level_name']) ? (string)$quiz['school_type_level_name'] : (!empty($quiz['grade']) ? ((int)$quiz['grade'] . '. Klasse') : '');
 $stateLabel = $quiz['state_name'] ?? '';
 $learningGoal = $quiz['learning_goal'] ?: ($quiz['topic_description'] ?? '');
 $introEmoji = $quiz['theme_emoji'] ?? $quiz['subject_icon'] ?? '🎯';
@@ -180,7 +180,7 @@ $hasListeningAudio = $listeningMode && $listeningAudioPath !== '';
           <div class="quiz-intro-actions">
             <button id="startBtn" class="btn btn-primary btn-lg" <?= ($hasIntroAudio || $hasListeningAudio) ? 'disabled' : '' ?>><?= ($hasIntroAudio || $hasListeningAudio) ? 'Audio zuerst anhören' : 'Quiz starten' ?></button>
             <span class="quiz-progress-text">
-              <?= $played ? qh($passed . ' von ' . $total . ' bestanden') : qh($total . ' Fragen') ?>
+              <?= $played ? qh($passed . ' von ' . $total . ' im Pool bestanden') : qh(count($quiz['questions']) . ' Fragen pro Runde · ' . $total . ' im Pool') ?>
             </span>
           </div>
         </div>
@@ -289,7 +289,9 @@ window.ELEVARO_QUIZ = {
   listeningAudioPath: <?= json_encode($listeningAudioPath, JSON_UNESCAPED_UNICODE) ?>,
   userLoggedIn: <?= $currentUser ? 'true' : 'false' ?>,
   userIsPremium: <?= $userIsPremium ? 'true' : 'false' ?>,
-  userCanContinue: <?= $userCanContinue ? 'true' : 'false' ?>
+  userCanContinue: <?= $userCanContinue ? 'true' : 'false' ?>,
+  roundQuestionCount: <?= (int)count($quiz['questions']) ?>,
+  poolQuestionCount: <?= (int)$total ?>
 };
 </script>
 <script src="assets/js/quiz.js?v=<?= filemtime(__DIR__ . '/assets/js/quiz.js') ?>"></script>
