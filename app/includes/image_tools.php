@@ -1,7 +1,6 @@
 <?php
 
 require_once __DIR__ . '/openai_client.php';
-
 function elevaro_generate_and_store_image(string $prompt, string $kind, int $entityId): array
 {
     $prompt = trim($prompt);
@@ -20,30 +19,74 @@ function elevaro_generate_and_store_image(string $prompt, string $kind, int $ent
         throw new RuntimeException('Upload-Verzeichnis konnte nicht erstellt werden: ' . $baseDir);
     }
 
-    $filename = $safeKind . '-' . $entityId . '-' . date('Ymd-His') . '-' . substr(md5($prompt . microtime(true)), 0, 8) . '.png';
-    $fullPath = $baseDir . '/' . $filename;
-    $publicPath = $baseUrl . '/' . $filename;
+    $baseName = $safeKind . '-' . $entityId . '-' . date('Ymd-His') . '-' . substr(md5($prompt . microtime(true)), 0, 8);
+
+    $originalFilename = $baseName . '.png';
+    $webpFilename = $baseName . '.webp';
+
+    $originalPath = $baseDir . '/' . $originalFilename;
+    $webpPath = $baseDir . '/' . $webpFilename;
+
+    $originalPublicPath = $baseUrl . '/' . $originalFilename;
+    $webpPublicPath = $baseUrl . '/' . $webpFilename;
 
     if (!empty($image['b64_json'])) {
         $binary = base64_decode($image['b64_json'], true);
         if ($binary === false) {
             throw new RuntimeException('OpenAI Bild konnte nicht decodiert werden.');
         }
-        file_put_contents($fullPath, $binary);
+        file_put_contents($originalPath, $binary);
     } elseif (!empty($image['url'])) {
         $binary = elevaro_download_binary($image['url']);
-        file_put_contents($fullPath, $binary);
+        file_put_contents($originalPath, $binary);
     } else {
         throw new RuntimeException('OpenAI Bildantwort enthält weder b64_json noch URL.');
     }
 
+    $frontendPath = $originalPublicPath;
+
+    if (function_exists('imagecreatefrompng') && function_exists('imagewebp')) {
+        $source = imagecreatefrompng($originalPath);
+
+        if ($source !== false) {
+            $width = imagesx($source);
+            $height = imagesy($source);
+
+            $maxWidth = 900;
+
+            if ($width > $maxWidth) {
+                $newWidth = $maxWidth;
+                $newHeight = (int)round($height * ($newWidth / $width));
+
+                $resized = imagecreatetruecolor($newWidth, $newHeight);
+                imagealphablending($resized, true);
+                imagesavealpha($resized, true);
+
+                imagecopyresampled($resized, $source, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
+
+                if (imagewebp($resized, $webpPath, 82)) {
+                    $frontendPath = $webpPublicPath;
+                }
+
+                imagedestroy($resized);
+            } else {
+                if (imagewebp($source, $webpPath, 82)) {
+                    $frontendPath = $webpPublicPath;
+                }
+            }
+
+            imagedestroy($source);
+        }
+    }
+
     return [
-        'path' => $publicPath,
+        'path' => $frontendPath,
+        'original_path' => $originalPublicPath,
+        'webp_path' => file_exists($webpPath) ? $webpPublicPath : null,
         'prompt' => $prompt,
         'revised_prompt' => $image['revised_prompt'] ?? null,
     ];
 }
-
 function elevaro_download_binary(string $url): string
 {
     $ch = curl_init($url);
@@ -64,15 +107,42 @@ function elevaro_download_binary(string $url): string
 
     return $binary;
 }
-
 function elevaro_card_image_prompt(array $quiz): string
 {
-    $title = $quiz['title'] ?? '';
-    $description = $quiz['description'] ?? '';
-    $subject = $quiz['subject_name'] ?? '';
-    $grade = $quiz['grade'] ?? '';
+    $title = trim((string)($quiz['title'] ?? ''));
+    $description = trim((string)($quiz['description'] ?? ''));
+    $subject = trim((string)($quiz['subject_name'] ?? ''));
+    $grade = (int)($quiz['grade'] ?? 0);
+    $levelName = trim((string)($quiz['school_type_level_name'] ?? ''));
 
-    return trim("Freundliche moderne flache Illustration für eine Lernquiz-Karte. Thema: {$title}. Beschreibung: {$description}. Fach: {$subject}, Klasse {$grade}. Stil: schülergerecht, motivierend, nicht babyhaft, helle Farben, klare Formen, kein Text im Bild, keine Logos, keine realistischen Personen, quadratisches Motiv mit ruhigem Hintergrund.");
+    if ($grade > 0 && $grade <= 4) {
+        $audienceStyle = 'playful, warm, child-friendly educational illustration, simple shapes, cheerful colors, suitable for primary school children';
+    } elseif ($grade > 0 && $grade <= 10) {
+        $audienceStyle = 'clear modern educational illustration, friendly but not childish, simple visual metaphors, suitable for middle school students';
+    } else {
+        $audienceStyle = 'clean modern educational illustration, slightly more mature and professional, subtle colors, suitable for older students and vocational school students';
+    }
+
+    $levelText = $levelName !== ''
+        ? "Level: {$levelName}."
+        : ($grade > 0 ? "Grade: {$grade}." : '');
+
+    return trim("
+Topic: {$title}.
+Description: {$description}.
+Subject: {$subject}. {$levelText}
+
+Create a full-bleed illustration for an educational quiz cover.
+Style: {$audienceStyle}.
+Bright but calm color palette, clear shapes, calm background, motivating learning atmosphere.
+
+No text, no typography, no letters, no numbers, no logos.
+No realistic people, no brand marks.
+
+Do not create a card, poster, sticker, badge, icon, UI element, mockup, or framed artwork.
+No borders, no frames, no outlines, no rounded edges, no drop shadows, no padding, no margins.
+The illustration must fill the entire canvas edge-to-edge.
+");
 }
 
 function elevaro_freepik_search_url(string $query): string
