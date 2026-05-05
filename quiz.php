@@ -12,7 +12,7 @@ if (!$quiz) {
 }
 
 $currentUser = auth_user();
-$userIsPremium = elevaro_user_is_premium($currentUser);
+$userIsPremium = elevaro_user_has_premium_for_quiz($currentUser, (int)$quiz['id']);
 $userCanContinue = elevaro_can_start_additional_quiz($currentUser);
 
 if (empty($quiz['questions'])) {

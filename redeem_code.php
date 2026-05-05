@@ -4,12 +4,15 @@ require_once __DIR__ . '/app/includes/auth.php';
 require_once __DIR__ . '/app/includes/access.php';
 
 if (!auth_is_logged_in()) {
-    header('Location: /register.php?return=' . urlencode('/redeem_code.php'));
+    $codeParam = trim((string)($_GET['code'] ?? ''));
+    $returnTarget = '/redeem_code.php' . ($codeParam !== '' ? '?code=' . urlencode($codeParam) : '');
+    header('Location: /register.php?return=' . urlencode($returnTarget));
     exit;
 }
 
 $error = null;
 $success = null;
+$prefillCode = strtoupper(trim((string)($_GET['code'] ?? '')));
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
@@ -40,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <?php if ($success): ?><div class="alert alert-success"><?= htmlspecialchars($success, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
     <?php if ($error): ?><div class="alert alert-danger"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
     <form method="post" class="paywall-code-form">
-      <input name="code" placeholder="Code eingeben" required>
+      <input name="code" placeholder="Code eingeben" value="<?= htmlspecialchars($prefillCode, ENT_QUOTES, 'UTF-8') ?>" required>
       <button class="btn btn-primary">Einlösen</button>
     </form>
     <a class="btn btn-light mt-3" href="/recommendations.php">Zurück zu deinen Quizzen</a>
