@@ -32,10 +32,10 @@ $stmt = $pdo->prepare("SELECT q.* FROM teacher_class_quizzes tcq JOIN quizzes q 
 $stmt->execute(['class_id' => $classId]);
 $assigned = $stmt->fetchAll();
 
-$params = ['subject' => $class['subject_code']];
+$params = ['subject' => $class['subject_code'] ?? '', 'subject_empty' => empty($class['subject_code']) ? 1 : 0];
 $gradeWhere = '';
 if (!empty($class['grade'])) { $gradeWhere = 'AND (q.grade = :grade OR q.grade IS NULL)'; $params['grade'] = (int)$class['grade']; }
-$stmt = $pdo->prepare("SELECT q.id, q.quiz_key, q.title, q.description, q.grade, q.theme_emoji, sub.name AS subject_name FROM quizzes q LEFT JOIN subjects sub ON sub.id = q.subject_id WHERE (sub.code = :subject OR :subject = '') {$gradeWhere} AND q.is_active = 1 AND (q.status IN ('published','draft') OR q.status IS NULL OR q.status = '') ORDER BY q.grade, q.title LIMIT 80");
+$stmt = $pdo->prepare("SELECT q.id, q.quiz_key, q.title, q.description, q.grade, q.theme_emoji, sub.name AS subject_name FROM quizzes q LEFT JOIN subjects sub ON sub.id = q.subject_id WHERE (sub.code = :subject OR :subject_empty = 1) {$gradeWhere} AND q.is_active = 1 AND (q.status IN ('published','draft') OR q.status IS NULL OR q.status = '') ORDER BY q.grade, q.title LIMIT 80");
 $stmt->execute($params);
 $available = $stmt->fetchAll();
 $assignedIds = array_map(static fn($q) => (int)$q['id'], $assigned);
