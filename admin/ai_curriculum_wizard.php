@@ -627,6 +627,7 @@ function collectContext(PDO $pdo, array $post, array $states, array $schoolTypes
         'school_type_level_id' => (int)$level['id'],
         'school_type_level_code' => $level['code'],
         'school_type_level_name' => $levelLabel,
+        'level_display' => $levelLabel,
         'level_prompt_label' => $levelPromptLabel,
         'subject_id' => (int)$subject['id'],
         'subject_name' => $subject['name'],
@@ -642,6 +643,11 @@ function collectContext(PDO $pdo, array $post, array $states, array $schoolTypes
 function buildTopicPrompt(array $context): string
 {
     $focus = $context['focus'] ? "- Zusätzlicher Schwerpunkt/Hinweis: {$context['focus']}" : "- Zusätzlicher Schwerpunkt/Hinweis: keiner";
+    $levelPromptLabel = $context['level_prompt_label'] ?? 'Klasse/Stufe';
+    $levelDisplay = $context['school_type_level_name'] ?? ($context['level_display'] ?? '');
+    if ($levelDisplay === '') {
+        $levelDisplay = !empty($context['grade']) ? ((int)$context['grade'] . '. Klasse') : 'nicht angegeben';
+    }
 
     return trim("
 Erstelle eine Liste sinnvoller, lehrplannaher Themen für Lernquizze.
@@ -649,7 +655,7 @@ Erstelle eine Liste sinnvoller, lehrplannaher Themen für Lernquizze.
 Kontext:
 - Bundesland: {$context['state_name']}
 - Schulart: {$context['school_type_name']}
-- Klasse oder Kurs-/Jahrgangsstufe: {$context['grade']}
+- {$levelPromptLabel}: {$levelDisplay}
 - Fach: {$context['subject_name']}
 {$focus}
 
@@ -931,7 +937,7 @@ admin_header('KI Curriculum Wizard', 'Themen werden gespeichert. Du kannst mehre
           <div class="list-group list-group-flush">
             <?php foreach ($recentBatches as $batch): ?>
               <a class="list-group-item list-group-item-action" href="?batch_id=<?= (int)$batch['id'] ?>">
-                <?= h($batch['state_name']) ?> · <?= h($batch['school_type_name']) ?> · Klasse <?= (int)$batch['grade'] ?> · <?= h($batch['subject_name']) ?>
+                <?= h($batch['state_name']) ?> · <?= h($batch['school_type_name']) ?> · <?= h($batch['level_name'] ?? ((int)$batch['grade'] > 0 ? ('Klasse ' . (int)$batch['grade']) : 'Klasse/Stufe nicht angegeben')) ?> · <?= h($batch['subject_name']) ?>
                 <small class="text-muted d-block"><?= h($batch['created_at']) ?><?= $batch['focus'] ? ' · ' . h($batch['focus']) : '' ?></small>
               </a>
             <?php endforeach; ?>
