@@ -1,6 +1,33 @@
 <?php
 require_once __DIR__ . '/_layout.php';
 
+function teacher_quiz_tools_ensure_schema(PDO $pdo): void
+{
+    $pdo->exec("CREATE TABLE IF NOT EXISTS teacher_custom_quizzes (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        teacher_id INT UNSIGNED NOT NULL,
+        class_id INT UNSIGNED NOT NULL,
+        source_quiz_id INT UNSIGNED NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        KEY idx_teacher_custom_quizzes_teacher (teacher_id),
+        KEY idx_teacher_custom_quizzes_class (class_id),
+        KEY idx_teacher_custom_quizzes_source (source_quiz_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS teacher_custom_quiz_questions (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        custom_quiz_id INT UNSIGNED NOT NULL,
+        source_question_id INT UNSIGNED NOT NULL,
+        sort_order INT UNSIGNED NOT NULL DEFAULT 100,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_custom_quiz_question (custom_quiz_id, source_question_id),
+        KEY idx_teacher_custom_quiz_questions_source (source_question_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+}
+
 $class = teacher_selected_class();
 if (!$class) {
     teacher_header('Quizzes', 'Lege zuerst eine Klasse an.');
@@ -10,10 +37,12 @@ if (!$class) {
 }
 
 $pdo = teacher_db();
+teacher_quiz_tools_ensure_schema($pdo);
 $error = null;
 $notice = null;
 $classId = (int)$class['id'];
 $classLabel = teacher_class_label($class);
+$teacherId = teacher_current_user_id();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
@@ -33,6 +62,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ->execute(['class_id' => $classId, 'quiz_id' => (int)($_POST['quiz_id'] ?? 0)]);
             $notice = 'Quiz wurde entfernt.';
         }
+        if ($action === 'copy_selected_questions') {
+            $questionIds = array_values(array_filter(array_map('intval', $_POST['question_ids'] ?? [])));
+            $sourceQuizId = (int)($_POST['source_quiz_id'] ?? 0);
+            if (!$questionIds) throw new RuntimeException('Bitte mindestens eine Frage auswählen.');
+            if (!$sourceQuizId) throw new RuntimeException('Ausgangsquiz fehlt.');
+
+            $title = trim((string)($_POST['custom_quiz_title'] ?? ''));
+            if ($title === '') {
+                $stmt = $pdo->prepare("SELECT title FROM quizzes WHERE id = :id LIMIT 1");
+                $stmt->execute(['id' => $sourceQuizId]);
+                $title = ((string)$stmt->fetchColumn() ?: 'Eigenes Quiz') . ' – eigene Auswahl';
+            }
+
+            $stmt = $pdo->prepare("INSERT INTO teacher_custom_quizzes (teacher_id, class_id, source_quiz_id, title, description)
+                VALUES (:teacher_id, :class_id, :source_quiz_id, :title, :description)");
+            $stmt->execute([
+                'teacher_id' => $teacherId,
+                'class_id' => $classId,
+                'source_quiz_id' => $sourceQuizId,
+                'title' => $title,
+                'description' => 'Aus bestehenden Fragen als Vorlage erstellt.',
+            ]);
+            $customQuizId = (int)$pdo->lastInsertId();
+
+            $insert = $pdo->prepare("INSERT IGNORE INTO teacher_custom_quiz_questions (custom_quiz_id, source_question_id, sort_order)
+                VALUES (:custom_quiz_id, :source_question_id, :sort_order)");
+            foreach ($questionIds as $index => $questionId) {
+                $insert->execute([
+                    'custom_quiz_id' => $customQuizId,
+                    'source_question_id' => $questionId,
+                    'sort_order' => ($index + 1) * 10,
+                ]);
+            }
+            $notice = count($questionIds) . ' Fragen wurden als eigenes Klassen-Quiz gespeichert.';
+        }
     } catch (Throwable $e) {
         $error = $e->getMessage();
     }
@@ -42,6 +106,15 @@ $stmt = $pdo->prepare("\n    SELECT q.*, sub.name AS subject_name\n    FROM teac
 $stmt->execute(['class_id' => $classId]);
 $assigned = $stmt->fetchAll();
 $assignedIds = array_map(static fn($q) => (int)$q['id'], $assigned);
+
+$customStmt = $pdo->prepare("SELECT cq.*, COUNT(cqq.id) AS question_count
+    FROM teacher_custom_quizzes cq
+    LEFT JOIN teacher_custom_quiz_questions cqq ON cqq.custom_quiz_id = cq.id
+    WHERE cq.teacher_id = :teacher_id AND cq.class_id = :class_id
+    GROUP BY cq.id
+    ORDER BY cq.created_at DESC");
+$customStmt->execute(['teacher_id' => $teacherId, 'class_id' => $classId]);
+$customQuizzes = $customStmt->fetchAll();
 
 $questionsByQuiz = [];
 $optionsByQuestion = [];
@@ -80,92 +153,113 @@ $available = $stmt->fetchAll();
 teacher_header('Quizzes', 'Bis zu 10 Quizzes für ' . $classLabel . ' freischalten.');
 ?>
 <style>
-  .teacher-quiz-title{appearance:none;background:transparent;border:0;padding:0;text-align:left;color:inherit;font:inherit;cursor:pointer}
+  .teacher-quiz-card{border-top:1px solid rgba(23,32,51,.12);padding:18px 0}
+  .teacher-quiz-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(180px,280px) auto;gap:22px;align-items:start}
+  .teacher-quiz-title{appearance:none;background:transparent;border:0;padding:0;text-align:left;color:inherit;font:inherit;cursor:pointer;width:100%}
   .teacher-quiz-title:hover strong{text-decoration:underline;text-underline-offset:4px}
-  .teacher-quiz-details{background:#f8fafc;border-radius:18px;padding:16px;margin-top:14px}
+  .teacher-quiz-title .toggle-label::after{content:'Details öffnen'}
+  .teacher-quiz-title[aria-expanded="true"] .toggle-label::after{content:'Details schließen'}
+  .teacher-class-column{font-weight:900;color:#5b6472;padding-top:7px;white-space:normal;line-height:1.2}
+  .teacher-quiz-details{background:#f8fafc;border-radius:18px;padding:16px;margin-top:16px}
   .teacher-quiz-meta{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 12px}
   .teacher-quiz-meta span{font-size:.78rem;font-weight:800;background:#fff;border:1px solid rgba(23,32,51,.08);border-radius:999px;padding:5px 9px;color:#5b6472}
-  .teacher-question-list{max-height:430px;overflow:auto;padding-right:4px}
-  .teacher-question-item{background:#fff;border:1px solid rgba(23,32,51,.08);border-radius:14px;padding:12px 14px;margin-bottom:10px}
-  .teacher-question-text{font-weight:900;margin-bottom:8px;line-height:1.25}
-  .teacher-answer-list{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
-  .teacher-answer-pill{font-size:.82rem;background:#f1f3f6;border-radius:999px;padding:4px 8px;color:#4f5867}
+  .teacher-question-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
+  .teacher-question-toolbar .form-control{max-width:340px;border-radius:999px}
+  .teacher-question-list{max-height:460px;overflow:auto;padding-right:4px}
+  .teacher-question-item{display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px;background:#fff;border:1px solid rgba(23,32,51,.08);border-radius:14px;padding:10px 12px;margin-bottom:8px}
+  .teacher-question-check{padding-top:2px}
+  .teacher-question-text{font-weight:900;margin-bottom:7px;line-height:1.22;font-size:.95rem}
+  .teacher-answer-list{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:4px}
+  .teacher-answer-pill{font-size:.78rem;background:#f1f3f6;border-radius:999px;padding:3px 7px;color:#4f5867}
   .teacher-answer-pill.is-correct{background:#e8f8ef;color:#167347;font-weight:800}
-  .teacher-explanation{font-size:.86rem;color:#697385;margin:6px 0 0;line-height:1.35}
+  .teacher-explanation{font-size:.8rem;color:#697385;margin:5px 0 0;line-height:1.3}
+  .teacher-custom-list{display:grid;gap:8px;margin-top:12px}
+  .teacher-custom-item{background:#f8fafc;border-radius:14px;padding:10px 12px;display:flex;justify-content:space-between;gap:12px}
+  @media (max-width: 900px){.teacher-quiz-row{grid-template-columns:1fr}.teacher-class-column{padding-top:0}}
 </style>
 <?php if ($notice): ?><div class="alert alert-success"><?= teacher_h($notice) ?></div><?php endif; ?>
 <?php if ($error): ?><div class="alert alert-danger"><?= teacher_h($error) ?></div><?php endif; ?>
 
 <div class="row g-4">
-  <div class="col-lg-7">
-    <div class="card card-soft admin-table-card"><div class="card-body p-4">
+  <div class="col-lg-8">
+    <div class="card card-soft"><div class="card-body p-4">
       <h2 class="h5 fw-bold">Freigeschaltete Premium-Quizzes <?= count($assigned) ?>/10</h2>
-      <table class="table align-middle"><thead><tr><th>Quiz</th><th>Klasse</th><th></th></tr></thead><tbody>
+      <div class="row fw-bold text-muted small mt-4 d-none d-lg-grid" style="grid-template-columns:minmax(0,1fr) minmax(180px,280px) auto;gap:22px;">
+        <div>Quiz</div><div>Klasse</div><div></div>
+      </div>
       <?php foreach ($assigned as $quiz): ?>
         <?php
           $quizId = (int)$quiz['id'];
           $quizQuestions = $questionsByQuiz[$quizId] ?? [];
           $detailsId = 'quizDetails' . $quizId;
         ?>
-        <tr>
-          <td colspan="3">
-            <div class="d-flex justify-content-between gap-3 align-items-start">
-              <button class="teacher-quiz-title" type="button" data-bs-toggle="collapse" data-bs-target="#<?= teacher_h($detailsId) ?>" aria-expanded="false" aria-controls="<?= teacher_h($detailsId) ?>">
-                <strong><?= teacher_h(($quiz['theme_emoji'] ?? '🎯') . ' ' . $quiz['title']) ?></strong><br>
-                <small class="text-muted"><?= teacher_h($quiz['quiz_key']) ?> · <?= count($quizQuestions) ?> Fragen · Details öffnen</small>
-              </button>
-              <div class="d-flex gap-3 align-items-center flex-shrink-0">
-                <strong class="text-muted"><?= teacher_h($classLabel) ?></strong>
-                <form method="post" class="m-0">
-                  <input type="hidden" name="action" value="remove_quiz">
-                  <input type="hidden" name="quiz_id" value="<?= $quizId ?>">
-                  <button class="btn btn-sm btn-light">Entfernen</button>
-                </form>
+        <section class="teacher-quiz-card">
+          <div class="teacher-quiz-row">
+            <button class="teacher-quiz-title" type="button" data-bs-toggle="collapse" data-bs-target="#<?= teacher_h($detailsId) ?>" aria-expanded="false" aria-controls="<?= teacher_h($detailsId) ?>">
+              <strong><?= teacher_h(($quiz['theme_emoji'] ?? '🎯') . ' ' . $quiz['title']) ?></strong><br>
+              <small class="text-muted"><?= teacher_h($quiz['quiz_key']) ?> · <?= count($quizQuestions) ?> Fragen · <span class="toggle-label"></span></small>
+            </button>
+            <div class="teacher-class-column"><?= teacher_h($classLabel) ?></div>
+            <form method="post" class="m-0">
+              <input type="hidden" name="action" value="remove_quiz">
+              <input type="hidden" name="quiz_id" value="<?= $quizId ?>">
+              <button class="btn btn-sm btn-light">Entfernen</button>
+            </form>
+          </div>
+          <div class="collapse" id="<?= teacher_h($detailsId) ?>">
+            <div class="teacher-quiz-details">
+              <div class="teacher-quiz-meta">
+                <?php if (!empty($quiz['subject_name'])): ?><span>Fach: <?= teacher_h($quiz['subject_name']) ?></span><?php endif; ?>
+                <span>Klasse: <?= teacher_h($classLabel) ?></span>
+                <?php if (!empty($quiz['grade'])): ?><span>Quiz-Stufe: <?= teacher_h((string)$quiz['grade']) ?></span><?php endif; ?>
+                <span><?= count($quizQuestions) ?> Fragen</span>
               </div>
-            </div>
-            <div class="collapse" id="<?= teacher_h($detailsId) ?>">
-              <div class="teacher-quiz-details">
-                <div class="teacher-quiz-meta">
-                  <?php if (!empty($quiz['subject_name'])): ?><span>Fach: <?= teacher_h($quiz['subject_name']) ?></span><?php endif; ?>
-                  <span>Klasse: <?= teacher_h($classLabel) ?></span>
-                  <?php if (!empty($quiz['grade'])): ?><span>Quiz-Stufe: <?= teacher_h((string)$quiz['grade']) ?></span><?php endif; ?>
-                  <span><?= count($quizQuestions) ?> Fragen</span>
-                </div>
-                <?php if (!empty($quiz['description'])): ?><p class="text-muted mb-3"><?= teacher_h($quiz['description']) ?></p><?php endif; ?>
-                <?php if ($quizQuestions): ?>
+              <?php if (!empty($quiz['description'])): ?><p class="text-muted mb-3"><?= teacher_h($quiz['description']) ?></p><?php endif; ?>
+              <?php if ($quizQuestions): ?>
+                <form method="post" class="teacher-question-actions">
+                  <input type="hidden" name="source_quiz_id" value="<?= $quizId ?>">
+                  <div class="teacher-question-toolbar">
+                    <button class="btn btn-sm btn-outline-secondary" type="button" data-select-all>Alle auswählen</button>
+                    <button class="btn btn-sm btn-outline-secondary" type="button" data-select-none>Auswahl leeren</button>
+                    <input class="form-control form-control-sm" name="custom_quiz_title" placeholder="Name für eigenes Quiz">
+                    <button class="btn btn-sm btn-primary" name="action" value="copy_selected_questions">In eigenes Quiz übernehmen</button>
+                    <button class="btn btn-sm btn-light" formaction="test_pdf.php" formtarget="_blank" name="action" value="test_pdf">Test-PDF erstellen</button>
+                  </div>
                   <div class="teacher-question-list">
                     <?php foreach ($quizQuestions as $idx => $question): ?>
                       <?php $opts = $optionsByQuestion[(int)$question['id']] ?? []; ?>
-                      <div class="teacher-question-item">
-                        <div class="teacher-question-text"><?= ($idx + 1) ?>. <?= teacher_h($question['question_text']) ?></div>
-                        <?php if ($opts): ?>
-                          <div class="teacher-answer-list">
-                            <?php foreach ($opts as $option): ?>
-                              <span class="teacher-answer-pill <?= (int)($option['is_correct'] ?? 0) === 1 ? 'is-correct' : '' ?>">
-                                <?= (int)($option['is_correct'] ?? 0) === 1 ? '✓ ' : '' ?><?= teacher_h($option['option_text']) ?>
-                              </span>
-                            <?php endforeach; ?>
-                          </div>
-                        <?php elseif (!empty($question['correct_answer'])): ?>
-                          <div class="teacher-answer-list"><span class="teacher-answer-pill is-correct">✓ <?= teacher_h($question['correct_answer']) ?></span></div>
-                        <?php endif; ?>
-                        <?php if (!empty($question['explanation'])): ?><p class="teacher-explanation"><?= teacher_h($question['explanation']) ?></p><?php endif; ?>
-                      </div>
+                      <label class="teacher-question-item">
+                        <span class="teacher-question-check"><input class="form-check-input" type="checkbox" name="question_ids[]" value="<?= (int)$question['id'] ?>"></span>
+                        <span>
+                          <span class="teacher-question-text"><?= ($idx + 1) ?>. <?= teacher_h($question['question_text']) ?></span>
+                          <?php if ($opts): ?>
+                            <span class="teacher-answer-list">
+                              <?php foreach ($opts as $option): ?>
+                                <span class="teacher-answer-pill <?= (int)($option['is_correct'] ?? 0) === 1 ? 'is-correct' : '' ?>">
+                                  <?= (int)($option['is_correct'] ?? 0) === 1 ? '✓ ' : '' ?><?= teacher_h($option['option_text']) ?>
+                                </span>
+                              <?php endforeach; ?>
+                            </span>
+                          <?php elseif (!empty($question['correct_answer'])): ?>
+                            <span class="teacher-answer-list"><span class="teacher-answer-pill is-correct">✓ <?= teacher_h($question['correct_answer']) ?></span></span>
+                          <?php endif; ?>
+                          <?php if (!empty($question['explanation'])): ?><span class="teacher-explanation d-block"><?= teacher_h($question['explanation']) ?></span><?php endif; ?>
+                        </span>
+                      </label>
                     <?php endforeach; ?>
                   </div>
-                <?php else: ?>
-                  <div class="text-muted">Für dieses Quiz sind noch keine Fragen hinterlegt.</div>
-                <?php endif; ?>
-              </div>
+                </form>
+              <?php else: ?>
+                <div class="text-muted">Für dieses Quiz sind noch keine Fragen hinterlegt.</div>
+              <?php endif; ?>
             </div>
-          </td>
-        </tr>
+          </div>
+        </section>
       <?php endforeach; ?>
-      <?php if (!$assigned): ?><tr><td colspan="3" class="text-muted">Noch keine Quizzes hinzugefügt.</td></tr><?php endif; ?>
-      </tbody></table>
+      <?php if (!$assigned): ?><div class="text-muted pt-4">Noch keine Quizzes hinzugefügt.</div><?php endif; ?>
     </div></div>
   </div>
-  <div class="col-lg-5">
+  <div class="col-lg-4">
     <div class="card card-soft"><div class="card-body p-4">
       <h2 class="h5 fw-bold">Quiz hinzufügen</h2>
       <p class="text-muted">Die Auswahl ist nach Fach und Klasse der aktuellen Klasse vorgefiltert.</p>
@@ -175,6 +269,27 @@ teacher_header('Quizzes', 'Bis zu 10 Quizzes für ' . $classLabel . ' freischalt
         <div class="col-12"><button class="btn btn-primary" <?= count($assigned) >= 10 ? 'disabled' : '' ?>>Hinzufügen</button></div>
       </form>
     </div></div>
+
+    <div class="card card-soft mt-4"><div class="card-body p-4">
+      <h2 class="h5 fw-bold">Eigene Klassen-Quizzes</h2>
+      <p class="text-muted mb-2">Ausgewählte Fragen aus Vorlagen. Sichtbar nur für diese Klasse.</p>
+      <div class="teacher-custom-list">
+        <?php foreach ($customQuizzes as $custom): ?>
+          <div class="teacher-custom-item">
+            <strong><?= teacher_h($custom['title']) ?></strong>
+            <span class="text-muted"><?= (int)$custom['question_count'] ?> Fragen</span>
+          </div>
+        <?php endforeach; ?>
+        <?php if (!$customQuizzes): ?><div class="text-muted">Noch kein eigenes Quiz erstellt.</div><?php endif; ?>
+      </div>
+    </div></div>
   </div>
 </div>
+<script>
+document.querySelectorAll('.teacher-question-actions').forEach((form) => {
+  const boxes = () => Array.from(form.querySelectorAll('input[type="checkbox"][name="question_ids[]"]'));
+  form.querySelector('[data-select-all]')?.addEventListener('click', () => boxes().forEach((box) => box.checked = true));
+  form.querySelector('[data-select-none]')?.addEventListener('click', () => boxes().forEach((box) => box.checked = false));
+});
+</script>
 <?php teacher_footer(); ?>
