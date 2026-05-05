@@ -83,6 +83,14 @@ function teacher_ensure_schema(): void
         KEY idx_teacher_class_quizzes_quiz (quiz_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+    $pdo->exec("CREATE TABLE IF NOT EXISTS teacher_class_students (
+        class_id INT UNSIGNED NOT NULL,
+        user_id INT UNSIGNED NOT NULL,
+        joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (class_id, user_id),
+        KEY idx_teacher_class_students_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
     // Keep compatibility with the existing low-threshold class-code redeem flow.
     $pdo->exec("CREATE TABLE IF NOT EXISTS class_codes (
         id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -155,6 +163,12 @@ function teacher_class_quiz_count(int $classId): int
 
 function teacher_class_student_count(int $classId): int
 {
+    if (teacher_table_exists('teacher_class_students')) {
+        $stmt = teacher_db()->prepare("SELECT COUNT(*) FROM teacher_class_students WHERE class_id = :class_id");
+        $stmt->execute(['class_id' => $classId]);
+        return (int)$stmt->fetchColumn();
+    }
+
     $stmt = teacher_db()->prepare("SELECT COUNT(*) FROM class_code_users ccu JOIN class_codes cc ON cc.id = ccu.class_code_id WHERE cc.class_id = :class_id");
     $stmt->execute(['class_id' => $classId]);
     return (int)$stmt->fetchColumn();

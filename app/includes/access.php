@@ -81,6 +81,57 @@ function elevaro_user_has_class_access(int $userId): bool
     return (int)$stmt->fetchColumn() > 0;
 }
 
+
+function elevaro_user_has_premium_for_quiz(?array $user, int $quizId): bool
+{
+    $user = $user ?: auth_user();
+
+    if (!$user) {
+        return false;
+    }
+
+    if (($user['role'] ?? '') === 'admin') {
+        return true;
+    }
+
+    $plan = (string)($user['plan'] ?? 'free');
+    if (in_array($plan, ['premium', 'teacher'], true)) {
+        return true;
+    }
+
+    if (!empty($user['plan_expires_at']) && strtotime((string)$user['plan_expires_at']) > time()) {
+        return true;
+    }
+
+    if (!$quizId || !elevaro_access_table_exists('class_code_users') || !elevaro_access_table_exists('class_codes')) {
+        return false;
+    }
+
+    // New teacher backend: only quizzes assigned to the joined class become premium.
+    if (elevaro_access_column_exists('class_codes', 'class_id') && elevaro_access_table_exists('teacher_class_quizzes')) {
+        $stmt = elevaro_db()->prepare("
+            SELECT COUNT(*)
+            FROM class_code_users ccu
+            JOIN class_codes cc ON cc.id = ccu.class_code_id
+            JOIN teacher_class_quizzes tcq ON tcq.class_id = cc.class_id
+            WHERE ccu.user_id = :user_id
+              AND tcq.quiz_id = :quiz_id
+              AND cc.is_active = 1
+              AND (cc.expires_at IS NULL OR cc.expires_at > NOW())
+        ");
+        $stmt->execute([
+            'user_id' => (int)$user['id'],
+            'quiz_id' => $quizId,
+        ]);
+
+        if ((int)$stmt->fetchColumn() > 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 function elevaro_free_quiz_limit(): int
 {
     return 2;
@@ -223,6 +274,16 @@ function elevaro_apply_access_code(int $userId, string $code): array
         'class_code_id' => (int)$classCode['id'],
         'user_id' => $userId,
     ]);
+
+    if (elevaro_access_table_exists('teacher_class_students') && !empty($classCode['class_id'])) {
+        $pdo->prepare("
+            INSERT IGNORE INTO teacher_class_students (class_id, user_id)
+            VALUES (:class_id, :user_id)
+        ")->execute([
+            'class_id' => (int)$classCode['class_id'],
+            'user_id' => $userId,
+        ]);
+    }
 
     return ['type' => 'class_code', 'label' => $classCode['label'] ?? 'Klasse'];
 }
