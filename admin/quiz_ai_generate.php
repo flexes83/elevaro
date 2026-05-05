@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../app/includes/db.php';
 require_once __DIR__ . '/../app/includes/openai_client.php';
+require_once __DIR__ . '/../app/includes/ai_source_context.php';
 
 $pdo = elevaro_db();
 $quizId = (int)($_GET['quiz_id'] ?? $_POST['quiz_id'] ?? 0);
@@ -21,12 +22,17 @@ $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $context['count'] = max(5, min(25, (int)($_POST['count'] ?? $context['count'])));
     $additionalHint = trim($_POST['learning_goal'] ?? '');
+    $sourceContext = elevaro_ai_collect_source_context($_POST, 'source_image');
 
     if ($additionalHint !== '') {
         $context['learning_goal'] = $additionalHint;
     }
 
-    $prompt = buildPrompt($context);
+    if (!empty($sourceContext['extra_prompt'])) {
+        $context['learning_goal'] = trim(($context['learning_goal'] ?? '') . "\n\n" . $sourceContext['extra_prompt']);
+    }
+
+    $prompt = buildPrompt($context, $sourceContext);
 
     $schema = [
         'type' => 'object',
@@ -79,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $result = elevaro_openai_chat_json([
             [
                 'role' => 'system',
-                'content' => 'Du bist ein erfahrener Lehrer und erstellst didaktisch saubere Multiple-Choice-Fragen für Schüler. Du lieferst ausschließlich valide strukturierte JSON-Daten.'
+                'content' => 'Du bist ein erfahrener Lehrer und erstellst didaktisch saubere Multiple-Choice-Fragen für Schüler. Du lieferst ausschließlich valide strukturierte JSON-Daten. Bei aktuellen, politischen oder strittigen Themen erfindest du keine Fakten und nutzt ausschließlich bereitgestellte Quellen.'
             ],
             [
                 'role' => 'user',
@@ -281,8 +287,10 @@ function buildContextFromQuiz(array $quiz): array
     ];
 }
 
-function buildPrompt(array $context): string
+function buildPrompt(array $context, array $sourceContext = []): string
 {
+    $sourceBlock = elevaro_ai_build_context_block($sourceContext);
+
     return trim("
 Erstelle {$context['count']} Multiple-Choice-Fragen für Elevaro.
 
@@ -306,6 +314,7 @@ Didaktische Anforderungen:
 - Mischung: leichte Einstiegsfragen, mittlere Übungsfragen, schwierigere Transferfragen
 - Schwierigkeit als Zahl zwischen 0.05 und 0.95
 - keine Fangfragen, keine uneindeutigen Lösungen
+{$sourceBlock}
 ");
 }
 
@@ -355,7 +364,7 @@ function h($value): string
           </div>
         </div>
 
-        <form method="post">
+        <form method="post" enctype="multipart/form-data">
           <input type="hidden" name="quiz_id" value="<?= (int)$quizId ?>">
 
           <div class="row g-3">
@@ -368,6 +377,23 @@ function h($value): string
               <label class="form-label fw-bold">Zusätzliche Hinweise / Lernziel</label>
               <textarea class="form-control" name="learning_goal" rows="4" placeholder="Optional: zusätzliche Hinweise für die neuen Fragen."><?= h($context['learning_goal']) ?></textarea>
               <div class="form-text">Bundesland, Schulart, Klasse/Stufe, Fach und Thema werden automatisch aus dem Quiz übernommen.</div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-bold">Quellen, Links oder Artikeltext</label>
+              <textarea class="form-control" name="ai_source_text" rows="7" placeholder="Artikeltext, Material, Notizen oder Links einfügen. Bei aktuellen Themen sollte hier unbedingt eine Quelle rein."></textarea>
+              <div class="form-text">Links werden automatisch auszulesen versucht. Sicherer ist es, den relevanten Text zusätzlich direkt einzufügen.</div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-bold">Quell-Links separat</label>
+              <textarea class="form-control" name="ai_source_links" rows="2" placeholder="https://..."></textarea>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-bold">Bild / Screenshot optional</label>
+              <input class="form-control" type="file" name="source_image" accept="image/*">
+              <div class="form-text">Bild wird gespeichert. Wichtige Inhalte daraus bitte aktuell zusätzlich als Text beschreiben.</div>
             </div>
           </div>
 

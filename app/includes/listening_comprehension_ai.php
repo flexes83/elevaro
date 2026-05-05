@@ -3,8 +3,9 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/openai_client.php';
+require_once __DIR__ . '/ai_source_context.php';
 
-function elevaro_build_listening_comprehension_prompt(array $quiz, int $questionCount = 12): string
+function elevaro_build_listening_comprehension_prompt(array $quiz, int $questionCount = 12, array $sourceContext = []): string
 {
     $subject = (string)($quiz['subject_name'] ?? '');
     $grade = (int)($quiz['grade'] ?? 0);
@@ -17,6 +18,8 @@ function elevaro_build_listening_comprehension_prompt(array $quiz, int $question
     $durationHint = $isEnglish
         ? 'ca. 430 bis 560 englische Wörter, je nach Satzlänge'
         : 'ca. 520 bis 700 deutsche Wörter, je nach Satzlänge';
+
+    $sourceBlock = elevaro_ai_build_context_block($sourceContext);
 
     return trim("
 Erstelle ein komplettes Listening-Comprehension-Quiz.
@@ -59,14 +62,16 @@ Didaktische Regeln:
 - Jede Frage bekommt ein kurzes source_excerpt aus dem Hörtext, worauf sie sich bezieht.
 - Schwierigkeitsmix: ca. 40% leicht, 40% mittel, 20% schwer.
 
+{$sourceBlock}
+
 Gib ausschließlich JSON zurück.
 ");
 }
 
-function elevaro_generate_listening_comprehension(array $quiz, int $questionCount = 12): array
+function elevaro_generate_listening_comprehension(array $quiz, int $questionCount = 12, array $sourceContext = []): array
 {
     $questionCount = max(6, min(20, $questionCount));
-    $prompt = elevaro_build_listening_comprehension_prompt($quiz, $questionCount);
+    $prompt = elevaro_build_listening_comprehension_prompt($quiz, $questionCount, $sourceContext);
 
     $schema = [
         'type' => 'object',
@@ -113,7 +118,7 @@ function elevaro_generate_listening_comprehension(array $quiz, int $questionCoun
     $result = elevaro_openai_chat_json([
         [
             'role' => 'system',
-            'content' => 'Du bist ein erfahrener Lehrer und erstellst didaktisch saubere Listening-Comprehension-Quizze. Du lieferst ausschließlich valides JSON.'
+            'content' => 'Du bist ein erfahrener Lehrer und erstellst didaktisch saubere Listening-Comprehension-Quizze. Du lieferst ausschließlich valides JSON. Bei aktuellen, politischen oder strittigen Themen bist du besonders konservativ: keine erfundenen Fakten, keine Spekulationen, keine unbelegten Entwicklungen.'
         ],
         [
             'role' => 'user',

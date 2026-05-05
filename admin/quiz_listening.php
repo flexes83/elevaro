@@ -2,6 +2,7 @@
 require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/../app/includes/listening_comprehension_ai.php';
 require_once __DIR__ . '/../app/includes/elevenlabs_client.php';
+require_once __DIR__ . '/../app/includes/ai_source_context.php';
 
 $pdo = admin_db();
 $quizId = (int)($_GET['quiz_id'] ?? 0);
@@ -53,6 +54,10 @@ foreach ([
     'listening_status',
     'listening_error',
     'listening_generated_at',
+    'ai_context_notes',
+    'ai_context_links',
+    'ai_context_source_text',
+    'ai_context_image_path',
 ] as $col) {
     if (!lc_column_exists($pdo, 'quizzes', $col)) $missing[] = 'quizzes.' . $col;
 }
@@ -96,7 +101,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$missing) {
 
         if ($action === 'generate_text_and_questions') {
             $questionCount = (int)($_POST['question_count'] ?? 12);
-            $generated = elevaro_generate_listening_comprehension($quiz, $questionCount);
+            $sourceContext = elevaro_ai_collect_source_context($_POST, 'source_image');
+            $generated = elevaro_generate_listening_comprehension($quiz, $questionCount, $sourceContext);
 
             $pdo->beginTransaction();
 
@@ -108,12 +114,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$missing) {
                     listening_prompt = :prompt,
                     listening_status = 'text_generated',
                     listening_error = NULL,
-                    listening_generated_at = NOW()
+                    listening_generated_at = NOW(),
+                    ai_context_notes = :ai_context_notes,
+                    ai_context_links = :ai_context_links,
+                    ai_context_source_text = :ai_context_source_text,
+                    ai_context_image_path = COALESCE(:ai_context_image_path, ai_context_image_path)
                 WHERE id = :id
             ")->execute([
                 'listening_text' => $generated['json']['listening_text'],
                 'summary' => $generated['json']['summary'],
                 'prompt' => $generated['prompt'],
+                'ai_context_notes' => $sourceContext['extra_prompt'],
+                'ai_context_links' => $sourceContext['source_links'] ?: ($_POST['ai_source_links'] ?? ''),
+                'ai_context_source_text' => trim(($sourceContext['source_text'] ?? '') . ($sourceContext['fetched_text'] ? "\n\n--- Automatisch gelesene Auszüge ---\n" . $sourceContext['fetched_text'] : '')),
+                'ai_context_image_path' => $sourceContext['image_path'],
                 'id' => $quizId,
             ]);
 
@@ -274,13 +288,38 @@ admin_header('Listening-Comprehension', '3–4 Minuten Hörtext + darauf abgesti
           <?php endif; ?>
         </div>
 
-        <form method="post" class="d-flex gap-2 align-items-end flex-wrap">
+        <form method="post" enctype="multipart/form-data">
           <input type="hidden" name="action" value="generate_text_and_questions">
-          <div>
-            <label class="form-label fw-bold">Anzahl Fragen</label>
-            <input class="form-control" type="number" min="6" max="20" name="question_count" value="12" <?= $missing ? 'disabled' : '' ?>>
+
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-bold">Anzahl Fragen</label>
+              <input class="form-control" type="number" min="6" max="20" name="question_count" value="12" <?= $missing ? 'disabled' : '' ?>>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-bold">Zusatz-Prompt / Steuerung</label>
+              <textarea class="form-control" name="ai_extra_prompt" rows="3" placeholder="z. B. Niveau B1, politisch neutral, nur diese Quelle verwenden, Fokus auf Hörverstehen ..." <?= $missing ? 'disabled' : '' ?>><?= admin_h($quiz['ai_context_notes'] ?? '') ?></textarea>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-bold">Quellen, Links oder Artikeltext</label>
+              <textarea class="form-control" name="ai_source_text" rows="7" placeholder="Hier Artikeltext, Material, Notizen oder Links einfügen. Bei aktuellen Themen sollte hier unbedingt eine Quelle rein." <?= $missing ? 'disabled' : '' ?>><?= admin_h($quiz['ai_context_source_text'] ?? '') ?></textarea>
+              <div class="form-text">Links werden automatisch auszulesen versucht. Sicherer ist es, den relevanten Text zusätzlich direkt einzufügen.</div>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-bold">Quell-Links separat</label>
+              <textarea class="form-control" name="ai_source_links" rows="2" placeholder="https://..." <?= $missing ? 'disabled' : '' ?>><?= admin_h($quiz['ai_context_links'] ?? '') ?></textarea>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-bold">Bild / Screenshot optional</label>
+              <input class="form-control" type="file" name="source_image" accept="image/*" <?= $missing ? 'disabled' : '' ?>>
+              <div class="form-text">Bild wird gespeichert. Wichtige Inhalte daraus bitte aktuell zusätzlich als Text beschreiben.</div>
+              <?php if (!empty($quiz['ai_context_image_path'])): ?>
+                <div class="small text-muted mt-1">Aktuelles Bild: <code><?= admin_h($quiz['ai_context_image_path']) ?></code></div>
+              <?php endif; ?>
+            </div>
           </div>
-          <button class="btn btn-primary" <?= $missing ? 'disabled' : '' ?> onclick="return confirm('Dieses Listening-Quiz ersetzt alle bisherigen Fragen dieses Quiz. Fortfahren?')">🎧 Listening-Quiz generieren</button>
+
+          <button class="btn btn-primary mt-3" <?= $missing ? 'disabled' : '' ?> onclick="return confirm('Dieses Listening-Quiz ersetzt alle bisherigen Fragen dieses Quiz. Fortfahren?')">🎧 Listening-Quiz generieren</button>
         </form>
       </div>
     </div>
