@@ -3,7 +3,7 @@ require_once __DIR__ . '/_layout.php';
 $class = teacher_selected_class();
 if (!$class) { teacher_header('Schüler', 'Lege zuerst eine Klasse an.'); echo '<div class="card card-soft"><div class="card-body p-4"><a class="btn btn-primary" href="classes.php">Klasse anlegen</a></div></div>'; teacher_footer(); exit; }
 if (teacher_table_exists('teacher_class_students')) {
-    $stmt = teacher_db()->prepare("SELECT u.id, u.display_name, u.email, tcs.joined_at AS created_at FROM teacher_class_students tcs JOIN auth_users u ON u.id = tcs.user_id WHERE tcs.class_id = :class_id ORDER BY tcs.joined_at DESC");
+    $stmt = teacher_db()->prepare("SELECT u.id, u.display_name, u.email, tcs.created_at FROM teacher_class_students tcs JOIN auth_users u ON u.id = tcs.user_id WHERE tcs.class_id = :class_id ORDER BY tcs.created_at DESC");
     $stmt->execute(['class_id' => (int)$class['id']]);
 } else {
     $stmt = teacher_db()->prepare("SELECT u.id, u.display_name, u.email, ccu.created_at FROM class_code_users ccu JOIN class_codes cc ON cc.id = ccu.class_code_id JOIN auth_users u ON u.id = ccu.user_id WHERE cc.class_id = :class_id ORDER BY ccu.created_at DESC");
