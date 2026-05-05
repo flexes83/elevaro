@@ -633,7 +633,8 @@ function collectContext(PDO $pdo, array $post, array $states, array $schoolTypes
         'subject_name' => $subject['name'],
         // Legacy fallback: old DB fields still require a numeric grade.
         // For vocational levels this remains 0 unless a numeric_grade exists.
-        'grade' => $numericGrade,
+        'grade' => $numericGrade ?: null,
+        'grade_label' => $levelLabel ?: ($numericGrade ? $numericGrade . '. Klasse' : ''),
         'focus' => trim($post['focus'] ?? ''),
         'official_sources' => trim($post['official_sources'] ?? ''),
         'curriculum_notes' => trim($post['curriculum_notes'] ?? ''),
@@ -655,7 +656,7 @@ Erstelle eine Liste sinnvoller, lehrplannaher Themen für Lernquizze.
 Kontext:
 - Bundesland: {$context['state_name']}
 - Schulart: {$context['school_type_name']}
-- {$levelPromptLabel}: {$levelDisplay}
+- {$levelPromptLabel}: {$context['grade_label']}
 - Fach: {$context['subject_name']}
 {$focus}
 
