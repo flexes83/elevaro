@@ -643,11 +643,18 @@ function collectContext(PDO $pdo, array $post, array $states, array $schoolTypes
 
 function buildTopicPrompt(array $context): string
 {
-    $focus = $context['focus'] ? "- Zusätzlicher Schwerpunkt/Hinweis: {$context['focus']}" : "- Zusätzlicher Schwerpunkt/Hinweis: keiner";
-    $levelPromptLabel = $context['level_prompt_label'] ?? 'Klasse/Stufe';
-    $levelDisplay = $context['school_type_level_name'] ?? ($context['level_display'] ?? '');
+   
+$focus = $context['focus'] ? "- Zusätzlicher Schwerpunkt/Hinweis: {$context['focus']}" : "- Zusätzlicher Schwerpunkt/Hinweis: keiner";
+$levelPromptLabel = $context['level_prompt_label'] ?? 'Klasse/Stufe';
+$levelDisplay = $context['grade_label']
+        ?? $context['school_type_level_name']
+        ?? $context['level_display']
+        ?? '';
+
     if ($levelDisplay === '') {
-        $levelDisplay = !empty($context['grade']) ? ((int)$context['grade'] . '. Klasse') : 'nicht angegeben';
+        $levelDisplay = !empty($context['grade'])
+            ? ((int)$context['grade'] . '. Klasse')
+            : 'nicht angegeben';
     }
 
     return trim("
@@ -693,7 +700,11 @@ Fachspezifische Orientierung:
 - Sach-/Grundschulfächer: Alltagsbezug, Beobachten, Zuordnen, Grundbegriffe
 - Berufliche Schulen: Praxisbezug, fachliche Grundbegriffe, wirtschaftliche Zusammenhänge, berufstypische Situationen, Handlungsorientierung
 
-Liefere 6 bis 10 Themen.
+Liefere eine möglichst vollständige, aber sinnvoll strukturierte Liste relevanter Themen für diese Klasse/Stufe.
+- vermeide Dopplungen
+- fasse ähnliche Themen sinnvoll zusammen
+- bevorzuge Qualität vor Quantität
+- wenn sinnvoll, liefere mehr als 10 Themen
 ");
 }
 
