@@ -11,6 +11,23 @@ $activeBatch = null;
 $states = $pdo->query("SELECT id, code, name FROM states ORDER BY sort_order, name")->fetchAll();
 $schoolTypes = $pdo->query("SELECT id, code, name FROM school_types ORDER BY sort_order, name")->fetchAll();
 $subjects = $pdo->query("SELECT id, code, name, icon FROM subjects ORDER BY sort_order, name")->fetchAll();
+$schoolTypeLevels = $pdo->query("
+    SELECT l.id, l.state_id, l.school_type_id, l.code, l.name, l.numeric_grade, l.sort_order,
+           s.name AS state_name, st.name AS school_type_name, st.school_category
+    FROM school_type_levels l
+    JOIN states s ON s.id = l.state_id
+    JOIN school_types st ON st.id = l.school_type_id
+    ORDER BY s.sort_order, st.sort_order, l.sort_order, l.name
+")->fetchAll();
+
+$levelSubjectMappings = $pdo->query("
+    SELECT
+      map.school_type_level_id,
+      sub.id AS subject_id
+    FROM school_type_level_subjects map
+    JOIN subjects sub ON sub.id = map.subject_id
+    ORDER BY map.school_type_level_id, map.sort_order, sub.sort_order
+")->fetchAll();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
@@ -38,11 +55,13 @@ if ($batchId) {
 
 $recentBatches = $pdo->query("
     SELECT b.id, b.grade, b.focus, b.created_at,
-           s.name AS state_name, st.name AS school_type_name, sub.name AS subject_name
+           s.name AS state_name, st.name AS school_type_name, sub.name AS subject_name,
+           lvl.name AS level_name, lvl.code AS level_code
     FROM ai_topic_batches b
     JOIN states s ON s.id = b.state_id
     JOIN school_types st ON st.id = b.school_type_id
     JOIN subjects sub ON sub.id = b.subject_id
+    LEFT JOIN school_type_levels lvl ON lvl.id = b.school_type_level_id
     WHERE b.status = 'success'
     ORDER BY b.created_at DESC
     LIMIT 8
@@ -50,7 +69,8 @@ $recentBatches = $pdo->query("
 
 function generateAndCacheTopics(PDO $pdo, array $post, array $states, array $schoolTypes, array $subjects): int
 {
-    $context = collectContext($post, $states, $schoolTypes, $subjects);
+    $schoolTypeLevels = $GLOBALS['schoolTypeLevels'] ?? [];
+    $context = collectContext($pdo, $post, $states, $schoolTypes, $subjects, $schoolTypeLevels);
     $prompt = buildTopicPrompt($context);
 
     $schema = topicSchema();
@@ -59,7 +79,7 @@ function generateAndCacheTopics(PDO $pdo, array $post, array $states, array $sch
         $result = elevaro_openai_chat_json([
             [
                 'role' => 'system',
-                'content' => 'Du bist ein erfahrener deutscher Lehrer und Curriculum-Experte. Du strukturierst Lernquizze nach Bundesland, Schulart, Klassenstufe und Fach. Du lieferst ausschließlich valide JSON-Daten.'
+                'content' => 'Du bist ein erfahrener deutscher Lehrer und Curriculum-Experte. Du strukturierst Lernquizze nach Bundesland, Schulart, Klasse oder Kurs-/Jahrgangsstufe und Fach. Du lieferst ausschließlich valide JSON-Daten.'
             ],
             [
                 'role' => 'user',
@@ -71,15 +91,16 @@ function generateAndCacheTopics(PDO $pdo, array $post, array $states, array $sch
 
         $stmt = $pdo->prepare("
             INSERT INTO ai_topic_batches
-              (state_id, school_type_id, subject_id, grade, focus, official_sources, curriculum_notes, prompt, response, status)
+              (state_id, school_type_id, subject_id, grade, school_type_level_id, focus, official_sources, curriculum_notes, prompt, response, status)
             VALUES
-              (:state_id, :school_type_id, :subject_id, :grade, :focus, :official_sources, :curriculum_notes, :prompt, :response, 'success')
+              (:state_id, :school_type_id, :subject_id, :grade, :school_type_level_id, :focus, :official_sources, :curriculum_notes, :prompt, :response, 'success')
         ");
         $stmt->execute([
             'state_id' => $context['state_id'],
             'school_type_id' => $context['school_type_id'],
             'subject_id' => $context['subject_id'],
             'grade' => $context['grade'],
+            'school_type_level_id' => $context['school_type_level_id'],
             'focus' => $context['focus'],
             'official_sources' => $context['official_sources'],
             'curriculum_notes' => $context['curriculum_notes'],
@@ -196,9 +217,9 @@ function createQuizAndQuestionsFromIdea(PDO $pdo, int $quizIdeaId): int
 
     $stmt = $pdo->prepare("
         INSERT INTO quizzes
-          (quiz_key, title, description, subject_id, grade, questions_path, is_active, status, source_type, ai_generated)
+          (quiz_key, title, description, subject_id, grade, school_type_level_id, questions_path, is_active, status, source_type, ai_generated)
         VALUES
-          (:quiz_key, :title, :description, :subject_id, :grade, '', 1, 'draft', 'system', 1)
+          (:quiz_key, :title, :description, :subject_id, :grade, :school_type_level_id, '', 1, 'draft', 'system', 1)
     ");
     $stmt->execute([
         'quiz_key' => $quizKey,
@@ -206,6 +227,7 @@ function createQuizAndQuestionsFromIdea(PDO $pdo, int $quizIdeaId): int
         'description' => $idea['description'],
         'subject_id' => (int)$idea['subject_id'],
         'grade' => (int)$idea['grade'],
+        'school_type_level_id' => !empty($idea['school_type_level_id']) ? (int)$idea['school_type_level_id'] : null,
     ]);
 
     $quizId = (int)$pdo->lastInsertId();
@@ -231,9 +253,9 @@ function ensureCurriculumTopic(PDO $pdo, array $idea): int
 
     $stmt = $pdo->prepare("
         INSERT INTO curriculum_topics
-          (state_id, school_type_id, grade, subject_id, code, title, description, learning_goal, ai_generated)
+          (state_id, school_type_id, grade, school_type_level_id, subject_id, code, title, description, learning_goal, ai_generated)
         VALUES
-          (:state_id, :school_type_id, :grade, :subject_id, :code, :title, :description, :learning_goal, 1)
+          (:state_id, :school_type_id, :grade, :school_type_level_id, :subject_id, :code, :title, :description, :learning_goal, 1)
         ON DUPLICATE KEY UPDATE
           title = VALUES(title),
           description = VALUES(description),
@@ -244,6 +266,7 @@ function ensureCurriculumTopic(PDO $pdo, array $idea): int
         'state_id' => (int)$idea['state_id'],
         'school_type_id' => (int)$idea['school_type_id'],
         'grade' => (int)$idea['grade'],
+        'school_type_level_id' => !empty($idea['school_type_level_id']) ? (int)$idea['school_type_level_id'] : null,
         'subject_id' => (int)$idea['subject_id'],
         'code' => $code,
         'title' => $idea['topic_title'],
@@ -260,6 +283,7 @@ function ensureCurriculumTopic(PDO $pdo, array $idea): int
         WHERE state_id = :state_id
           AND school_type_id = :school_type_id
           AND grade = :grade
+          AND (school_type_level_id <=> :school_type_level_id)
           AND subject_id = :subject_id
           AND code = :code
         LIMIT 1
@@ -268,6 +292,7 @@ function ensureCurriculumTopic(PDO $pdo, array $idea): int
         'state_id' => (int)$idea['state_id'],
         'school_type_id' => (int)$idea['school_type_id'],
         'grade' => (int)$idea['grade'],
+        'school_type_level_id' => !empty($idea['school_type_level_id']) ? (int)$idea['school_type_level_id'] : null,
         'subject_id' => (int)$idea['subject_id'],
         'code' => $code,
     ]);
@@ -358,10 +383,7 @@ function generateQuestionsForIdea(array $idea): array
 
 function buildQuestionPrompt(array $idea): string
 {
-    $levelLabel = $idea['school_type_level_name'] ?? '';
-    if ($levelLabel === '') {
-        $levelLabel = !empty($idea['grade']) ? ((int)$idea['grade'] . '. Klasse') : 'nicht angegeben';
-    }
+    $levelLabel = $idea['school_type_level_name'] ?: $idea['grade'];
 
     return trim("
 Erstelle 15 Multiple-Choice-Fragen für ein Elevaro-Quiz.
@@ -576,25 +598,41 @@ function saveQuestionsAsDraft(PDO $pdo, int $quizId, array $questions): void
     }
 }
 
-function collectContext(array $post, array $states, array $schoolTypes, array $subjects): array
+function collectContext(PDO $pdo, array $post, array $states, array $schoolTypes, array $subjects, array $schoolTypeLevels): array
 {
     $state = findById($states, (int)($post['state_id'] ?? 0));
     $schoolType = findById($schoolTypes, (int)($post['school_type_id'] ?? 0));
     $subject = findById($subjects, (int)($post['subject_id'] ?? 0));
-    $grade = (int)($post['grade'] ?? 0);
+    $level = findById($schoolTypeLevels, (int)($post['school_type_level_id'] ?? 0));
 
-    if (!$state || !$schoolType || !$subject || !$grade) {
-        throw new RuntimeException('Bitte Bundesland, Schulart, Klasse und Fach auswählen.');
+    if (!$state || !$schoolType || !$subject || !$level) {
+        throw new RuntimeException('Bitte Bundesland, Schulart, Klasse/Stufe und Fach auswählen.');
     }
+
+    if ((int)$level['state_id'] !== (int)$state['id'] || (int)$level['school_type_id'] !== (int)$schoolType['id']) {
+        throw new RuntimeException('Die gewählte Klasse/Stufe passt nicht zur gewählten Schulart.');
+    }
+
+    $numericGrade = $level['numeric_grade'] !== null ? (int)$level['numeric_grade'] : 0;
+    $schoolCategory = (string)($schoolType['school_category'] ?? $level['school_category'] ?? 'general');
+    $levelLabel = (string)$level['name'];
+    $levelPromptLabel = $schoolCategory === 'vocational' ? 'Kurs-/Jahrgangsstufe' : 'Klassenstufe';
 
     return [
         'state_id' => (int)$state['id'],
         'state_name' => $state['name'],
         'school_type_id' => (int)$schoolType['id'],
         'school_type_name' => $schoolType['name'],
+        'school_category' => $schoolCategory,
+        'school_type_level_id' => (int)$level['id'],
+        'school_type_level_code' => $level['code'],
+        'school_type_level_name' => $levelLabel,
+        'level_prompt_label' => $levelPromptLabel,
         'subject_id' => (int)$subject['id'],
         'subject_name' => $subject['name'],
-        'grade' => $grade,
+        // Legacy fallback: old DB fields still require a numeric grade.
+        // For vocational levels this remains 0 unless a numeric_grade exists.
+        'grade' => $numericGrade,
         'focus' => trim($post['focus'] ?? ''),
         'official_sources' => trim($post['official_sources'] ?? ''),
         'curriculum_notes' => trim($post['curriculum_notes'] ?? ''),
@@ -604,11 +642,6 @@ function collectContext(array $post, array $states, array $schoolTypes, array $s
 function buildTopicPrompt(array $context): string
 {
     $focus = $context['focus'] ? "- Zusätzlicher Schwerpunkt/Hinweis: {$context['focus']}" : "- Zusätzlicher Schwerpunkt/Hinweis: keiner";
-    $levelPromptLabel = $context['level_prompt_label'] ?? 'Klasse/Stufe';
-    $levelDisplay = $context['school_type_level_name'] ?? ($context['level_display'] ?? '');
-    if ($levelDisplay === '') {
-        $levelDisplay = !empty($context['grade']) ? ((int)$context['grade'] . '. Klasse') : 'nicht angegeben';
-    }
 
     return trim("
 Erstelle eine Liste sinnvoller, lehrplannaher Themen für Lernquizze.
@@ -616,7 +649,7 @@ Erstelle eine Liste sinnvoller, lehrplannaher Themen für Lernquizze.
 Kontext:
 - Bundesland: {$context['state_name']}
 - Schulart: {$context['school_type_name']}
-- {$levelPromptLabel}: {$levelDisplay}
+- Klasse oder Kurs-/Jahrgangsstufe: {$context['grade']}
 - Fach: {$context['subject_name']}
 {$focus}
 
@@ -632,11 +665,11 @@ Die Themen sollen für kurze, motivierende Lernquizze geeignet sein und sich am 
 Wenn du den exakten Bildungsplan nicht sicher kennst:
 - erfinde keine spezifischen Lehrplanformulierungen
 - bleibe allgemein schulnah
-- wähle Themen, die für diese Klassenstufe realistisch und üblich sind
+- wähle Themen, die für diese Klasse oder Kurs-/Jahrgangsstufe realistisch und üblich sind
 - formuliere keine Behauptung, dass ein Thema exakt im Bildungsplan steht
 
 Didaktische Anforderungen:
-- altersgerecht für die angegebene Klassenstufe
+- alters- und stufengerecht für die angegebene Klasse oder Kurs-/Jahrgangsstufe
 - passend zur angegebenen Schulart
 - vom Einfachen zum Schwierigen aufgebaut
 - nicht nur reines Auswendiglernen
@@ -651,6 +684,7 @@ Fachspezifische Orientierung:
 - Gesellschafts-/Geofächer: Orientierung, Begriffe, Zusammenhänge, Karten/Quellen/Bilder verstehen
 - Deutsch: Sprachgefühl, Grammatik, Lesen, Textverständnis, Schreiben
 - Sach-/Grundschulfächer: Alltagsbezug, Beobachten, Zuordnen, Grundbegriffe
+- Berufliche Schulen: Praxisbezug, fachliche Grundbegriffe, wirtschaftliche Zusammenhänge, berufstypische Situationen, Handlungsorientierung
 
 Liefere 6 bis 10 Themen.
 ");
@@ -703,11 +737,13 @@ function topicSchema(): array
 function loadBatch(PDO $pdo, int $batchId): ?array
 {
     $stmt = $pdo->prepare("
-        SELECT b.*, s.name AS state_name, st.name AS school_type_name, sub.name AS subject_name
+        SELECT b.*, s.name AS state_name, st.name AS school_type_name, sub.name AS subject_name,
+               lvl.name AS level_name, lvl.code AS level_code
         FROM ai_topic_batches b
         JOIN states s ON s.id = b.state_id
         JOIN school_types st ON st.id = b.school_type_id
         JOIN subjects sub ON sub.id = b.subject_id
+        LEFT JOIN school_type_levels lvl ON lvl.id = b.school_type_level_id
         WHERE b.id = :id
         LIMIT 1
     ");
@@ -788,8 +824,20 @@ admin_header('KI Curriculum Wizard', 'Themen werden gespeichert. Du kannst mehre
             </div>
 
             <div class="col-md-2">
-              <label class="form-label fw-bold">Klasse</label>
-              <input class="form-control" name="grade" type="number" min="1" max="13" value="5" required>
+              <label class="form-label fw-bold">Klasse/Stufe</label>
+              <select class="form-select" name="school_type_level_id" required>
+                <option value="">Bitte wählen</option>
+                <?php foreach ($schoolTypeLevels as $level): ?>
+                  <option
+                    value="<?= (int)$level['id'] ?>"
+                    data-state-id="<?= (int)$level['state_id'] ?>"
+                    data-school-type-id="<?= (int)$level['school_type_id'] ?>"
+                    data-label="<?= h($level['name']) ?>"
+                  >
+                    <?= h($level['name']) ?>
+                  </option>
+                <?php endforeach; ?>
+              </select>
             </div>
 
             <div class="col-md-4">
@@ -797,7 +845,7 @@ admin_header('KI Curriculum Wizard', 'Themen werden gespeichert. Du kannst mehre
               <select class="form-select" name="subject_id" required>
                 <option value="">Bitte wählen</option>
                 <?php foreach ($subjects as $subject): ?>
-                  <option value="<?= (int)$subject['id'] ?>"><?= h(($subject['icon'] ?? '') . ' ' . $subject['name']) ?></option>
+                  <option value="<?= (int)$subject['id'] ?>" data-subject-id="<?= (int)$subject['id'] ?>" data-label="<?= h(($subject['icon'] ?? '') . ' ' . $subject['name']) ?>"><?= h(($subject['icon'] ?? '') . ' ' . $subject['name']) ?></option>
                 <?php endforeach; ?>
               </select>
             </div>
@@ -827,7 +875,7 @@ admin_header('KI Curriculum Wizard', 'Themen werden gespeichert. Du kannst mehre
       <div class="mb-3">
         <h3 class="fw-bold">2. Gespeicherte Vorschläge</h3>
         <p class="text-muted">
-          <?= h($activeBatch['state_name']) ?> · <?= h($activeBatch['school_type_name']) ?> · Klasse <?= (int)$activeBatch['grade'] ?> · <?= h($activeBatch['subject_name']) ?>
+          <?= h($activeBatch['state_name']) ?> · <?= h($activeBatch['school_type_name']) ?> · <?= h($activeBatch['level_name'] ?: ('Klasse ' . (int)$activeBatch['grade'])) ?> · <?= h($activeBatch['subject_name']) ?>
         </p>
       </div>
 
@@ -891,5 +939,103 @@ admin_header('KI Curriculum Wizard', 'Themen werden gespeichert. Du kannst mehre
         </div>
       </div>
     <?php endif; ?>
+
+
+
+<script>
+window.ElevaroLevelSubjectMap = <?= json_encode(array_reduce($levelSubjectMappings, static function ($carry, $row) {
+  $levelId = (string)$row['school_type_level_id'];
+  if (!isset($carry[$levelId])) $carry[$levelId] = [];
+  $carry[$levelId][] = (string)$row['subject_id'];
+  return $carry;
+}, []), JSON_UNESCAPED_UNICODE) ?>;
+</script>
+
+
+
+
+<script>
+(function () {
+  const stateSelect = document.querySelector('select[name="state_id"]');
+  const schoolSelect = document.querySelector('select[name="school_type_id"]');
+  const levelSelect = document.querySelector('select[name="school_type_level_id"]');
+  const subjectSelect = document.querySelector('select[name="subject_id"]');
+  const levelSubjectMap = window.ElevaroLevelSubjectMap || {};
+
+  if (!stateSelect || !schoolSelect || !levelSelect || !subjectSelect) return;
+
+  const allLevelOptions = Array.from(levelSelect.options)
+    .filter(option => option.value)
+    .map(option => ({
+      value: option.value,
+      label: option.dataset.label || option.textContent.trim(),
+      stateId: option.dataset.stateId,
+      schoolTypeId: option.dataset.schoolTypeId
+    }));
+
+  const allSubjectOptions = Array.from(subjectSelect.options)
+    .filter(option => option.value)
+    .map(option => ({
+      value: option.value,
+      label: option.dataset.label || option.textContent.trim(),
+      subjectId: option.dataset.subjectId || option.value
+    }));
+
+  function rebuildSelect(select, options, placeholder) {
+    const previous = select.value;
+    select.innerHTML = '';
+
+    const placeholderOption = document.createElement('option');
+    placeholderOption.value = '';
+    placeholderOption.textContent = placeholder;
+    select.appendChild(placeholderOption);
+
+    options.forEach(item => {
+      const option = document.createElement('option');
+      option.value = item.value;
+      option.textContent = item.label;
+      if (item.stateId) option.dataset.stateId = item.stateId;
+      if (item.schoolTypeId) option.dataset.schoolTypeId = item.schoolTypeId;
+      if (item.subjectId) option.dataset.subjectId = item.subjectId;
+      select.appendChild(option);
+    });
+
+    if (options.some(item => item.value === previous)) {
+      select.value = previous;
+    } else if (options.length) {
+      select.value = options[0].value;
+    } else {
+      select.value = '';
+    }
+  }
+
+  function filterSubjects() {
+    const allowed = levelSubjectMap[String(levelSelect.value)] || [];
+    const subjectOptions = allowed.length
+      ? allSubjectOptions.filter(item => allowed.includes(String(item.subjectId)))
+      : allSubjectOptions;
+
+    rebuildSelect(subjectSelect, subjectOptions, 'Bitte wählen');
+  }
+
+  function filterLevels() {
+    const stateId = stateSelect.value;
+    const schoolTypeId = schoolSelect.value;
+
+    const levelOptions = allLevelOptions.filter(item =>
+      item.stateId === stateId && item.schoolTypeId === schoolTypeId
+    );
+
+    rebuildSelect(levelSelect, levelOptions, 'Bitte wählen');
+    filterSubjects();
+  }
+
+  stateSelect.addEventListener('change', filterLevels);
+  schoolSelect.addEventListener('change', filterLevels);
+  levelSelect.addEventListener('change', filterSubjects);
+
+  filterLevels();
+})();
+</script>
 
 <?php admin_footer(); ?>
