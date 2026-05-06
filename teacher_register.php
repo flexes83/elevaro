@@ -1,6 +1,5 @@
 <?php
 require_once __DIR__ . '/app/includes/auth.php';
-require_once __DIR__ . '/app/includes/frontend_header.php';
 
 auth_start_session();
 
@@ -9,7 +8,6 @@ if (auth_is_logged_in()) {
     exit;
 }
 
-$return = '/teacher/dashboard.php';
 $error = null;
 
 $values = [
@@ -66,72 +64,110 @@ function reg_h($value): string
     <meta name="description" content="Erstelle deinen kostenlosen Lehrerzugang für Klassenräume und KI-Quizze.">
     <link rel="stylesheet" href="/assets/css/register.css">
 </head>
-<body class="register-page">
+<body class="register-page teacher-register-page">
 
-<div class="register-layout">
-    <div class="register-card">
-        <div class="register-brand">
-            <span class="register-badge">Für Lehrkräfte</span>
-            <h1>Erstelle deinen Lehrerzugang</h1>
-            <p>
-                Klassenräume erstellen, KI-Quizze generieren und Lernstände verfolgen –
-                zunächst kostenlos ohne Bezahlmodell.
-            </p>
+<div class="register-bg-orb register-bg-orb-1"></div>
+<div class="register-bg-orb register-bg-orb-2"></div>
+
+<main class="register-shell">
+    <section class="register-card register-card-teacher">
+        <aside class="register-hero-panel">
+            <a href="/" class="register-logo" aria-label="Elevaro Startseite">
+                <span class="register-logo-mark">e</span>
+                <span>Elevaro</span>
+            </a>
+
+            <div class="register-hero-content">
+                <span class="register-badge">Kostenloser Beta-Zugang</span>
+                <h1>Teste Elevaro mit deiner Klasse.</h1>
+                <p>
+                    Elevaro befindet sich aktuell in einer kleinen Beta mit ausgewählten Lehrkräften. Erstelle Klassenräume, teile Quizzes per QR-Code und gib uns Feedback aus dem echten Unterricht.
+                </p>
+
+                <div class="register-benefits">
+                    <div class="register-benefit">
+                        <span>⚡</span>
+                        <strong>Kostenlose Beta</strong>
+                        <small>Ohne Payment, ohne Laufzeit, direkt ausprobieren.</small>
+                    </div>
+                    <div class="register-benefit">
+                        <span>🧠</span>
+                        <strong>Gemeinsam verbessern</strong>
+                        <small>Dein Feedback hilft, Elevaro schulnah weiterzuentwickeln.</small>
+                    </div>
+                    <div class="register-benefit">
+                        <span>🎮</span>
+                        <strong>Lebendiger Klassenraum</strong>
+                        <small>Quizzes, Duelle und Fortschritte an einem Ort.</small>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <div class="register-form-panel">
+            <div class="register-form-head">
+                <span class="register-kicker">Geschlossene Beta</span>
+                <h2>Lehrerzugang erstellen</h2>
+                <p>Der Zugang ist während der Beta kostenlos. Eine E-Mail-Verifikation ist aktuell noch nicht erforderlich.</p>
+            </div>
+
+            <?php if ($error): ?>
+                <div class="register-error">
+                    <?= reg_h($error) ?>
+                </div>
+            <?php endif; ?>
+
+            <form method="post" class="register-form">
+                <div class="form-group">
+                    <label for="display_name">Name</label>
+                    <input type="text" id="display_name" name="display_name" required value="<?= reg_h($values['display_name']) ?>" placeholder="z. B. Felix Küster">
+                </div>
+
+                <div class="form-group">
+                    <label for="school_name">Schule <span>optional</span></label>
+                    <input type="text" id="school_name" name="school_name" value="<?= reg_h($values['school_name']) ?>" placeholder="z. B. Gymnasium am See">
+                </div>
+
+                <div class="form-group">
+                    <label for="email">E-Mail</label>
+                    <input type="email" id="email" name="email" required value="<?= reg_h($values['email']) ?>" placeholder="name@schule.de">
+                </div>
+
+                <div class="register-grid-2">
+                    <div class="form-group">
+                        <label for="password">Passwort</label>
+                        <input type="password" id="password" name="password" required minlength="8" placeholder="Mind. 8 Zeichen">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password_confirm">Wiederholen</label>
+                        <input type="password" id="password_confirm" name="password_confirm" required minlength="8" placeholder="Noch einmal">
+                    </div>
+                </div>
+
+                <label class="checkbox-row">
+                    <input type="checkbox" name="accept_terms" value="1" required>
+                    <span>Ich akzeptiere die <a href="/agb.php" target="_blank">AGB</a>.</span>
+                </label>
+
+                <label class="checkbox-row">
+                    <input type="checkbox" name="accept_privacy" value="1" required>
+                    <span>Ich akzeptiere die <a href="/datenschutz.php" target="_blank">Datenschutzerklärung</a>.</span>
+                </label>
+
+                <button type="submit" class="register-submit">
+                    Kostenlosen Beta-Zugang erstellen
+                    <span>→</span>
+                </button>
+
+                <div class="register-footer">
+                    Bereits registriert?
+                    <a href="/login.php?return=/teacher/dashboard.php">Zum Login</a>
+                </div>
+            </form>
         </div>
-
-        <?php if ($error): ?>
-            <div class="register-error">
-                <?= reg_h($error) ?>
-            </div>
-        <?php endif; ?>
-
-        <form method="post" class="register-form">
-            <div class="form-group">
-                <label for="display_name">Name</label>
-                <input type="text" id="display_name" name="display_name" required value="<?= reg_h($values['display_name']) ?>">
-            </div>
-
-            <div class="form-group">
-                <label for="school_name">Schule (optional)</label>
-                <input type="text" id="school_name" name="school_name" value="<?= reg_h($values['school_name']) ?>">
-            </div>
-
-            <div class="form-group">
-                <label for="email">E-Mail</label>
-                <input type="email" id="email" name="email" required value="<?= reg_h($values['email']) ?>">
-            </div>
-
-            <div class="form-group">
-                <label for="password">Passwort</label>
-                <input type="password" id="password" name="password" required minlength="8">
-            </div>
-
-            <div class="form-group">
-                <label for="password_confirm">Passwort wiederholen</label>
-                <input type="password" id="password_confirm" name="password_confirm" required minlength="8">
-            </div>
-
-            <label class="checkbox-row">
-                <input type="checkbox" name="accept_terms" value="1" required>
-                <span>Ich akzeptiere die AGB.</span>
-            </label>
-
-            <label class="checkbox-row">
-                <input type="checkbox" name="accept_privacy" value="1" required>
-                <span>Ich akzeptiere die Datenschutzerklärung.</span>
-            </label>
-
-            <button type="submit" class="register-submit">
-                Lehrerzugang erstellen
-            </button>
-
-            <div class="register-footer">
-                Bereits registriert?
-                <a href="/login.php?return=/teacher/dashboard.php">Zum Login</a>
-            </div>
-        </form>
-    </div>
-</div>
+    </section>
+</main>
 
 </body>
 </html>
