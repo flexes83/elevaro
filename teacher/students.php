@@ -5,7 +5,7 @@ if (!$class) { teacher_header('Schüler', 'Lege zuerst eine Klasse an.'); echo '
 $classId = (int)$class['id'];
 $registered = [];
 if (teacher_table_exists('teacher_class_students')) {
-    $stmt = teacher_db()->prepare("SELECT u.id, u.display_name, u.email, tcs.joined_at AS created_at FROM teacher_class_students tcs JOIN auth_users u ON u.id = tcs.user_id WHERE tcs.class_id = :class_id ORDER BY tcs.joined_at DESC");
+    $stmt = teacher_db()->prepare("SELECT u.id, u.display_name, u.email, tcs.created_at AS created_at FROM teacher_class_students tcs JOIN auth_users u ON u.id = tcs.user_id WHERE tcs.class_id = :class_id ORDER BY tcs.created_at DESC");
     $stmt->execute(['class_id' => $classId]);
     $registered = $stmt->fetchAll();
 }
