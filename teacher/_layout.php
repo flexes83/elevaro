@@ -49,6 +49,7 @@ function teacher_header(string $title, string $subtitle = ''): void {
       <a class="<?= teacher_active('index.php') ?>" href="<?= teacher_h($withClass('index.php')) ?>">🏠 Dashboard</a>
       <a class="<?= teacher_active('students.php') ?>" href="<?= teacher_h($withClass('students.php')) ?>">👧 Schüler</a>
       <a class="<?= teacher_active('quizzes.php') ?>" href="<?= teacher_h($withClass('quizzes.php')) ?>">📝 Quizzes</a>
+      <a class="<?= teacher_active('ai_wizard.php') ?>" href="<?= teacher_h($withClass('ai_wizard.php')) ?>">✨ KI-Wizard</a>
       <a class="<?= teacher_active('live.php') ?>" href="<?= teacher_h($withClass('live.php')) ?>">⚡ Live Quizz</a>
       <a class="<?= teacher_active('settings.php') ?>" href="<?= teacher_h($withClass('settings.php')) ?>">⚙️ Einstellungen</a>
       <a class="<?= teacher_active('classes.php') ?>" href="classes.php">🏫 Klassen</a>
