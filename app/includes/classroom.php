@@ -216,7 +216,7 @@ function classroom_update_avatar(int $participantId, int $classId, string $type,
         }
     }
 
-    $stmt = classroom_db()->prepare("SELECT id FROM classroom_participants WHERE class_id = :class_id AND id <> :id AND avatar_type = :type AND avatar_emoji = :value LIMIT 1");
+    $stmt = classroom_db()->prepare("SELECT id FROM classroom_participants WHERE class_id = :class_id AND id <> :id AND avatar_type = :type AND BINARY avatar_emoji = BINARY :value LIMIT 1");
     $stmt->execute(['class_id' => $classId, 'id' => $participantId, 'type' => $type, 'value' => $value]);
     if ($stmt->fetch()) {
         throw new RuntimeException('Dieser Avatar ist im Klassenraum schon vergeben.');
@@ -246,7 +246,7 @@ function classroom_join_guest(array $class, string $displayName): array
     $gradient = classroom_pick_gradient($displayName);
     $type = 'emoji';
 
-    $stmt = classroom_db()->prepare("SELECT id FROM classroom_participants WHERE class_id = :class_id AND avatar_type = 'emoji' AND avatar_emoji = :avatar LIMIT 1");
+    $stmt = classroom_db()->prepare("SELECT id FROM classroom_participants WHERE class_id = :class_id AND avatar_type = 'emoji' AND BINARY avatar_emoji = BINARY :avatar LIMIT 1");
     $stmt->execute(['class_id' => (int)$class['id'], 'avatar' => $avatar]);
     if ($stmt->fetch()) {
         $type = 'initials';

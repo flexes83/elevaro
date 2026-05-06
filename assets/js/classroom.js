@@ -131,6 +131,13 @@
       .catch((error) => showAvatarError(error.message));
   }
 
+  function syncInitialPreview() {
+    const initials = (initialsInput?.value || '').toUpperCase().trim() || '??';
+    document.querySelectorAll('.gradient-choice span').forEach((el) => { el.textContent = initials; });
+  }
+
+  initialsInput?.addEventListener('input', syncInitialPreview);
   document.querySelector('[data-gradient]')?.classList.add('active');
+  syncInitialPreview();
   setInterval(() => request().catch(() => {}), 12000);
 })();
