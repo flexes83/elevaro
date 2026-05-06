@@ -109,3 +109,43 @@ function elevaro_openai_request(string $url, array $payload, string $apiKey, int
 
     return $raw;
 }
+
+if (!function_exists('elevaro_openai_chat_json_flexible')) {
+    function elevaro_openai_chat_json_flexible(array $messages, array $schema, float $temperature = 0.35, int $timeout = 180): array
+    {
+        $config = elevaro_config('openai');
+
+        if (empty($config['api_key'])) {
+            throw new RuntimeException('OpenAI API key missing. Create /config/openai.php.');
+        }
+
+        $payload = [
+            'model' => $config['model'] ?? 'gpt-4.1-mini',
+            'messages' => $messages,
+            'temperature' => $temperature,
+            'response_format' => [
+                'type' => 'json_schema',
+                'json_schema' => [
+                    'name' => 'elevaro_teacher_ai_generation',
+                    'strict' => true,
+                    'schema' => $schema
+                ]
+            ]
+        ];
+
+        $raw = elevaro_openai_request('https://api.openai.com/v1/chat/completions', $payload, $config['api_key'], $timeout);
+        $data = json_decode($raw, true);
+        $content = $data['choices'][0]['message']['content'] ?? null;
+
+        if (!$content) {
+            throw new RuntimeException('OpenAI response did not contain content.');
+        }
+
+        $json = json_decode($content, true);
+        if (!is_array($json)) {
+            throw new RuntimeException('OpenAI response was not valid JSON.');
+        }
+
+        return ['json' => $json, 'raw' => $raw, 'content' => $content];
+    }
+}
