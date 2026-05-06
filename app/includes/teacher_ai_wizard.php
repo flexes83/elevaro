@@ -25,8 +25,20 @@ function elevaro_teacher_ai_wizard_column_exists(string $table, string $column):
 
 function elevaro_teacher_ai_wizard_add_column_if_missing(string $table, string $column, string $definition): void
 {
-    if (!elevaro_teacher_ai_wizard_column_exists($table, $column)) {
+    if (elevaro_teacher_ai_wizard_column_exists($table, $column)) {
+        return;
+    }
+
+    try {
         elevaro_teacher_ai_wizard_db()->exec("ALTER TABLE `{$table}` ADD COLUMN {$definition}");
+    } catch (PDOException $e) {
+        // MySQL 1060 = duplicate column. This can still happen if an older migration already
+        // created the column or if two requests run the schema check at the same time.
+        if (($e->errorInfo[1] ?? null) === 1060) {
+            return;
+        }
+
+        throw $e;
     }
 }
 
