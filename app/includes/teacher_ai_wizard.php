@@ -408,7 +408,7 @@ function elevaro_teacher_ai_responses_content_for_material(array $files): array
                 $fileId = elevaro_openai_upload_file($absolute, 'application/pdf', 'user_data');
             }
             if ($fileId !== '') {
-                $content[] = ['type' => 'input_text', 'text' => 'Direkt hochgeladenes PDF des Lehrers: ' . $name . '. Lies alle sichtbaren Inhalte, auch Scans, abfotografierte Seiten, Layout, Tabellen, Aufgaben und handschriftliche Notizen, soweit erkennbar.'];
+                $content[] = ['type' => 'input_text', 'text' => 'Direkt hochgeladenes PDF des Lehrers: ' . $name . '. Lies alle sichtbaren Inhalte, auch Scans, abfotografierte Seiten, Layout, Tabellen und Aufgaben, soweit erkennbar.'];
                 $content[] = ['type' => 'input_file', 'file_id' => $fileId];
                 continue;
             }
@@ -416,7 +416,7 @@ function elevaro_teacher_ai_responses_content_for_material(array $files): array
 
         $dataUrl = elevaro_teacher_ai_file_to_data_url($file);
         if ($dataUrl) {
-            $content[] = ['type' => 'input_text', 'text' => 'Bildmaterial des Lehrers: ' . $name . '. Lies Text, Aufgaben, Tabellen und handschriftliche Notizen, soweit erkennbar.'];
+            $content[] = ['type' => 'input_text', 'text' => 'Bildmaterial des Lehrers: ' . $name . '. Lies Text, Aufgaben, Tabellen und sichtbare Markierungen, soweit erkennbar.'];
             $content[] = ['type' => 'input_image', 'image_url' => $dataUrl, 'detail' => 'high'];
         }
     }
@@ -456,7 +456,7 @@ Zusatzwunsch des Lehrers:
 
 Aufgabe:
 - Analysiere zuerst das direkt bereitgestellte Material. PDFs und Bilder sind die Primärquelle.
-- Berücksichtige bei PDFs auch visuelle Seiteninhalte, Scans, Fotos von Buchseiten, Tabellen, Aufgabenstellungen und handschriftliche Notizen, soweit lesbar.
+- Berücksichtige bei PDFs auch visuelle Seiteninhalte, Scans, Fotos von Buchseiten, Tabellen und Aufgabenstellungen, soweit lesbar.
 - Erstelle ein fertiges Quiz mit 30 Fragen, davon eher leichte Fragen am Anfang und schwerere später.
 - Jede Frage hat exakt 4 Antwortoptionen.
 - Genau eine Antwort ist richtig.
@@ -480,7 +480,7 @@ function elevaro_teacher_ai_generate_from_material(array $class, string $mode, s
     $content = [['type' => 'input_text', 'text' => $prompt]];
     $content = array_merge($content, elevaro_teacher_ai_responses_content_for_material($files));
 
-    $system = 'Du bist ein erfahrener Lehrer, Fachdidaktiker und Quizautor. Du lieferst ausschließlich valides JSON nach Schema. Du darfst keine Fragen erfinden, die nicht aus dem bereitgestellten Material ableitbar sind. PDFs und Bilder sind als Primärquelle auszuwerten; lies auch sichtbare handschriftliche Notizen, soweit erkennbar.';
+    $system = 'Du bist ein erfahrener Lehrer, Fachdidaktiker und Quizautor. Du lieferst ausschließlich valides JSON nach Schema. Du darfst keine Fragen erfinden, die nicht aus dem bereitgestellten Material ableitbar sind. PDFs und Bilder sind als Primärquelle auszuwerten; lies alle sichtbaren Inhalte sorgfältig, soweit erkennbar.';
     $result = elevaro_openai_responses_json($system, $content, elevaro_teacher_ai_generation_schema(), 0.22, 300);
     $result['prompt_log'] = $prompt;
     return $result;
@@ -987,7 +987,7 @@ if (!function_exists('elevaro_teacher_ai_start_background_generation')) {
         $prompt = elevaro_teacher_ai_build_generation_prompt($class, $mode, $sourceText, $extraPrompt, $files);
         $content = [['type' => 'input_text', 'text' => $prompt]];
         $content = array_merge($content, elevaro_teacher_ai_responses_content_for_material($files));
-        $system = 'Du bist ein erfahrener Lehrer, Fachdidaktiker und Quizautor. Du lieferst ausschließlich valides JSON nach Schema. Du darfst keine Fragen erfinden, die nicht aus dem bereitgestellten Material ableitbar sind. PDFs und Bilder sind als Primärquelle auszuwerten; lies auch sichtbare handschriftliche Notizen, soweit erkennbar.';
+        $system = 'Du bist ein erfahrener Lehrer, Fachdidaktiker und Quizautor. Du lieferst ausschließlich valides JSON nach Schema. Du darfst keine Fragen erfinden, die nicht aus dem bereitgestellten Material ableitbar sind. PDFs und Bilder sind als Primärquelle auszuwerten; lies alle sichtbaren Inhalte sorgfältig, soweit erkennbar.';
         $response = elevaro_openai_responses_create_background_json($system, $content, elevaro_teacher_ai_generation_schema(), 0.22);
         $response['prompt_log'] = $prompt;
         return $response;
@@ -1187,7 +1187,7 @@ if (!function_exists('elevaro_teacher_ai_split_build_analysis_prompt')) {
             "Lehrertext / Aufgabenstellung:\n" . ($sourceText !== '' ? $sourceText : '[Kein zusätzlicher Text eingetragen.]') . "\n\n" .
             "Zusatzwunsch des Lehrers:\n" . ($extraPrompt !== '' ? $extraPrompt : '[Keine Zusatzanweisung.]') . "\n\n" .
             "Aufgabe für diesen Schritt: Erstelle KEINE fertigen Fragen. Analysiere nur die Quelle. " .
-            "Fasse alle sicher lesbaren Inhalte vollständig und quellengebunden zusammen, inklusive handschriftlicher Notizen soweit erkennbar. " .
+            "Fasse alle sicher lesbaren Inhalte vollständig und quellengebunden zusammen. " .
             "Erstelle eine belastbare Themen-/Fragenplanung für 30 spätere Multiple-Choice-Fragen in 6 Blöcken à 5 Fragen, sodass die relevanten Inhalte möglichst vollständig und ausgewogen abgedeckt werden. " .
             "description ist eine kurze, motivierende Quizbeschreibung für Schülerinnen und Schüler, keine Beschreibung der hochgeladenen Quelle. " .
             "image_prompt beschreibt ein passendes Elevaro-Quizbild im bestehenden modernen, freundlichen, spielerisch-edukativen Stil für die Zielgruppe; beschreibe NICHT das PDF, Arbeitsblatt oder Handschriften. " .
@@ -1229,7 +1229,6 @@ if (!function_exists('elevaro_teacher_ai_split_build_questions_prompt')) {
 if (!function_exists('elevaro_teacher_ai_plausibility_schema')) {
     function elevaro_teacher_ai_plausibility_schema(): array
     {
-        $questionSchema = elevaro_teacher_ai_questions_block_schema()['properties']['questions']['items'];
         return [
             'type' => 'object',
             'additionalProperties' => false,
@@ -1251,51 +1250,111 @@ if (!function_exists('elevaro_teacher_ai_plausibility_schema')) {
                         'required' => ['question_number', 'severity', 'message', 'suggestion'],
                     ],
                 ],
-                'improved_questions' => [
-                    'type' => 'array',
-                    'minItems' => 1,
-                    'items' => $questionSchema,
-                ],
             ],
-            'required' => ['overall_status', 'coverage_summary', 'teacher_notes', 'issues', 'improved_questions'],
+            'required' => ['overall_status', 'coverage_summary', 'teacher_notes', 'issues'],
         ];
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_sanitize_student_visible_question')) {
+    function elevaro_teacher_ai_sanitize_student_visible_question(array $question): array
+    {
+        $patterns = [
+            '/\b[Ll]aut\s+(der\s+|dem\s+|des\s+)?(Mindmap|Arbeitsblatt|Quelle|Material|Text|Seite|Notiz)\b/u',
+            '/\b[Ii]m\s+(Arbeitsblatt|Material|Text|Dokument|PDF)\b/u',
+            '/\b[Aa]uf\s+(der\s+)?(Seite|Quelle)\b/u',
+            '/\b[Ww]ie\s+in\s+(der\s+)?(Mindmap|Quelle|Material)\b/u',
+        ];
+        $replacement = 'Im Unterricht';
+        foreach (['question', 'explanation'] as $key) {
+            if (isset($question[$key]) && is_string($question[$key])) {
+                $question[$key] = trim(preg_replace($patterns, $replacement, $question[$key]));
+            }
+        }
+        if (!empty($question['options']) && is_array($question['options'])) {
+            foreach ($question['options'] as $i => $option) {
+                if (is_string($option)) {
+                    $question['options'][$i] = trim(preg_replace($patterns, $replacement, $option));
+                }
+            }
+        }
+        return $question;
     }
 }
 
 if (!function_exists('elevaro_teacher_ai_build_plausibility_prompt')) {
     function elevaro_teacher_ai_build_plausibility_prompt(array $analysis, array $questions, string $mode): string
     {
-        return trim("Prüfe diesen Elevaro-Quizentwurf abschließend pädagogisch und fachlich.\n\n" .
+        $compactQuestions = [];
+        foreach ($questions as $idx => $q) {
+            $compactQuestions[] = [
+                'nr' => $idx + 1,
+                'question' => (string)($q['question'] ?? ''),
+                'options' => array_values((array)($q['options'] ?? [])),
+                'answer' => (string)($q['answer'] ?? ''),
+            ];
+        }
+
+        $compactAnalysis = [
+            'title' => $analysis['title'] ?? '',
+            'description' => $analysis['description'] ?? '',
+            'topics' => $analysis['topics'] ?? [],
+            'content_map' => $analysis['content_map'] ?? [],
+            'question_plan' => $analysis['question_plan'] ?? [],
+        ];
+
+        return trim("Prüfe diesen Elevaro-Quizentwurf abschließend kurz und fachlich.\n\n" .
             "Modus: {$mode}\n\n" .
-            "Verbindliche Materialanalyse / Inhaltslandkarte:\n" . json_encode($analysis, JSON_UNESCAPED_UNICODE) . "\n\n" .
-            "Zu prüfende Fragen:\n" . json_encode($questions, JSON_UNESCAPED_UNICODE) . "\n\n" .
+            "Verbindliche Inhaltslandkarte aus dem Unterrichtsmaterial:\n" . json_encode($compactAnalysis, JSON_UNESCAPED_UNICODE) . "\n\n" .
+            "Zu prüfende Fragen:\n" . json_encode($compactQuestions, JSON_UNESCAPED_UNICODE) . "\n\n" .
             "Aufgaben:\n" .
-            "1. Prüfe, ob die Fragen die relevanten Inhalte möglichst vollständig und ausgewogen abdecken.\n" .
-            "2. Prüfe, ob jede Frage eindeutig aus dem Material ableitbar ist. Keine Halluzinationen.\n" .
-            "3. Prüfe, ob genau eine Antwort richtig ist und die Distraktoren plausibel, aber eindeutig falsch sind.\n" .
-            "4. Entferne sichtbare Materialverweise aus Frage, Antwort und Erklärung, z. B. 'laut Mindmap', 'im Arbeitsblatt', 'auf der Seite', 'in der Quelle'. Die Schüler sehen das Material später nicht.\n" .
-            "5. Entferne Dubletten und sehr ähnliche Formulierungen, ohne wichtige Inhalte zu verlieren.\n" .
-            "6. Passe Sprache und Niveau an die Zielgruppe an.\n\n" .
-            "Gib improved_questions mit derselben Anzahl an Fragen zurück. Wenn eine Frage gut ist, übernimm sie unverändert. Wenn du etwas korrigierst, vermerke es in issues oder teacher_notes. Liefere ausschließlich valides JSON.");
+            "1. Prüfe, ob die Fragen die relevanten Inhalte ausgewogen abdecken.\n" .
+            "2. Markiere nur echte Probleme: nicht ableitbar, fachlich falsch, mehrdeutig, doppelt oder zu schwer/zu leicht.\n" .
+            "3. Achte auf sichtbare Materialverweise wie 'laut Mindmap', 'im Arbeitsblatt', 'auf der Seite' oder 'in der Quelle'. Schüler sehen das Material später nicht.\n" .
+            "4. Gib nur kurze Lehrerhinweise und Issues zurück. Schreibe NICHT alle Fragen neu aus. Liefere ausschließlich valides JSON.");
     }
 }
 
 if (!function_exists('elevaro_teacher_ai_apply_plausibility_review')) {
     function elevaro_teacher_ai_apply_plausibility_review(array $analysis, array $questions, string $mode, array $files): array
     {
-        $prompt = elevaro_teacher_ai_build_plausibility_prompt($analysis, $questions, $mode);
-        $content = [['type' => 'input_text', 'text' => $prompt]];
-        // Das Originalmaterial bleibt angehängt, damit die Prüfung nicht nur die Zusammenfassung bewertet.
-        $content = array_merge($content, elevaro_teacher_ai_responses_content_for_material($files));
-        $system = 'Du bist eine sorgfältige fachliche und didaktische Prüfinstanz für Lehrer-Quizentwürfe. Prüfe streng, verbessere behutsam, erfinde keine neuen Fakten und liefere ausschließlich valides JSON nach Schema.';
-        $result = elevaro_openai_responses_json($system, $content, elevaro_teacher_ai_plausibility_schema(), 0.1, 100);
-        $review = $result['json'];
-        $improved = $review['improved_questions'] ?? [];
-        if (!is_array($improved) || count($improved) < max(1, min(5, count($questions)))) {
-            $improved = $questions;
-            $review['teacher_notes'][] = 'Die Plausibilitätsprüfung konnte keine vollständige korrigierte Fragenliste liefern. Der ursprüngliche Entwurf wurde beibehalten.';
+        $questions = array_map('elevaro_teacher_ai_sanitize_student_visible_question', $questions);
+
+        $fallbackReview = [
+            'overall_status' => 'ok',
+            'coverage_summary' => 'Der Quizentwurf wurde automatisch auf sichtbare Materialverweise bereinigt und für den Lehrer-Review vorbereitet.',
+            'teacher_notes' => ['Bitte prüfe die Fragen vor der Veröffentlichung noch einmal fachlich.'],
+            'issues' => [],
+        ];
+
+        try {
+            @set_time_limit(45);
+            $prompt = elevaro_teacher_ai_build_plausibility_prompt($analysis, $questions, $mode);
+            $content = [['type' => 'input_text', 'text' => $prompt]];
+            // Wichtig: Hier wird bewusst NICHT erneut das komplette Original-PDF angehängt.
+            // Die Prüfung läuft gegen die zuvor erstellte Inhaltslandkarte, damit der letzte Schritt kurz bleibt und nicht timeoutet.
+            $system = 'Du bist eine knappe fachliche Prüfinstanz für Lehrer-Quizentwürfe. Gib nur Hinweise und Issues zurück, keine vollständige Fragenliste. Liefere ausschließlich valides JSON nach Schema.';
+            $result = elevaro_openai_responses_json($system, $content, elevaro_teacher_ai_plausibility_schema(), 0.1, 45);
+            $review = $result['json'];
+            if (!is_array($review)) {
+                $review = $fallbackReview;
+            }
+            $review['teacher_notes'] = array_values(array_unique(array_filter(array_merge(
+                (array)($review['teacher_notes'] ?? []),
+                ['Automatisch entfernte sichtbare Materialverweise wurden bereinigt, falls vorhanden.']
+            ))));
+            return ['questions' => $questions, 'review' => $review];
+        } catch (Throwable $e) {
+            $fallbackReview['overall_status'] = 'needs_review';
+            $fallbackReview['teacher_notes'][] = 'Die zusätzliche KI-Plausibilitätsprüfung wurde wegen Zeitüberschreitung oder API-Fehler übersprungen. Der Entwurf ist trotzdem nutzbar, sollte aber vom Lehrer geprüft werden.';
+            $fallbackReview['issues'][] = [
+                'question_number' => 0,
+                'severity' => 'info',
+                'message' => 'Automatischer Abschlusscheck konnte nicht vollständig ausgeführt werden.',
+                'suggestion' => 'Bitte den Entwurf im Review kurz prüfen oder die Generierung mit weniger Material erneut starten.',
+            ];
+            return ['questions' => $questions, 'review' => $fallbackReview];
         }
-        return ['questions' => $improved, 'review' => $review];
     }
 }
 
@@ -1360,7 +1419,7 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
                         'id' => $draftId,
                         'teacher_id' => $teacherId,
                     ]);
-                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'analysis_done', 'status_label' => 'Material analysiert. Fragenblock 1/6 wird vorbereitet…'];
+                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'analysis_done', 'status_label' => 'Inhalte wurden strukturiert. Die Fragen werden jetzt erstellt…'];
             }
 
             $blockSize = 5;
@@ -1390,7 +1449,7 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
             if (($draft['generation_step'] ?? '') !== 'plausibility') {
                 elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts SET generation_step = 'plausibility' WHERE id = :id AND teacher_id = :teacher_id")
                     ->execute(['id' => $draftId, 'teacher_id' => $teacherId]);
-                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'plausibility', 'progress' => 93, 'status_label' => 'Plausibilität und fachliche Richtigkeit werden geprüft…'];
+                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'plausibility', 'progress' => 93, 'status_label' => 'Prüfe fachliche Richtigkeit und Plausibilität…'];
             }
 
             $plausibility = elevaro_teacher_ai_apply_plausibility_review($analysis, $allQuestions, $mode, $files);

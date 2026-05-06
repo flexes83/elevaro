@@ -43,12 +43,10 @@
   const loadingTexts = [
     'Inhalte werden extrahiert...',
     'Wichtige Themen werden erkannt...',
-    'Handschriftliche Notizen werden ausgewertet...',
     'Inhalte werden pädagogisch sortiert...',
     'Fragen werden altersgerecht formuliert...',
     'Antwortmöglichkeiten werden geprüft...',
-    'Plausibilität und fachliche Richtigkeit werden geprüft...',
-    'Der Quizentwurf wird finalisiert...'
+    'Der Quizentwurf wird vorbereitet...'
   ];
   let loadingTimer = null;
   function startLoadingCopy() {
@@ -65,6 +63,13 @@
   function setProgress(percent, label) {
     const bar = document.querySelector('#aiWizardProgressBar');
     const labelEl = $('#aiWizardProgressText');
+    const generatingCard = document.querySelector('.ai-generating-card');
+    const isPlausibility = String(label || '').toLowerCase().includes('plausibilität') || String(label || '').toLowerCase().includes('fachliche richtigkeit');
+    if (generatingCard) generatingCard.classList.toggle('is-plausibility-check', isPlausibility);
+    if (isPlausibility && loadingTimer) {
+      clearInterval(loadingTimer);
+      loadingTimer = null;
+    }
     const safePercent = Math.max(5, Math.min(100, Number(percent || 0)));
     if (bar) {
       bar.style.animation = 'none';
