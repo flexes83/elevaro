@@ -495,6 +495,40 @@ function elevaro_teacher_ai_generation_schema(): array
     ];
 }
 
+function elevaro_teacher_ai_decode_openai_json(string $content): array
+{
+    $content = trim($content);
+    if ($content === '') {
+        throw new RuntimeException('OpenAI hat keine auswertbare Antwort geliefert.');
+    }
+
+    $decoded = json_decode($content, true);
+    if (is_array($decoded)) {
+        return $decoded;
+    }
+
+    // Some models still wrap JSON in Markdown fences or add a short leading note.
+    if (preg_match('/```(?:json)?\s*(\{.*?\})\s*```/is', $content, $match)) {
+        $decoded = json_decode(trim($match[1]), true);
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+    }
+
+    $first = strpos($content, '{');
+    $last = strrpos($content, '}');
+    if ($first !== false && $last !== false && $last > $first) {
+        $candidate = substr($content, $first, $last - $first + 1);
+        $decoded = json_decode($candidate, true);
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+    }
+
+    $preview = mb_substr(preg_replace('/\s+/', ' ', $content), 0, 500);
+    throw new RuntimeException('OpenAI-Antwort war kein valides JSON. Antwortauszug: ' . $preview);
+}
+
 function elevaro_teacher_ai_normalize_payload(array $payload, string $mode): array
 {
     $payload['title'] = trim((string)($payload['title'] ?? 'KI-Quiz')) ?: 'KI-Quiz';
@@ -787,10 +821,7 @@ if (!function_exists('elevaro_teacher_ai_poll_background_draft')) {
         if ($content === '') {
             throw new RuntimeException('OpenAI hat keine auswertbare Antwort geliefert.');
         }
-        $json = json_decode($content, true);
-        if (!is_array($json)) {
-            throw new RuntimeException('OpenAI-Antwort war kein valides JSON.');
-        }
+        $json = elevaro_teacher_ai_decode_openai_json($content);
         $payload = elevaro_teacher_ai_normalize_payload($json, (string)($draft['mode'] ?? 'quiz'));
 
         $stmt = elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts
