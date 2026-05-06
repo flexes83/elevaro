@@ -41,24 +41,45 @@
   });
 
   const loadingTexts = [
-    'Material wird gelesen und quellengebunden analysiert...',
-    'Die KI erstellt zuerst eine sichere Inhaltsbasis...',
-    'Danach entstehen die Fragen in mehreren kleinen Blöcken...',
-    'So gehen keine Informationen verloren und die Antwort wird nicht abgeschnitten...',
-    'Handschriftliche Notizen werden visuell geprüft, soweit erkennbar...',
-    'Fragenblock 1/6 wird vorbereitet...',
-    'Antwortoptionen werden plausibel gemischt...'
+    'Inhalte werden extrahiert...',
+    'Wichtige Themen werden erkannt...',
+    'Handschriftliche Notizen werden ausgewertet...',
+    'Inhalte werden pädagogisch sortiert...',
+    'Fragen werden altersgerecht formuliert...',
+    'Antwortmöglichkeiten werden geprüft...',
+    'Der Quizentwurf wird vorbereitet...'
   ];
   let loadingTimer = null;
   function startLoadingCopy() {
     let i = 0;
     $('#aiWizardProgressText').textContent = loadingTexts[0];
+    setProgress(10, loadingTexts[0]);
     loadingTimer = setInterval(() => {
       i = (i + 1) % loadingTexts.length;
       $('#aiWizardProgressText').textContent = loadingTexts[i];
     }, 2300);
   }
   function stopLoadingCopy() { if (loadingTimer) clearInterval(loadingTimer); }
+
+  function setProgress(percent, label) {
+    const bar = document.querySelector('#aiWizardProgressBar');
+    const labelEl = $('#aiWizardProgressText');
+    const safePercent = Math.max(5, Math.min(100, Number(percent || 0)));
+    if (bar) {
+      bar.style.animation = 'none';
+      bar.style.transform = 'none';
+      bar.style.width = safePercent + '%';
+    }
+    if (labelEl && label) labelEl.textContent = label;
+  }
+
+  function progressFromStatus(status) {
+    if (!status) return 12;
+    if (status === 'analysis_done') return 28;
+    const match = String(status).match(/^questions_(\d+)/);
+    if (match) return 28 + Math.round((Number(match[1]) / 6) * 62);
+    return 14;
+  }
 
   async function pollGeneration(draftId) {
     const started = Date.now();
@@ -68,13 +89,13 @@
       await new Promise(resolve => setTimeout(resolve, 3500));
       const res = await apiJson('/teacher/api/ai_wizard_status.php', { draft_id: draftId });
       if (res.done) {
+        setProgress(100, 'Fertig. Dein Quizentwurf wird geladen…');
         state.payload = res.payload;
         return;
       }
       if (res.status && res.status !== lastStatus) {
         lastStatus = res.status;
-        const label = $('#aiWizardProgressText');
-        if (label) label.textContent = res.status_label || ('OpenAI verarbeitet dein Material… Status: ' + res.status);
+        setProgress(res.progress || progressFromStatus(res.status), res.status_label || 'Elevaro erstellt deinen Quizentwurf…');
       }
     }
 
@@ -84,6 +105,7 @@
   $('#aiWizardSourceForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     step(2);
+    setProgress(8, 'Inhalte werden hochgeladen…');
     startLoadingCopy();
     try {
       const form = e.currentTarget;
@@ -177,8 +199,7 @@
       </div>
       <label class="form-label fw-bold mt-3">Erklärung</label>
       <textarea class="form-control ai-question-explanation" rows="2">${esc(q.explanation || '')}</textarea>
-      <label class="form-label fw-bold mt-3">Schwierigkeit</label>
-      <input class="form-range ai-question-difficulty" min="0.05" max="0.95" step="0.05" value="${Number(q.difficulty || .35)}" type="range">
+      <input class="ai-question-difficulty" value="${Number(q.difficulty || .35)}" type="hidden">
       <div class="ai-question-actions">
         <button class="btn btn-sm btn-outline-primary ai-suggest-options" type="button">✨ 4 Antworten vorschlagen</button>
       </div>`;

@@ -102,7 +102,7 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
       </div>
       <h3>Elevaro baut dein Quiz</h3>
       <p id="aiWizardProgressText">Material wird gelesen und didaktisch sortiert...</p>
-      <div class="ai-progress"><i></i></div>
+      <div class="ai-progress"><i id="aiWizardProgressBar"></i></div>
       <div class="ai-progress-list">
         <span data-loading-copy>📄 Quelle verstehen</span>
         <span data-loading-copy>🧠 Fragen entwickeln</span>
