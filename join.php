@@ -5,24 +5,46 @@ $code = strtoupper(trim((string)($_GET['code'] ?? $_POST['code'] ?? '')));
 $class = $code !== '' ? classroom_by_code($code) : null;
 $error = null;
 $mode = (string)($_POST['join_mode'] ?? 'name');
+$showPinConfirm = false;
+$newGuestPin = null;
+$participant = null;
+
+if ($class) {
+    $participant = classroom_current_participant((int)$class['id']);
+    $newGuestPin = classroom_pending_new_guest_pin();
+    $showPinConfirm = isset($_GET['show_pin']) && $participant && $newGuestPin;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         if (!$class) throw new RuntimeException('Dieser Klassenraum wurde nicht gefunden.');
 
-        if ($mode === 'pin') {
-            $participant = classroom_login_guest_pin($class, (string)($_POST['guest_pin'] ?? ''));
-        } else {
-            if (isset($class['allow_guest_join']) && (int)$class['allow_guest_join'] !== 1 && !auth_is_logged_in()) {
-                throw new RuntimeException('Für diesen Klassenraum brauchst du ein Schülerkonto.');
+        if ($mode === 'pin_ack') {
+            $participant = classroom_current_participant((int)$class['id']);
+            if (!$participant) {
+                throw new RuntimeException('Deine Klassenraum-Sitzung wurde nicht gefunden. Bitte tritt dem Klassenraum erneut bei.');
             }
-            $participant = classroom_join_guest($class, (string)($_POST['display_name'] ?? ''));
+            classroom_clear_new_guest_pin();
+            header('Location: /classroom.php?class_id=' . (int)$class['id']);
+            exit;
         }
 
-        header('Location: /classroom.php?class_id=' . (int)$class['id']);
+        if ($mode === 'pin') {
+            $participant = classroom_login_guest_pin($class, (string)($_POST['guest_pin'] ?? ''));
+            classroom_clear_new_guest_pin();
+            header('Location: /classroom.php?class_id=' . (int)$class['id']);
+            exit;
+        }
+
+        if (isset($class['allow_guest_join']) && (int)$class['allow_guest_join'] !== 1 && !auth_is_logged_in()) {
+            throw new RuntimeException('Für diesen Klassenraum brauchst du ein Schülerkonto.');
+        }
+        $participant = classroom_join_guest($class, (string)($_POST['display_name'] ?? ''));
+        header('Location: /join.php?code=' . urlencode((string)$class['invite_code']) . '&show_pin=1');
         exit;
     } catch (Throwable $e) {
         $error = $e->getMessage();
+        $showPinConfirm = false;
     }
 }
 
@@ -42,7 +64,18 @@ if ($user = auth_user()) $prefill = (string)($user['display_name'] ?: $user['use
 <main class="classroom-join-shell">
   <section class="classroom-join-card">
     <div class="join-badge">🏫 Klassenraum</div>
-    <?php if ($class): ?>
+    <?php if ($class && $showPinConfirm && $newGuestPin): ?>
+      <div class="pin-confirm-hero">🔐</div>
+      <h1>Merke dir deinen PIN</h1>
+      <p>Mit diesem PIN kommst du später auch auf einem anderen Gerät wieder in deinen Klassenraum – ganz ohne E-Mail-Adresse.</p>
+      <div class="classroom-pin-display" aria-label="Dein persönlicher Klassen-PIN"><?= classroom_h($newGuestPin) ?></div>
+      <p class="pin-confirm-hint">Solltest du den PIN vergessen, wende dich einfach an deine Lehrkraft.</p>
+      <form method="post" class="join-form">
+        <input type="hidden" name="code" value="<?= classroom_h($code) ?>">
+        <input type="hidden" name="join_mode" value="pin_ack">
+        <button class="btn btn-primary btn-lg w-100">Ich habe mir den PIN notiert</button>
+      </form>
+    <?php elseif ($class): ?>
       <h1>Willkommen in<br><?= classroom_h(classroom_label($class)) ?></h1>
       <p>Du kannst neu beitreten oder deinen 4-stelligen Klassen-PIN nutzen, wenn du schon einmal dabei warst.</p>
       <?php if ($error): ?><div class="alert alert-danger"><?= classroom_h($error) ?></div><?php endif; ?>
@@ -67,6 +100,7 @@ if ($user = auth_user()) $prefill = (string)($user['display_name'] ?: $user['use
           <p>Wenn du das Gerät gewechselt hast, kommst du damit direkt zurück.</p>
           <label class="form-label">4-stelliger Klassen-PIN</label>
           <input class="form-control form-control-lg join-pin-input" name="guest_pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="4827" autocomplete="one-time-code" <?= $mode === 'pin' ? 'autofocus' : '' ?>>
+          <div class="join-help-text">Solltest du den PIN vergessen haben, wende dich an deine Lehrkraft.</div>
           <button class="btn btn-outline-primary btn-lg w-100">Mit PIN weiter</button>
         </form>
       </div>

@@ -13,7 +13,6 @@ if (!$participant) {
     exit;
 }
 classroom_touch((int)$participant['id']);
-$newGuestPin = classroom_consume_new_guest_pin();
 $quizzes = classroom_assigned_quizzes((int)$class['id'], (int)$participant['id']);
 $online = classroom_online_participants((int)$class['id']);
 $activities = classroom_recent_activities((int)$class['id']);
@@ -51,16 +50,6 @@ $gradientOptions = classroom_gradient_options();
       <span>gerade aktiv</span>
     </div>
 
-    <?php if ($newGuestPin): ?>
-      <div class="classroom-pin-notice">
-        <div>
-          <span class="eyebrow">Dein persönlicher Klassen-PIN</span>
-          <strong><?= classroom_h($newGuestPin) ?></strong>
-          <p>Merke dir diesen PIN. Wenn du später ein anderes Gerät nutzt, kannst du damit wieder in diesen Klassenraum.</p>
-        </div>
-        <small>Vergessen? Frag einfach deine Lehrkraft.</small>
-      </div>
-    <?php endif; ?>
   </section>
 
   <div class="classroom-grid">

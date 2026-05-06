@@ -368,12 +368,24 @@ function classroom_login_guest_pin(array $class, string $pin): array
     return classroom_current_participant((int)$class['id']) ?: $participant;
 }
 
-function classroom_consume_new_guest_pin(): ?string
+function classroom_pending_new_guest_pin(): ?string
 {
     auth_start_session();
     $pin = isset($_SESSION[ELEVARO_CLASSROOM_PIN_FLASH_KEY]) ? (string)$_SESSION[ELEVARO_CLASSROOM_PIN_FLASH_KEY] : '';
-    unset($_SESSION[ELEVARO_CLASSROOM_PIN_FLASH_KEY]);
     return $pin !== '' ? $pin : null;
+}
+
+function classroom_clear_new_guest_pin(): void
+{
+    auth_start_session();
+    unset($_SESSION[ELEVARO_CLASSROOM_PIN_FLASH_KEY]);
+}
+
+function classroom_consume_new_guest_pin(): ?string
+{
+    $pin = classroom_pending_new_guest_pin();
+    classroom_clear_new_guest_pin();
+    return $pin;
 }
 
 function classroom_join_guest(array $class, string $displayName): array
