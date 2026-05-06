@@ -45,7 +45,9 @@
     'Die KI sucht passende Verständnisfragen...',
     'Antwortoptionen werden plausibel gemischt...',
     'Schwierigkeitsgrad wird für den Fragenpool verteilt...',
-    'Quizbeschreibung und Bildidee werden vorbereitet...'
+    'Quizbeschreibung und Bildidee werden vorbereitet...',
+    'Das kann bei handschriftlichen PDFs ein bis zwei Minuten dauern...',
+    'Du kannst kurz durchatmen – die Auswertung läuft weiter...'
   ];
   let loadingTimer = null;
   function startLoadingCopy() {
@@ -58,6 +60,27 @@
   }
   function stopLoadingCopy() { if (loadingTimer) clearInterval(loadingTimer); }
 
+  async function pollGeneration(draftId) {
+    const started = Date.now();
+    let lastStatus = '';
+
+    while (Date.now() - started < 8 * 60 * 1000) {
+      await new Promise(resolve => setTimeout(resolve, 3500));
+      const res = await apiJson('/teacher/api/ai_wizard_status.php', { draft_id: draftId });
+      if (res.done) {
+        state.payload = res.payload;
+        return;
+      }
+      if (res.status && res.status !== lastStatus) {
+        lastStatus = res.status;
+        const label = $('#aiWizardProgressText');
+        if (label) label.textContent = 'OpenAI verarbeitet dein Material… Status: ' + res.status;
+      }
+    }
+
+    throw new Error('Die KI-Erstellung dauert ungewöhnlich lange. Bitte versuche es später erneut oder nutze weniger Seiten.');
+  }
+
   $('#aiWizardSourceForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     step(2);
@@ -68,7 +91,13 @@
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.ok) throw new Error(json.error || 'KI-Erstellung fehlgeschlagen.');
       state.draftId = json.draft_id;
-      state.payload = json.payload;
+
+      if (json.pending) {
+        await pollGeneration(state.draftId);
+      } else {
+        state.payload = json.payload;
+      }
+
       fillEditor();
       step(3);
       generateImage(false);

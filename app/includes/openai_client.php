@@ -266,3 +266,94 @@ if (!function_exists('elevaro_openai_extract_response_text')) {
         return trim(implode("\n", $parts));
     }
 }
+
+
+if (!function_exists('elevaro_openai_get_json')) {
+    function elevaro_openai_get_json(string $url, string $apiKey, int $timeout = 60): array
+    {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => $timeout,
+            CURLOPT_HTTPHEADER => [
+                'Authorization: Bearer ' . $apiKey,
+                'Content-Type: application/json',
+            ],
+        ]);
+        $raw = curl_exec($ch);
+        $error = curl_error($ch);
+        $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($raw === false || $error) {
+            throw new RuntimeException('OpenAI request failed: ' . $error);
+        }
+        $data = json_decode((string)$raw, true);
+        if ($status < 200 || $status >= 300) {
+            $message = is_array($data) ? ($data['error']['message'] ?? $raw) : $raw;
+            throw new RuntimeException('OpenAI API error: ' . $message);
+        }
+        if (!is_array($data)) {
+            throw new RuntimeException('OpenAI API returned invalid JSON.');
+        }
+        return $data;
+    }
+}
+
+if (!function_exists('elevaro_openai_responses_create_background_json')) {
+    function elevaro_openai_responses_create_background_json(string $systemText, array $userContent, array $schema, float $temperature = 0.25): array
+    {
+        $config = elevaro_config('openai');
+        if (empty($config['api_key'])) {
+            throw new RuntimeException('OpenAI API key missing. Create /config/openai.php.');
+        }
+
+        $payload = [
+            'model' => $config['model'] ?? 'gpt-4.1-mini',
+            'background' => true,
+            'input' => [
+                [
+                    'role' => 'system',
+                    'content' => [
+                        ['type' => 'input_text', 'text' => $systemText],
+                    ],
+                ],
+                [
+                    'role' => 'user',
+                    'content' => $userContent,
+                ],
+            ],
+            'temperature' => $temperature,
+            'text' => [
+                'format' => [
+                    'type' => 'json_schema',
+                    'name' => 'elevaro_teacher_ai_generation',
+                    'strict' => true,
+                    'schema' => $schema,
+                ],
+            ],
+        ];
+
+        $raw = elevaro_openai_request('https://api.openai.com/v1/responses', $payload, $config['api_key'], 75);
+        $data = json_decode($raw, true);
+        if (!is_array($data) || empty($data['id'])) {
+            throw new RuntimeException('OpenAI background response could not be started.');
+        }
+        return ['id' => (string)$data['id'], 'raw' => $raw, 'data' => $data];
+    }
+}
+
+if (!function_exists('elevaro_openai_responses_retrieve')) {
+    function elevaro_openai_responses_retrieve(string $responseId): array
+    {
+        $config = elevaro_config('openai');
+        if (empty($config['api_key'])) {
+            throw new RuntimeException('OpenAI API key missing. Create /config/openai.php.');
+        }
+        $responseId = trim($responseId);
+        if ($responseId === '') {
+            throw new RuntimeException('OpenAI response id missing.');
+        }
+        return elevaro_openai_get_json('https://api.openai.com/v1/responses/' . rawurlencode($responseId), $config['api_key'], 60);
+    }
+}

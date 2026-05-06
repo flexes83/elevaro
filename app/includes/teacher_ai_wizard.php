@@ -694,3 +694,104 @@ function elevaro_teacher_ai_json_response(array $data, int $status = 200): void
     echo json_encode($data, JSON_UNESCAPED_UNICODE);
     exit;
 }
+
+if (!function_exists('elevaro_teacher_ai_create_background_draft')) {
+    function elevaro_teacher_ai_create_background_draft(int $teacherId, int $classId, string $mode, string $sourceText, string $extraPrompt, array $files, string $promptLog, string $openaiResponseId): int
+    {
+        elevaro_teacher_ai_wizard_ensure_schema();
+        elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'openai_response_id', "openai_response_id VARCHAR(120) NULL AFTER status");
+        elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'generation_error', "generation_error TEXT NULL AFTER openai_response_id");
+        $pdo = elevaro_teacher_ai_wizard_db();
+        $stmt = $pdo->prepare("INSERT INTO teacher_ai_quiz_drafts
+            (teacher_id, class_id, mode, status, openai_response_id, source_title, source_text, source_files_json, prompt, generated_payload_json, image_prompt, image_status)
+            VALUES (:teacher_id, :class_id, :mode, 'generating', :openai_response_id, NULL, :source_text, :source_files_json, :prompt, NULL, NULL, 'none')");
+        $stmt->execute([
+            'teacher_id' => $teacherId,
+            'class_id' => $classId,
+            'mode' => $mode,
+            'openai_response_id' => $openaiResponseId,
+            'source_text' => $sourceText,
+            'source_files_json' => json_encode(array_map(static function ($file) {
+                unset($file['absolute_path'], $file['pdf_preview_images'], $file['openai_file_id']);
+                return $file;
+            }, $files), JSON_UNESCAPED_UNICODE),
+            'prompt' => $promptLog,
+        ]);
+        return (int)$pdo->lastInsertId();
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_start_background_generation')) {
+    function elevaro_teacher_ai_start_background_generation(array $class, string $mode, string $sourceText, string $extraPrompt, array $files): array
+    {
+        if (!elevaro_teacher_ai_has_readable_material($sourceText, $files)) {
+            throw new RuntimeException('Bitte lade ein PDF/Bild hoch oder gib Material als Text ein. Ohne Unterrichtsmaterial wird kein Quiz generiert, damit keine Fantasiefragen entstehen.');
+        }
+
+        $prompt = elevaro_teacher_ai_build_generation_prompt($class, $mode, $sourceText, $extraPrompt, $files);
+        $content = [['type' => 'input_text', 'text' => $prompt]];
+        $content = array_merge($content, elevaro_teacher_ai_responses_content_for_material($files));
+        $system = 'Du bist ein erfahrener Lehrer, Fachdidaktiker und Quizautor. Du lieferst ausschließlich valides JSON nach Schema. Du darfst keine Fragen erfinden, die nicht aus dem bereitgestellten Material ableitbar sind. PDFs und Bilder sind als Primärquelle auszuwerten; lies auch sichtbare handschriftliche Notizen, soweit erkennbar.';
+        $response = elevaro_openai_responses_create_background_json($system, $content, elevaro_teacher_ai_generation_schema(), 0.22);
+        $response['prompt_log'] = $prompt;
+        return $response;
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_poll_background_draft')) {
+    function elevaro_teacher_ai_poll_background_draft(int $draftId, int $teacherId): array
+    {
+        elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'openai_response_id', "openai_response_id VARCHAR(120) NULL AFTER status");
+        elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'generation_error', "generation_error TEXT NULL AFTER openai_response_id");
+        $draft = elevaro_teacher_ai_load_draft($draftId, $teacherId);
+
+        if (($draft['status'] ?? '') === 'draft' && !empty($draft['generated_payload_json'])) {
+            return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => elevaro_teacher_ai_draft_payload($draft)];
+        }
+        if (!empty($draft['generation_error'])) {
+            throw new RuntimeException((string)$draft['generation_error']);
+        }
+
+        $responseId = (string)($draft['openai_response_id'] ?? '');
+        if ($responseId === '') {
+            throw new RuntimeException('Für diesen Entwurf wurde keine OpenAI-Background-ID gespeichert. Bitte starte die Generierung neu.');
+        }
+
+        $data = elevaro_openai_responses_retrieve($responseId);
+        $status = (string)($data['status'] ?? 'in_progress');
+
+        if (in_array($status, ['queued', 'in_progress', 'requires_action'], true)) {
+            return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => $status];
+        }
+
+        if ($status !== 'completed') {
+            $message = $data['error']['message'] ?? ('OpenAI-Generierung wurde mit Status ' . $status . ' beendet.');
+            elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts SET status = 'failed', generation_error = :error WHERE id = :id AND teacher_id = :teacher_id")
+                ->execute(['error' => $message, 'id' => $draftId, 'teacher_id' => $teacherId]);
+            throw new RuntimeException((string)$message);
+        }
+
+        $content = elevaro_openai_extract_response_text($data);
+        if ($content === '') {
+            throw new RuntimeException('OpenAI hat keine auswertbare Antwort geliefert.');
+        }
+        $json = json_decode($content, true);
+        if (!is_array($json)) {
+            throw new RuntimeException('OpenAI-Antwort war kein valides JSON.');
+        }
+        $payload = elevaro_teacher_ai_normalize_payload($json, (string)($draft['mode'] ?? 'quiz'));
+
+        $stmt = elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts
+            SET status = 'draft', generated_payload_json = :payload, source_title = :title, image_prompt = :image_prompt, image_status = 'pending'
+            WHERE id = :id AND teacher_id = :teacher_id");
+        $stmt->execute([
+            'payload' => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            'title' => $payload['title'] ?? null,
+            'image_prompt' => $payload['image_prompt'] ?? null,
+            'id' => $draftId,
+            'teacher_id' => $teacherId,
+        ]);
+
+        return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => $payload];
+    }
+}

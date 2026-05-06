@@ -4,6 +4,8 @@ require_once __DIR__ . '/../../app/includes/teacher_ai_wizard.php';
 
 try {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new RuntimeException('Ungültige Anfrage.');
+    @set_time_limit(120);
+
     $teacherId = teacher_current_user_id();
     $classId = (int)($_POST['class_id'] ?? 0);
     $mode = ($_POST['mode'] ?? 'quiz') === 'listening' ? 'listening' : 'quiz';
@@ -16,15 +18,23 @@ try {
         throw new RuntimeException('Bitte Material hochladen oder einen Text/eine Aufgabenstellung eingeben.');
     }
 
-    $result = elevaro_teacher_ai_generate_from_material($class, $mode, $sourceText, $extraPrompt, $files);
-    $payload = elevaro_teacher_ai_normalize_payload($result['json'], $mode);
-    $draftId = elevaro_teacher_ai_create_draft($teacherId, $classId, $mode, $sourceText, $extraPrompt, $files, $payload, $result['prompt_log'] ?? $result['content']);
+    $response = elevaro_teacher_ai_start_background_generation($class, $mode, $sourceText, $extraPrompt, $files);
+    $draftId = elevaro_teacher_ai_create_background_draft(
+        $teacherId,
+        $classId,
+        $mode,
+        $sourceText,
+        $extraPrompt,
+        $files,
+        $response['prompt_log'] ?? '',
+        $response['id']
+    );
 
     elevaro_teacher_ai_json_response([
         'ok' => true,
+        'pending' => true,
         'draft_id' => $draftId,
-        'payload' => $payload,
-        'message' => 'Quiz-Entwurf wurde erstellt.',
+        'message' => 'Die KI-Erstellung läuft im Hintergrund.',
     ]);
 } catch (Throwable $e) {
     elevaro_teacher_ai_json_response(['ok' => false, 'error' => $e->getMessage()], 400);
