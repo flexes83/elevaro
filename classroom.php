@@ -67,8 +67,22 @@ $gradientOptions = classroom_gradient_options();
             $bestCorrect = isset($quiz['best_correct']) ? (int)$quiz['best_correct'] : 0;
             $bestTotal = isset($quiz['best_total']) ? (int)$quiz['best_total'] : 0;
             $roundsPlayed = isset($quiz['rounds_played']) ? (int)$quiz['rounds_played'] : 0;
-            $greenDeg = max(0, min(360, $bestPercent * 3.6));
-            $redDeg = $roundsPlayed > 0 ? max(0, 360 - $greenDeg) : 0;
+            $poolTotal = max(0, (int)($quiz['question_pool_total'] ?? 0));
+            if ($poolTotal <= 0) {
+              $poolTotal = max($bestTotal, 0);
+            }
+            $progressPassed = max(0, (int)($quiz['progress_passed'] ?? 0));
+            $progressFailed = max(0, (int)($quiz['progress_failed'] ?? 0));
+            $progressAttempted = max(0, (int)($quiz['progress_attempted'] ?? ($progressPassed + $progressFailed)));
+            if ($poolTotal > 0) {
+              $progressPassed = min($progressPassed, $poolTotal);
+              $progressFailed = min($progressFailed, max(0, $poolTotal - $progressPassed));
+              $progressAttempted = min($progressAttempted, $poolTotal);
+            }
+            $unanswered = max(0, $poolTotal - $progressPassed - $progressFailed);
+            $greenDeg = $poolTotal > 0 ? max(0, min(360, ($progressPassed / $poolTotal) * 360)) : 0;
+            $redDeg = $poolTotal > 0 ? max(0, min(360 - $greenDeg, ($progressFailed / $poolTotal) * 360)) : 0;
+            $progressPercent = $poolTotal > 0 ? round((($progressPassed + $progressFailed) / $poolTotal) * 100) : 0;
             $quizUrl = '/quiz.php?key=' . urlencode((string)$quiz['quiz_key']) . '&class_id=' . (int)$class['id'];
           ?>
           <article class="elevaro-quiz-card classroom-quiz-card">
@@ -84,8 +98,8 @@ $gradientOptions = classroom_gradient_options();
                 <?php if (!empty($quiz['grade'])): ?> · <?= (int)$quiz['grade'] ?>. Klasse<?php endif; ?>
               </span>
 
-              <span class="elevaro-quiz-card-donut <?= $roundsPlayed > 0 ? '' : 'is-empty' ?>" style="--quiz-donut-green: <?= (float)$greenDeg ?>deg; --quiz-donut-red: <?= (float)$redDeg ?>deg;" title="<?= $roundsPlayed > 0 ? classroom_h('Bester Versuch: ' . round($bestPercent) . '%') : 'Noch nicht gespielt' ?>">
-                <span class="elevaro-quiz-card-donut-label"><?= $roundsPlayed > 0 ? (int)round($bestPercent) . '%' : '' ?></span>
+              <span class="elevaro-quiz-card-donut <?= $progressAttempted > 0 ? '' : 'is-empty' ?>" style="--quiz-donut-green: <?= (float)$greenDeg ?>deg; --quiz-donut-red: <?= (float)$redDeg ?>deg;" title="<?= $poolTotal > 0 ? classroom_h($progressPassed . ' richtig, ' . $progressFailed . ' falsch, ' . $unanswered . ' offen') : 'Noch nicht gespielt' ?>">
+                <span class="elevaro-quiz-card-donut-label"><?= $poolTotal > 0 && $progressAttempted > 0 ? (int)$progressPercent . '%' : '' ?></span>
               </span>
             </div>
 
@@ -94,12 +108,14 @@ $gradientOptions = classroom_gradient_options();
               <p class="elevaro-quiz-card-description"><?= classroom_h($quiz['description'] ?? 'Kurzes Quiz zum Üben und Wiederholen.') ?></p>
 
               <div class="classroom-card-progress">
-                <?php if ($roundsPlayed > 0): ?>
-                  <span>🏆 Bester Versuch: <strong><?= (int)$bestCorrect ?>/<?= (int)$bestTotal ?></strong></span>
-                  <span><?= (int)$roundsPlayed ?> Runde<?= $roundsPlayed === 1 ? '' : 'n' ?></span>
+                <?php if ($progressAttempted > 0): ?>
+                  <span>✅ Richtig: <strong><?= (int)$progressPassed ?>/<?= (int)$poolTotal ?></strong></span>
+                  <?php if ($progressFailed > 0): ?><span>🔴 Falsch: <strong><?= (int)$progressFailed ?></strong></span><?php endif; ?>
+                  <?php if ($unanswered > 0): ?><span>⚪ Offen: <strong><?= (int)$unanswered ?></strong></span><?php endif; ?>
+                  <?php if ($roundsPlayed > 0): ?><span><?= (int)$roundsPlayed ?> Runde<?= $roundsPlayed === 1 ? '' : 'n' ?></span><?php endif; ?>
                 <?php else: ?>
                   <span>✨ Noch offen</span>
-                  <span>Hol dir Punkte für den Klassen-Highscore</span>
+                  <span><?= $poolTotal > 0 ? (int)$poolTotal . ' Fragen im Pool' : 'Hol dir Punkte für den Klassen-Highscore' ?></span>
                 <?php endif; ?>
               </div>
 

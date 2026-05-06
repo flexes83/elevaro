@@ -364,10 +364,38 @@ function classroom_assigned_quizzes(int $classId, ?int $participantId = null): a
             best.best_total,
             best.best_percent,
             best.rounds_played,
-            best.last_completed_at
+            best.last_completed_at,
+            COALESCE(pool.question_pool_total, 0) AS question_pool_total,
+            COALESCE(progress.progress_passed, 0) AS progress_passed,
+            COALESCE(progress.progress_failed, 0) AS progress_failed,
+            COALESCE(progress.progress_attempted, 0) AS progress_attempted
         FROM teacher_class_quizzes tcq
         JOIN quizzes q ON q.id = tcq.quiz_id
         LEFT JOIN subjects subj ON subj.id = q.subject_id
+        LEFT JOIN (
+            SELECT quiz_id, COUNT(*) AS question_pool_total
+            FROM questions
+            WHERE status = 'published'
+            GROUP BY quiz_id
+        ) pool ON pool.quiz_id = q.id
+        LEFT JOIN (
+            SELECT
+                e.quiz_id,
+                SUM(CASE WHEN e.was_correct = 1 THEN 1 ELSE 0 END) AS progress_passed,
+                SUM(CASE WHEN e.was_correct = 1 THEN 0 ELSE 1 END) AS progress_failed,
+                COUNT(*) AS progress_attempted
+            FROM (
+                SELECT
+                    cae.quiz_id,
+                    cae.question_id,
+                    MAX(cae.is_correct) AS was_correct
+                FROM classroom_answer_events cae
+                WHERE cae.class_id = :answer_progress_class_id
+                  AND cae.participant_id = :answer_progress_participant_id
+                GROUP BY cae.quiz_id, cae.question_id
+            ) e
+            GROUP BY e.quiz_id
+        ) progress ON progress.quiz_id = q.id
         LEFT JOIN (
             SELECT
                 quiz_id,
@@ -393,6 +421,8 @@ function classroom_assigned_quizzes(int $classId, ?int $participantId = null): a
         'class_id' => $classId,
         'progress_class_id' => $classId,
         'progress_participant_id' => $participantId ?: 0,
+        'answer_progress_class_id' => $classId,
+        'answer_progress_participant_id' => $participantId ?: 0,
     ]);
     return $stmt->fetchAll();
 }
