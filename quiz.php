@@ -32,6 +32,20 @@ if ($classroomMode) {
     $classroomHasQuiz = (int)$stmt->fetchColumn() > 0;
     if ($classroomHasQuiz) {
         classroom_touch((int)$classroomParticipant['id']);
+
+        // Klassenraum-Schüler erhalten den Premium-/Adaptive-Round-Algorithmus,
+        // aber auf Basis ihrer Klassenraum-Teilnahme statt eines User-Accounts.
+        $quiz['questions'] = classroom_get_questions_for_quiz_round(
+            (int)$quiz['id'],
+            (int)$classroomParticipant['id'],
+            elevaro_quiz_round_length()
+        );
+        $quiz['round_question_count'] = count($quiz['questions']);
+        $quiz['progress'] = classroom_get_quiz_progress_for_participant(
+            (int)$classroomParticipant['id'],
+            (int)$quiz['id']
+        );
+
         auth_start_session();
         $logKey = 'classroom_quiz_started_' . $classId . '_' . (int)$quiz['id'];
         if (empty($_SESSION[$logKey])) {

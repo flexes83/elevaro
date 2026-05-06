@@ -739,3 +739,196 @@ function classroom_highscores(int $classId, ?int $quizId = null, int $limit = 10
 }
 
 classroom_ensure_schema();
+
+function classroom_question_progress_map(int $participantId, int $quizId): array
+{
+    classroom_ensure_schema();
+
+    $stmt = classroom_db()->prepare("\n        SELECT question_id, is_correct, answered_at, id\n        FROM classroom_answer_events\n        WHERE participant_id = :participant_id\n          AND quiz_id = :quiz_id\n        ORDER BY question_id ASC, answered_at ASC, id ASC\n    ");
+    $stmt->execute([
+        'participant_id' => $participantId,
+        'quiz_id' => $quizId,
+    ]);
+
+    $map = [];
+    foreach ($stmt->fetchAll() as $event) {
+        $qid = (int)$event['question_id'];
+        if (!isset($map[$qid])) {
+            $map[$qid] = [
+                'answered_count' => 0,
+                'correct_count' => 0,
+                'wrong_count' => 0,
+                'needs_recovery' => 0,
+                'is_mastered' => 0,
+                'last_answer_correct' => null,
+                'last_answered_at' => null,
+                'consecutive_correct_after_wrong' => 0,
+            ];
+        }
+
+        $isCorrect = (int)$event['is_correct'] === 1;
+        $map[$qid]['answered_count']++;
+        $map[$qid]['correct_count'] += $isCorrect ? 1 : 0;
+        $map[$qid]['wrong_count'] += $isCorrect ? 0 : 1;
+        $map[$qid]['last_answer_correct'] = $isCorrect ? 1 : 0;
+        $map[$qid]['last_answered_at'] = $event['answered_at'] ?? null;
+
+        if ($isCorrect) {
+            if ((int)$map[$qid]['needs_recovery'] === 1) {
+                $map[$qid]['consecutive_correct_after_wrong']++;
+                if ((int)$map[$qid]['consecutive_correct_after_wrong'] >= 2) {
+                    $map[$qid]['needs_recovery'] = 0;
+                    $map[$qid]['is_mastered'] = 1;
+                }
+            } else {
+                $map[$qid]['is_mastered'] = 1;
+                $map[$qid]['consecutive_correct_after_wrong'] = max(1, (int)$map[$qid]['consecutive_correct_after_wrong']);
+            }
+        } else {
+            $map[$qid]['needs_recovery'] = 1;
+            $map[$qid]['is_mastered'] = 0;
+            $map[$qid]['consecutive_correct_after_wrong'] = 0;
+        }
+    }
+
+    return $map;
+}
+
+function classroom_get_quiz_progress_for_participant(int $participantId, int $quizId): array
+{
+    $total = function_exists('elevaro_get_quiz_question_count') ? elevaro_get_quiz_question_count($quizId) : 0;
+    $progressMap = classroom_question_progress_map($participantId, $quizId);
+
+    $passed = 0;
+    $failed = 0;
+    $attempted = 0;
+
+    foreach ($progressMap as $progress) {
+        $attempted++;
+        if ((int)($progress['needs_recovery'] ?? 0) === 1) {
+            $failed++;
+        } elseif ((int)($progress['is_mastered'] ?? 0) === 1 || (int)($progress['last_answer_correct'] ?? 0) === 1) {
+            $passed++;
+        }
+    }
+
+    return [
+        'total' => $total,
+        'passed' => $passed,
+        'failed' => $failed,
+        'unanswered' => max(0, $total - $attempted),
+        'attempted' => $attempted,
+        'played' => $attempted > 0,
+    ];
+}
+
+function classroom_get_questions_for_quiz_round(int $quizId, int $participantId, ?int $limit = null): array
+{
+    classroom_ensure_schema();
+    $limit = $limit ?: (function_exists('elevaro_quiz_round_length') ? elevaro_quiz_round_length() : 15);
+    $progressMap = classroom_question_progress_map($participantId, $quizId);
+
+    $stmt = classroom_db()->prepare("\n        SELECT\n            q.*,\n            COALESCE(q.difficulty_manual, qs.calculated_difficulty, q.difficulty_calculated, 0.3) AS difficulty\n        FROM questions q\n        LEFT JOIN question_stats qs ON qs.question_id = q.id\n        WHERE q.quiz_id = :quiz_id\n          AND q.status = 'published'\n        ORDER BY COALESCE(q.difficulty_manual, qs.calculated_difficulty, q.difficulty_calculated, 0.3) ASC, q.sort_order ASC, q.id ASC\n    ");
+    $stmt->execute(['quiz_id' => $quizId]);
+    $questions = $stmt->fetchAll();
+
+    if (!$questions) return [];
+
+    foreach ($questions as &$question) {
+        $qid = (int)$question['id'];
+        $progress = $progressMap[$qid] ?? [];
+        $question['answered_count'] = (int)($progress['answered_count'] ?? 0);
+        $question['correct_count'] = (int)($progress['correct_count'] ?? 0);
+        $question['wrong_count'] = (int)($progress['wrong_count'] ?? 0);
+        $question['needs_recovery'] = (int)($progress['needs_recovery'] ?? 0);
+        $question['is_mastered'] = (int)($progress['is_mastered'] ?? 0);
+        $question['last_answer_correct'] = $progress['last_answer_correct'] ?? null;
+        $question['last_answered_at'] = $progress['last_answered_at'] ?? null;
+    }
+    unset($question);
+
+    if (function_exists('elevaro_select_premium_question_round')) {
+        $questions = elevaro_select_premium_question_round($questions, $limit);
+    } else {
+        $questions = array_slice($questions, 0, $limit);
+    }
+
+    $ids = array_map(static fn($q) => (int)$q['id'], $questions);
+    if (!$ids) return [];
+
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $optionsStmt = classroom_db()->prepare("\n        SELECT *\n        FROM question_options\n        WHERE question_id IN ({$placeholders})\n        ORDER BY question_id ASC, sort_order ASC, id ASC\n    ");
+    $optionsStmt->execute($ids);
+
+    $optionsByQuestion = [];
+    foreach ($optionsStmt->fetchAll() as $option) {
+        $qid = (int)$option['question_id'];
+        $optionsByQuestion[$qid][] = [
+            'text' => (string)$option['option_text'],
+            'label' => (string)$option['option_text'],
+            'is_correct' => (bool)$option['is_correct'],
+            'media' => [
+                'type' => $option['media_type'] ?? 'none',
+                'path' => $option['media_path'] ?? null,
+                'alt' => $option['media_alt'] ?? null,
+                'credit' => $option['media_credit'] ?? null,
+                'source' => $option['media_source'] ?? null,
+            ],
+            'media_type' => $option['media_type'] ?? 'none',
+            'media_path' => $option['media_path'] ?? null,
+            'media_alt' => $option['media_alt'] ?? null,
+        ];
+    }
+
+    $payload = [];
+    foreach ($questions as $question) {
+        $qid = (int)$question['id'];
+        $options = $optionsByQuestion[$qid] ?? [];
+        if (count($options) > 1) shuffle($options);
+
+        $payload[] = [
+            'id' => $qid,
+            'type' => $question['type'],
+            'question' => $question['question_text'],
+            'media' => [
+                'type' => $question['media_type'] ?? 'none',
+                'path' => $question['media_path'] ?? null,
+                'alt' => $question['media_alt'] ?? null,
+                'credit' => $question['media_credit'] ?? null,
+                'source' => $question['media_source'] ?? null,
+            ],
+            'audio' => [
+                'text' => $question['audio_text'] ?? null,
+                'path' => $question['audio_path'] ?? null,
+                'voice_id' => $question['audio_voice_id'] ?? null,
+                'model_id' => $question['audio_model_id'] ?? null,
+                'status' => $question['audio_status'] ?? 'none',
+            ],
+            'options' => array_map(static function ($option) {
+                return [
+                    'text' => (string)($option['text'] ?? ''),
+                    'label' => (string)($option['text'] ?? ''),
+                    'media' => $option['media'] ?? ['type' => 'none'],
+                    'media_type' => $option['media']['type'] ?? 'none',
+                    'media_path' => $option['media']['path'] ?? null,
+                    'media_alt' => $option['media']['alt'] ?? null,
+                ];
+            }, $options),
+            'answer' => $question['correct_answer'],
+            'fact' => $question['explanation'],
+            'difficulty' => (float)$question['difficulty'],
+            'source_context' => $question['source_context'] ?? 'general',
+            'source_excerpt' => $question['source_excerpt'] ?? null,
+            'reports_count' => (int)($question['reports_count'] ?? 0),
+            'progress_state' => [
+                'answered_count' => (int)($question['answered_count'] ?? 0),
+                'correct_count' => (int)($question['correct_count'] ?? 0),
+                'wrong_count' => (int)($question['wrong_count'] ?? 0),
+                'needs_recovery' => (int)($question['needs_recovery'] ?? 0),
+                'is_mastered' => (int)($question['is_mastered'] ?? 0),
+            ],
+        ];
+    }
+
+    return $payload;
+}

@@ -298,9 +298,10 @@ function elevaro_select_premium_question_round(array $questions, int $limit): ar
 
     $selected = [];
     $seen = [];
-    $add = static function (array $items, int $max) use (&$selected, &$seen, $limit): void {
+    $add = static function (array $items, ?int $max = null) use (&$selected, &$seen, $limit): void {
+        $target = $max !== null ? min($limit, $max) : $limit;
         foreach ($items as $item) {
-            if (count($selected) >= $limit || count($selected) >= $max) break;
+            if (count($selected) >= $limit || count($selected) >= $target) break;
             $id = (int)$item['id'];
             if (isset($seen[$id])) continue;
             $seen[$id] = true;
@@ -308,11 +309,14 @@ function elevaro_select_premium_question_round(array $questions, int $limit): ar
         }
     };
 
-    // Falsche Fragen zuerst, dann neue/leichtere Fragen, danach Lernfragen, sichere Fragen nur zum Auffüllen.
-    $add($bucketRecovery, min($limit, 6));
-    $add($bucketNew, min($limit, 11));
-    $add($bucketLearning, min($limit, 13));
-    $add($bucketMastered, $limit);
+    // Premium-Rundenlogik:
+    // 1. falsch beantwortete / wackelige Fragen gezielt wiederholen,
+    // 2. danach so viele neue, möglichst leichte Fragen wie möglich,
+    // 3. erst dann angefangene oder bereits sichere Fragen zum Auffüllen.
+    $add($bucketRecovery, min(6, $limit));
+    $add($bucketNew);
+    $add($bucketLearning);
+    $add($bucketMastered);
 
     return array_slice($selected, 0, $limit);
 }
