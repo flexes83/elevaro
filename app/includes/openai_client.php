@@ -239,9 +239,14 @@ if (!function_exists('elevaro_openai_responses_json')) {
         if ($content === '') {
             throw new RuntimeException('OpenAI response did not contain text content.');
         }
-        $json = json_decode($content, true);
-        if (!is_array($json)) {
-            throw new RuntimeException('OpenAI response was not valid JSON.');
+        if (function_exists('elevaro_teacher_ai_decode_openai_json')) {
+            $json = elevaro_teacher_ai_decode_openai_json($content);
+        } else {
+            $json = json_decode($content, true);
+            if (!is_array($json)) {
+                $preview = mb_substr(preg_replace('/\s+/', ' ', $content), 0, 700);
+                throw new RuntimeException('OpenAI response was not valid JSON. Preview: ' . $preview);
+            }
         }
         return ['json' => $json, 'raw' => $raw, 'content' => $content];
     }
@@ -312,6 +317,7 @@ if (!function_exists('elevaro_openai_responses_create_background_json')) {
         $payload = [
             'model' => $config['model'] ?? 'gpt-4.1-mini',
             'background' => true,
+            'max_output_tokens' => (int)($config['max_output_tokens'] ?? 12000),
             'input' => [
                 [
                     'role' => 'system',

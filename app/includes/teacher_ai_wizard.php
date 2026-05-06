@@ -503,6 +503,8 @@ function elevaro_teacher_ai_generation_schema(): array
 function elevaro_teacher_ai_decode_openai_json(string $content): array
 {
     $content = trim($content);
+    $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
+    $content = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/u', '', $content);
     if ($content === '') {
         throw new RuntimeException('OpenAI hat keine auswertbare Antwort geliefert.');
     }
@@ -510,6 +512,14 @@ function elevaro_teacher_ai_decode_openai_json(string $content): array
     $decoded = json_decode($content, true);
     if (is_array($decoded)) {
         return $decoded;
+    }
+
+    // Some API responses may return the JSON object as a JSON-encoded string.
+    if (is_string($decoded)) {
+        $decodedAgain = json_decode($decoded, true);
+        if (is_array($decodedAgain)) {
+            return $decodedAgain;
+        }
     }
 
     // Some models still wrap JSON in Markdown fences or add a short leading note.
@@ -909,7 +919,7 @@ if (!function_exists('elevaro_teacher_ai_questions_block_schema')) {
             'properties' => [
                 'questions' => [
                     'type' => 'array',
-                    'minItems' => 8,
+                    'minItems' => 1,
                     'maxItems' => 10,
                     'items' => [
                         'type' => 'object',
@@ -1017,7 +1027,7 @@ if (!function_exists('elevaro_teacher_ai_split_build_questions_prompt')) {
             "Lehrertext / Zusatzwunsch als Zusatzkontext:\n" . ($sourceText !== '' ? $sourceText : '[leer]') . "\n" . ($extraPrompt !== '' ? $extraPrompt : '') . "\n\n" .
             "Erzeuge exakt {$blockSize} neue Multiple-Choice-Fragen. Jede Frage hat exakt 4 Optionen und genau eine richtige Antwort. " .
             "Alle Fragen müssen eindeutig aus Originalmaterial oder Analyse ableitbar sein. Prüfe im Zweifel wieder das direkt angehängte PDF/Bildmaterial. " .
-            "Block 1 eher leicht, Block 2 mittel, Block 3 anspruchsvoller. Gib eine kurze Erklärung und eine Quellenreferenz an.");
+            "Die Schwierigkeit soll über alle 6 Blöcke sanft ansteigen: Block 1 sehr leicht, Blöcke 2–3 leicht bis mittel, Blöcke 4–5 mittel, Block 6 anspruchsvoller. Gib eine kurze Erklärung und eine Quellenreferenz an.");
     }
 }
 
@@ -1082,11 +1092,11 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
                         'id' => $draftId,
                         'teacher_id' => $teacherId,
                     ]);
-                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'analysis_done', 'status_label' => 'Material analysiert. Fragenblock 1/3 wird vorbereitet…'];
+                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'analysis_done', 'status_label' => 'Material analysiert. Fragenblock 1/6 wird vorbereitet…'];
             }
 
-            $blockSize = 10;
-            $targetBlocks = 3;
+            $blockSize = 5;
+            $targetBlocks = 6;
             if (count($blocks) < $targetBlocks) {
                 $blockIndex = count($blocks);
                 $prompt = elevaro_teacher_ai_split_build_questions_prompt($class, $analysis, $blockIndex, $blockSize, $mode, $sourceText, $extraPrompt, $allQuestions);
@@ -1106,7 +1116,7 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
                         'id' => $draftId,
                         'teacher_id' => $teacherId,
                     ]);
-                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'questions_' . count($blocks), 'status_label' => 'Fragenblock ' . count($blocks) . '/3 ist fertig…'];
+                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'questions_' . count($blocks), 'status_label' => 'Fragenblock ' . count($blocks) . '/' . $targetBlocks . ' ist fertig…'];
             }
 
             $payload = elevaro_teacher_ai_split_base_payload($analysis, $mode, $allQuestions);

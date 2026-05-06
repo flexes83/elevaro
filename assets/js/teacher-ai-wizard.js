@@ -46,7 +46,7 @@
     'Danach entstehen die Fragen in mehreren kleinen Blöcken...',
     'So gehen keine Informationen verloren und die Antwort wird nicht abgeschnitten...',
     'Handschriftliche Notizen werden visuell geprüft, soweit erkennbar...',
-    'Fragenblock 1/3 wird vorbereitet...',
+    'Fragenblock 1/6 wird vorbereitet...',
     'Antwortoptionen werden plausibel gemischt...'
   ];
   let loadingTimer = null;
