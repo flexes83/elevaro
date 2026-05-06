@@ -41,13 +41,13 @@
   });
 
   const loadingTexts = [
-    'Material wird gelesen und didaktisch sortiert...',
-    'Die KI sucht passende Verständnisfragen...',
-    'Antwortoptionen werden plausibel gemischt...',
-    'Schwierigkeitsgrad wird für den Fragenpool verteilt...',
-    'Quizbeschreibung und Bildidee werden vorbereitet...',
-    'Das kann bei handschriftlichen PDFs ein bis zwei Minuten dauern...',
-    'Du kannst kurz durchatmen – die Auswertung läuft weiter...'
+    'Material wird gelesen und quellengebunden analysiert...',
+    'Die KI erstellt zuerst eine sichere Inhaltsbasis...',
+    'Danach entstehen die Fragen in mehreren kleinen Blöcken...',
+    'So gehen keine Informationen verloren und die Antwort wird nicht abgeschnitten...',
+    'Handschriftliche Notizen werden visuell geprüft, soweit erkennbar...',
+    'Fragenblock 1/3 wird vorbereitet...',
+    'Antwortoptionen werden plausibel gemischt...'
   ];
   let loadingTimer = null;
   function startLoadingCopy() {
@@ -74,7 +74,7 @@
       if (res.status && res.status !== lastStatus) {
         lastStatus = res.status;
         const label = $('#aiWizardProgressText');
-        if (label) label.textContent = 'OpenAI verarbeitet dein Material… Status: ' + res.status;
+        if (label) label.textContent = res.status_label || ('OpenAI verarbeitet dein Material… Status: ' + res.status);
       }
     }
 

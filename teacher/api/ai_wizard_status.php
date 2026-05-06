@@ -9,7 +9,7 @@ try {
     if ($draftId <= 0) throw new RuntimeException('Entwurf fehlt.');
 
     $teacherId = teacher_current_user_id();
-    elevaro_teacher_ai_json_response(elevaro_teacher_ai_poll_background_draft($draftId, $teacherId));
+    elevaro_teacher_ai_json_response(elevaro_teacher_ai_poll_split_draft($draftId, $teacherId));
 } catch (Throwable $e) {
     elevaro_teacher_ai_json_response(['ok' => false, 'error' => $e->getMessage()], 400);
 }

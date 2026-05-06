@@ -9,7 +9,7 @@ try {
     $teacherId = teacher_current_user_id();
     $classId = (int)($_POST['class_id'] ?? 0);
     $mode = ($_POST['mode'] ?? 'quiz') === 'listening' ? 'listening' : 'quiz';
-    $class = elevaro_teacher_ai_class_for_teacher($classId, $teacherId);
+    elevaro_teacher_ai_class_for_teacher($classId, $teacherId);
     $sourceText = trim((string)($_POST['source_text'] ?? ''));
     $extraPrompt = trim((string)($_POST['extra_prompt'] ?? ''));
     $files = elevaro_teacher_ai_collect_files('source_files');
@@ -18,23 +18,13 @@ try {
         throw new RuntimeException('Bitte Material hochladen oder einen Text/eine Aufgabenstellung eingeben.');
     }
 
-    $response = elevaro_teacher_ai_start_background_generation($class, $mode, $sourceText, $extraPrompt, $files);
-    $draftId = elevaro_teacher_ai_create_background_draft(
-        $teacherId,
-        $classId,
-        $mode,
-        $sourceText,
-        $extraPrompt,
-        $files,
-        $response['prompt_log'] ?? '',
-        $response['id']
-    );
+    $draftId = elevaro_teacher_ai_create_split_draft($teacherId, $classId, $mode, $sourceText, $extraPrompt, $files);
 
     elevaro_teacher_ai_json_response([
         'ok' => true,
         'pending' => true,
         'draft_id' => $draftId,
-        'message' => 'Die KI-Erstellung läuft im Hintergrund.',
+        'message' => 'Die KI-Erstellung läuft mehrstufig im Hintergrund.',
     ]);
 } catch (Throwable $e) {
     elevaro_teacher_ai_json_response(['ok' => false, 'error' => $e->getMessage()], 400);

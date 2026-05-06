@@ -304,11 +304,16 @@ function elevaro_teacher_ai_responses_content_for_material(array $files): array
         $name = (string)($file['original_name'] ?? 'Material');
         $absolute = (string)($file['absolute_path'] ?? '');
 
-        if ($mime === 'application/pdf' && $absolute !== '' && is_file($absolute)) {
-            $fileId = elevaro_openai_upload_file($absolute, 'application/pdf', 'user_data');
-            $content[] = ['type' => 'input_text', 'text' => 'Direkt hochgeladenes PDF des Lehrers: ' . $name . '. Lies alle sichtbaren Inhalte, auch Scans, abfotografierte Seiten, Layout, Tabellen und handschriftliche Notizen, soweit erkennbar.'];
-            $content[] = ['type' => 'input_file', 'file_id' => $fileId];
-            continue;
+        if ($mime === 'application/pdf') {
+            $fileId = (string)($file['openai_file_id'] ?? '');
+            if ($fileId === '' && $absolute !== '' && is_file($absolute)) {
+                $fileId = elevaro_openai_upload_file($absolute, 'application/pdf', 'user_data');
+            }
+            if ($fileId !== '') {
+                $content[] = ['type' => 'input_text', 'text' => 'Direkt hochgeladenes PDF des Lehrers: ' . $name . '. Lies alle sichtbaren Inhalte, auch Scans, abfotografierte Seiten, Layout, Tabellen, Aufgaben und handschriftliche Notizen, soweit erkennbar.'];
+                $content[] = ['type' => 'input_file', 'file_id' => $fileId];
+                continue;
+            }
         }
 
         $dataUrl = elevaro_teacher_ai_file_to_data_url($file);
@@ -842,3 +847,285 @@ if (!function_exists('elevaro_teacher_ai_poll_background_draft')) {
         return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => $payload];
     }
 }
+
+if (!function_exists('elevaro_teacher_ai_prepare_openai_material_files')) {
+    function elevaro_teacher_ai_prepare_openai_material_files(array $files): array
+    {
+        foreach ($files as &$file) {
+            $mime = (string)($file['mime'] ?? '');
+            $absolute = (string)($file['absolute_path'] ?? '');
+            if ($mime === 'application/pdf' && empty($file['openai_file_id']) && $absolute !== '' && is_file($absolute)) {
+                $file['openai_file_id'] = elevaro_openai_upload_file($absolute, 'application/pdf', 'user_data');
+            }
+        }
+        unset($file);
+        return $files;
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_analysis_schema')) {
+    function elevaro_teacher_ai_analysis_schema(): array
+    {
+        return [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'properties' => [
+                'title' => ['type' => 'string'],
+                'description' => ['type' => 'string'],
+                'mode' => ['type' => 'string', 'enum' => ['quiz', 'listening']],
+                'language' => ['type' => 'string'],
+                'source_summary' => ['type' => 'string'],
+                'usable_material_note' => ['type' => 'string'],
+                'topics' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'difficulty_progression' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'image_prompt' => ['type' => 'string'],
+                'listening_text' => ['type' => 'string'],
+                'question_plan' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'additionalProperties' => false,
+                        'properties' => [
+                            'block' => ['type' => 'integer'],
+                            'focus' => ['type' => 'string'],
+                            'difficulty' => ['type' => 'string'],
+                            'source_reference' => ['type' => 'string'],
+                        ],
+                        'required' => ['block', 'focus', 'difficulty', 'source_reference'],
+                    ],
+                ],
+            ],
+            'required' => ['title', 'description', 'mode', 'language', 'source_summary', 'usable_material_note', 'topics', 'difficulty_progression', 'image_prompt', 'listening_text', 'question_plan'],
+        ];
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_questions_block_schema')) {
+    function elevaro_teacher_ai_questions_block_schema(): array
+    {
+        return [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'properties' => [
+                'questions' => [
+                    'type' => 'array',
+                    'minItems' => 8,
+                    'maxItems' => 10,
+                    'items' => [
+                        'type' => 'object',
+                        'additionalProperties' => false,
+                        'properties' => [
+                            'question' => ['type' => 'string'],
+                            'options' => ['type' => 'array', 'minItems' => 4, 'maxItems' => 4, 'items' => ['type' => 'string']],
+                            'answer' => ['type' => 'string'],
+                            'explanation' => ['type' => 'string'],
+                            'difficulty' => ['type' => 'number'],
+                            'source_reference' => ['type' => 'string'],
+                        ],
+                        'required' => ['question', 'options', 'answer', 'explanation', 'difficulty', 'source_reference'],
+                    ],
+                ],
+            ],
+            'required' => ['questions'],
+        ];
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_split_ensure_schema')) {
+    function elevaro_teacher_ai_split_ensure_schema(): void
+    {
+        elevaro_teacher_ai_wizard_ensure_schema();
+        elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'generation_step', "generation_step VARCHAR(60) NULL AFTER status");
+        elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'analysis_json', "analysis_json LONGTEXT NULL AFTER generated_payload_json");
+        elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'question_blocks_json', "question_blocks_json LONGTEXT NULL AFTER analysis_json");
+        elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'generation_error', "generation_error TEXT NULL AFTER question_blocks_json");
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_create_split_draft')) {
+    function elevaro_teacher_ai_create_split_draft(int $teacherId, int $classId, string $mode, string $sourceText, string $extraPrompt, array $files): int
+    {
+        elevaro_teacher_ai_split_ensure_schema();
+        if (!elevaro_teacher_ai_has_readable_material($sourceText, $files)) {
+            throw new RuntimeException('Bitte lade ein PDF/Bild hoch oder gib Material als Text ein. Ohne Unterrichtsmaterial wird kein Quiz generiert, damit keine Fantasiefragen entstehen.');
+        }
+
+        $files = elevaro_teacher_ai_prepare_openai_material_files($files);
+        $class = elevaro_teacher_ai_class_for_teacher($classId, $teacherId);
+        $promptLog = elevaro_teacher_ai_build_generation_prompt($class, $mode, $sourceText, $extraPrompt, $files);
+
+        $pdo = elevaro_teacher_ai_wizard_db();
+        $stmt = $pdo->prepare("INSERT INTO teacher_ai_quiz_drafts
+            (teacher_id, class_id, mode, status, generation_step, source_title, source_text, source_files_json, prompt, generated_payload_json, image_prompt, image_status)
+            VALUES (:teacher_id, :class_id, :mode, 'generating', 'analysis', NULL, :source_text, :source_files_json, :prompt, NULL, NULL, 'none')");
+        $stmt->execute([
+            'teacher_id' => $teacherId,
+            'class_id' => $classId,
+            'mode' => $mode,
+            'source_text' => $sourceText,
+            'source_files_json' => json_encode($files, JSON_UNESCAPED_UNICODE),
+            'prompt' => $promptLog,
+        ]);
+        return (int)$pdo->lastInsertId();
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_split_build_analysis_prompt')) {
+    function elevaro_teacher_ai_split_build_analysis_prompt(array $class, string $mode, string $sourceText, string $extraPrompt, array $files): string
+    {
+        $subject = elevaro_teacher_ai_subject_label($class['subject_code'] ?? '');
+        $grade = (string)($class['grade'] ?? '');
+        $level = (string)($class['level_key'] ?? '');
+        $school = (string)($class['school_type_code'] ?? '');
+        $language = elevaro_teacher_ai_language_for_class($class, $mode);
+        $fileList = array_map(static fn($file) => '- ' . (string)($file['original_name'] ?? 'Material') . ' (' . (string)($file['mime'] ?? 'Datei') . ')', $files);
+
+        return trim("Analysiere das Unterrichtsmaterial für einen Elevaro-KI-Quiz-Wizard.\n\n" .
+            "Klassenkontext:\n- Klasse: {$grade}\n- Schulart/Level: {$school} / {$level}\n- Fach: {$subject}\n- Modus: " . ($mode === 'listening' ? 'Listening + Comprehension' : 'normales Multiple-Choice-Quiz') . "\n- Sprache der Fragen: {$language}\n\n" .
+            "Dateien:\n" . ($fileList ? implode("\n", $fileList) : '[Keine Datei hochgeladen.]') . "\n\n" .
+            "Lehrertext / Aufgabenstellung:\n" . ($sourceText !== '' ? $sourceText : '[Kein zusätzlicher Text eingetragen.]') . "\n\n" .
+            "Zusatzwunsch des Lehrers:\n" . ($extraPrompt !== '' ? $extraPrompt : '[Keine Zusatzanweisung.]') . "\n\n" .
+            "Aufgabe für diesen Schritt: Erstelle KEINE fertigen Fragen. Analysiere nur die Quelle. " .
+            "Fasse alle sicher lesbaren Inhalte vollständig und quellengebunden zusammen, inklusive handschriftlicher Notizen soweit erkennbar. " .
+            "Erstelle eine belastbare Themen-/Fragenplanung für 30 spätere Multiple-Choice-Fragen in 3 Blöcken à 10 Fragen. " .
+            "Der Klassenkontext darf nur Niveau und Sprache steuern, aber keine Fakten ergänzen. Wenn Inhalte unleserlich sind, benenne das offen. " .
+            "Bei Listening: Erstelle zusätzlich einen Sprechertext in der Zielsprache, ausschließlich aus dem Material abgeleitet.");
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_split_build_questions_prompt')) {
+    function elevaro_teacher_ai_split_build_questions_prompt(array $class, array $analysis, int $blockIndex, int $blockSize, string $mode, string $sourceText, string $extraPrompt, array $existingQuestions): string
+    {
+        $start = $blockIndex * $blockSize + 1;
+        $end = $start + $blockSize - 1;
+        $language = (string)($analysis['language'] ?? elevaro_teacher_ai_language_for_class($class, $mode));
+        $existing = array_map(static fn($q) => (string)($q['question'] ?? ''), $existingQuestions);
+        $focus = '';
+        foreach (($analysis['question_plan'] ?? []) as $plan) {
+            if ((int)($plan['block'] ?? 0) === $blockIndex + 1) {
+                $focus .= '- Fokus: ' . (string)($plan['focus'] ?? '') . ' | Schwierigkeit: ' . (string)($plan['difficulty'] ?? '') . ' | Quelle: ' . (string)($plan['source_reference'] ?? '') . "\n";
+            }
+        }
+        if ($focus === '') $focus = '- Nutze die Analyse und das Originalmaterial für diesen Block.\n';
+
+        return trim("Erstelle Fragen {$start} bis {$end} für ein Elevaro-Schülerquiz.\n\n" .
+            "Sprache: {$language}\n" .
+            "Modus: {$mode}\n\n" .
+            "Verbindliche Materialanalyse:\n" . json_encode($analysis, JSON_UNESCAPED_UNICODE) . "\n\n" .
+            "Block-Fokus:\n{$focus}\n" .
+            "Bereits erzeugte Fragen, die NICHT wiederholt werden dürfen:\n" . ($existing ? implode("\n", array_slice($existing, -20)) : '[Noch keine]') . "\n\n" .
+            "Lehrertext / Zusatzwunsch als Zusatzkontext:\n" . ($sourceText !== '' ? $sourceText : '[leer]') . "\n" . ($extraPrompt !== '' ? $extraPrompt : '') . "\n\n" .
+            "Erzeuge exakt {$blockSize} neue Multiple-Choice-Fragen. Jede Frage hat exakt 4 Optionen und genau eine richtige Antwort. " .
+            "Alle Fragen müssen eindeutig aus Originalmaterial oder Analyse ableitbar sein. Prüfe im Zweifel wieder das direkt angehängte PDF/Bildmaterial. " .
+            "Block 1 eher leicht, Block 2 mittel, Block 3 anspruchsvoller. Gib eine kurze Erklärung und eine Quellenreferenz an.");
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_split_base_payload')) {
+    function elevaro_teacher_ai_split_base_payload(array $analysis, string $mode, array $questions): array
+    {
+        return elevaro_teacher_ai_normalize_payload([
+            'title' => (string)($analysis['title'] ?? 'KI-Quiz'),
+            'description' => (string)($analysis['description'] ?? ''),
+            'mode' => $mode,
+            'language' => (string)($analysis['language'] ?? 'Deutsch'),
+            'listening_text' => $mode === 'listening' ? (string)($analysis['listening_text'] ?? '') : '',
+            'image_prompt' => (string)($analysis['image_prompt'] ?? ''),
+            'questions' => $questions,
+        ], $mode);
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
+    function elevaro_teacher_ai_poll_split_draft(int $draftId, int $teacherId): array
+    {
+        @set_time_limit(100);
+        elevaro_teacher_ai_split_ensure_schema();
+        $draft = elevaro_teacher_ai_load_draft($draftId, $teacherId);
+
+        if (($draft['status'] ?? '') === 'draft' && !empty($draft['generated_payload_json'])) {
+            return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => elevaro_teacher_ai_draft_payload($draft)];
+        }
+        if (($draft['status'] ?? '') === 'failed' && !empty($draft['generation_error'])) {
+            throw new RuntimeException((string)$draft['generation_error']);
+        }
+
+        $class = elevaro_teacher_ai_class_for_teacher((int)$draft['class_id'], $teacherId);
+        $mode = (string)($draft['mode'] ?? 'quiz');
+        $sourceText = (string)($draft['source_text'] ?? '');
+        $extraPrompt = '';
+        $files = json_decode((string)($draft['source_files_json'] ?? '[]'), true);
+        if (!is_array($files)) $files = [];
+        $files = elevaro_teacher_ai_prepare_openai_material_files($files);
+
+        $analysis = json_decode((string)($draft['analysis_json'] ?? ''), true);
+        $blocks = json_decode((string)($draft['question_blocks_json'] ?? '[]'), true);
+        if (!is_array($blocks)) $blocks = [];
+        $allQuestions = [];
+        foreach ($blocks as $block) {
+            foreach (($block['questions'] ?? []) as $q) $allQuestions[] = $q;
+        }
+
+        try {
+            if (!is_array($analysis)) {
+                $prompt = elevaro_teacher_ai_split_build_analysis_prompt($class, $mode, $sourceText, $extraPrompt, $files);
+                $content = [['type' => 'input_text', 'text' => $prompt]];
+                $content = array_merge($content, elevaro_teacher_ai_responses_content_for_material($files));
+                $system = 'Du bist ein erfahrener Lehrer und Fachdidaktiker. Analysiere Unterrichtsmaterial quellengebunden. Keine Fantasieinhalte. Liefere ausschließlich valides JSON nach Schema.';
+                $result = elevaro_openai_responses_json($system, $content, elevaro_teacher_ai_analysis_schema(), 0.15, 90);
+                $analysis = $result['json'];
+                elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts SET analysis_json = :analysis, generation_step = 'questions_1', source_title = :title, image_prompt = :image_prompt WHERE id = :id AND teacher_id = :teacher_id")
+                    ->execute([
+                        'analysis' => json_encode($analysis, JSON_UNESCAPED_UNICODE),
+                        'title' => (string)($analysis['title'] ?? null),
+                        'image_prompt' => (string)($analysis['image_prompt'] ?? null),
+                        'id' => $draftId,
+                        'teacher_id' => $teacherId,
+                    ]);
+                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'analysis_done', 'status_label' => 'Material analysiert. Fragenblock 1/3 wird vorbereitet…'];
+            }
+
+            $blockSize = 10;
+            $targetBlocks = 3;
+            if (count($blocks) < $targetBlocks) {
+                $blockIndex = count($blocks);
+                $prompt = elevaro_teacher_ai_split_build_questions_prompt($class, $analysis, $blockIndex, $blockSize, $mode, $sourceText, $extraPrompt, $allQuestions);
+                $content = [['type' => 'input_text', 'text' => $prompt]];
+                $content = array_merge($content, elevaro_teacher_ai_responses_content_for_material($files));
+                $system = 'Du bist ein präziser Quizautor. Erzeuge ausschließlich valides JSON. Jede Frage muss quellengebunden aus dem Material ableitbar sein. Keine Wiederholungen.';
+                $result = elevaro_openai_responses_json($system, $content, elevaro_teacher_ai_questions_block_schema(), 0.2, 90);
+                $block = $result['json'];
+                $block['block'] = $blockIndex + 1;
+                $blocks[] = $block;
+                foreach (($block['questions'] ?? []) as $q) $allQuestions[] = $q;
+
+                elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts SET question_blocks_json = :blocks, generation_step = :step WHERE id = :id AND teacher_id = :teacher_id")
+                    ->execute([
+                        'blocks' => json_encode($blocks, JSON_UNESCAPED_UNICODE),
+                        'step' => count($blocks) < $targetBlocks ? 'questions_' . (count($blocks) + 1) : 'assemble',
+                        'id' => $draftId,
+                        'teacher_id' => $teacherId,
+                    ]);
+                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'questions_' . count($blocks), 'status_label' => 'Fragenblock ' . count($blocks) . '/3 ist fertig…'];
+            }
+
+            $payload = elevaro_teacher_ai_split_base_payload($analysis, $mode, $allQuestions);
+            $stmt = elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts
+                SET status = 'draft', generation_step = 'done', generated_payload_json = :payload, source_title = :title, image_prompt = :image_prompt, image_status = 'pending'
+                WHERE id = :id AND teacher_id = :teacher_id");
+            $stmt->execute([
+                'payload' => json_encode($payload, JSON_UNESCAPED_UNICODE),
+                'title' => $payload['title'] ?? null,
+                'image_prompt' => $payload['image_prompt'] ?? null,
+                'id' => $draftId,
+                'teacher_id' => $teacherId,
+            ]);
+            return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => $payload];
+        } catch (Throwable $e) {
+            elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts SET status = 'failed', generation_error = :error WHERE id = :id AND teacher_id = :teacher_id")
+                ->execute(['error' => $e->getMessage(), 'id' => $draftId, 'teacher_id' => $teacherId]);
+            throw $e;
+        }
+    }
+}
+
