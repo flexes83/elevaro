@@ -287,6 +287,11 @@
       const btn = $('#aiPublishQuiz');
       btn.disabled = true; btn.textContent = 'Veröffentliche...';
       const payload = readPayload();
+      if (!state.imagePath) {
+        btn.textContent = 'Erstelle Quizbild...';
+        try { await generateImage(false); } catch (e) {}
+        btn.textContent = 'Veröffentliche...';
+      }
       const res = await apiJson('/teacher/api/ai_wizard_publish.php', { draft_id: state.draftId, payload });
       toast('Quiz wurde veröffentlicht.');
       window.location.href = res.class_quizzes_url || '/teacher/quizzes.php';
