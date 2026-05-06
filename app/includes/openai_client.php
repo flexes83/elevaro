@@ -222,6 +222,7 @@ if (!function_exists('elevaro_openai_responses_json')) {
                 ],
             ],
             'temperature' => $temperature,
+            'max_output_tokens' => (int)($config['max_output_tokens'] ?? 16000),
             'text' => [
                 'format' => [
                     'type' => 'json_schema',

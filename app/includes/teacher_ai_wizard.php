@@ -525,8 +525,12 @@ function elevaro_teacher_ai_decode_openai_json(string $content): array
         }
     }
 
-    $preview = mb_substr(preg_replace('/\s+/', ' ', $content), 0, 500);
-    throw new RuntimeException('OpenAI-Antwort war kein valides JSON. Antwortauszug: ' . $preview);
+    $preview = mb_substr(preg_replace('/\s+/', ' ', $content), 0, 700);
+    $looksTruncated = (strpos($content, '{') !== false && strrpos($content, '}') !== strlen(rtrim($content)) - 1);
+    $hint = $looksTruncated
+        ? ' Die Antwort wirkt abgeschnitten. Bitte starte die Generierung erneut; die Ausgabe-Länge wurde in diesem Patch erhöht.'
+        : '';
+    throw new RuntimeException('OpenAI-Antwort war kein valides JSON.' . $hint . ' Antwortauszug: ' . $preview);
 }
 
 function elevaro_teacher_ai_normalize_payload(array $payload, string $mode): array
