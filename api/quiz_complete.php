@@ -9,13 +9,31 @@ try {
     $payload = json_decode(file_get_contents('php://input') ?: '[]', true) ?: [];
     $classId = (int)($payload['class_id'] ?? 0);
     $classroomSessionId = (int)($payload['classroom_session_id'] ?? 0);
+    $quizId = (int)($payload['quiz_id'] ?? 0);
+    $duelId = (int)($payload['duel_id'] ?? 0);
+    $sessionToken = isset($payload['session_token']) ? (string)$payload['session_token'] : null;
+    $roundQuestionCount = isset($payload['question_count']) ? max(1, min(50, (int)$payload['question_count'])) : null;
 
-    if ($classId && $classroomSessionId) {
+    if ($classId) {
         $participant = classroom_current_participant($classId);
         if (!$participant) {
             http_response_code(401);
             echo json_encode(['success'=>false,'error'=>'classroom_not_joined'], JSON_UNESCAPED_UNICODE);
             exit;
+        }
+
+        if (!$classroomSessionId) {
+            if (!$quizId) {
+                throw new RuntimeException('quiz_id fehlt für Klassenraum-Highscore.');
+            }
+            $classroomSessionId = classroom_find_or_start_quiz_session(
+                $classId,
+                (int)$participant['id'],
+                $quizId,
+                $sessionToken,
+                $roundQuestionCount,
+                $duelId ?: null
+            );
         }
 
         $result = classroom_complete_quiz_session(
@@ -28,7 +46,7 @@ try {
             (int)($payload['best_streak'] ?? 0)
         );
 
-        echo json_encode(['success'=>true,'classroom'=>true] + $result, JSON_UNESCAPED_UNICODE);
+        echo json_encode(['success'=>true,'classroom'=>true,'classroom_session_id'=>$classroomSessionId] + $result, JSON_UNESCAPED_UNICODE);
         exit;
     }
 

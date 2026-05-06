@@ -485,6 +485,48 @@ function classroom_start_quiz_session(int $classId, int $participantId, int $qui
     return (int)classroom_db()->lastInsertId();
 }
 
+function classroom_find_or_start_quiz_session(int $classId, int $participantId, int $quizId, ?string $sessionToken = null, ?int $roundQuestionCount = null, ?int $duelId = null): int
+{
+    classroom_ensure_schema();
+
+    $sessionToken = $sessionToken !== null ? trim($sessionToken) : null;
+
+    if ($sessionToken !== null && $sessionToken !== '') {
+        $sql = "
+            SELECT id
+            FROM classroom_quiz_sessions
+            WHERE class_id = :class_id
+              AND participant_id = :participant_id
+              AND quiz_id = :quiz_id
+              AND session_token = :session_token
+              AND completed_at IS NULL
+        ";
+        $params = [
+            'class_id' => $classId,
+            'participant_id' => $participantId,
+            'quiz_id' => $quizId,
+            'session_token' => $sessionToken,
+        ];
+
+        if ($duelId) {
+            $sql .= " AND duel_id = :duel_id";
+            $params['duel_id'] = $duelId;
+        } else {
+            $sql .= " AND duel_id IS NULL";
+        }
+
+        $sql .= " ORDER BY id DESC LIMIT 1";
+        $stmt = classroom_db()->prepare($sql);
+        $stmt->execute($params);
+        $existingId = (int)$stmt->fetchColumn();
+        if ($existingId > 0) {
+            return $existingId;
+        }
+    }
+
+    return classroom_start_quiz_session($classId, $participantId, $quizId, $sessionToken, $roundQuestionCount, $duelId);
+}
+
 function classroom_record_answer(int $classId, int $participantId, int $sessionId, int $quizId, int $questionId, string $selectedAnswer, string $correctAnswer, bool $isCorrect, int $points = 0): void
 {
     classroom_ensure_schema();

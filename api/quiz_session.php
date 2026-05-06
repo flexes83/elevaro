@@ -30,7 +30,7 @@ try {
             exit;
         }
 
-        $classroomSessionId = classroom_start_quiz_session(
+        $classroomSessionId = classroom_find_or_start_quiz_session(
             $classId,
             (int)$participant['id'],
             $quizId,

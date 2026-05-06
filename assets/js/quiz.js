@@ -470,16 +470,21 @@
         is_correct: isCorrect,
         session_id: quizSessionId || null,
         quiz_session_id: quizSessionId || null,
-        classroom_session_id: classroomSessionId || null,
-        class_id: window.ELEVARO_QUIZ.classroomMode ? window.ELEVARO_QUIZ.classroomId : 0,
-        duel_id: window.ELEVARO_QUIZ.classroomDuelId || 0,
         session_token: sessionId,
         response_time_ms: responseTimeMs,
-        points
+        points,
+        class_id: window.ELEVARO_QUIZ.classroomMode ? window.ELEVARO_QUIZ.classroomId : 0,
+        classroom_session_id: classroomSessionId || null,
+        duel_id: window.ELEVARO_QUIZ.classroomDuelId || 0,
+        question_count: questions.length
       })
     })
       .then(response => response.json().catch(() => null))
       .then(data => {
+        if (data && data.classroom_session_id) {
+          classroomSessionId = data.classroom_session_id;
+          window.ELEVARO_QUIZ.classroomSessionId = data.classroom_session_id;
+        }
         if (data && data.success && data.progress) {
           window.ELEVARO_LAST_PROGRESS = data.progress;
         }
@@ -521,17 +526,20 @@
   }
 
   function completeQuizSession() {
-    if (!quizSessionId && !classroomSessionId) return;
+    if (!quizSessionId && !classroomSessionId && !window.ELEVARO_QUIZ.classroomMode) return;
 
     fetch('api/quiz_complete.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
       body: JSON.stringify({
+        quiz_id: window.ELEVARO_QUIZ.dbId,
         quiz_session_id: quizSessionId || null,
         classroom_session_id: classroomSessionId || null,
         class_id: window.ELEVARO_QUIZ.classroomMode ? window.ELEVARO_QUIZ.classroomId : 0,
         duel_id: window.ELEVARO_QUIZ.classroomDuelId || 0,
+        session_token: sessionId,
+        question_count: questions.length,
         score,
         total: questions.length,
         points: totalPoints,
@@ -540,6 +548,10 @@
     })
       .then(response => response.json().catch(() => null))
       .then(data => {
+        if (data && data.classroom_session_id) {
+          classroomSessionId = data.classroom_session_id;
+          window.ELEVARO_QUIZ.classroomSessionId = data.classroom_session_id;
+        }
         if (data && data.success && data.duel_result) {
           renderDuelResult(data.duel_result);
         }
