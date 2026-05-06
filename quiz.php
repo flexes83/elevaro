@@ -14,9 +14,19 @@ if (!$quiz) {
 
 $currentUser = auth_user();
 $classId = (int)($_GET['class_id'] ?? 0);
-$classroomParticipant = $classId ? classroom_current_participant($classId) : null;
+$classroomDuelId = (int)($_GET['duel_id'] ?? 0);
+$classroomClass = $classId ? classroom_by_id($classId) : null;
+$classroomParticipant = ($classId && $classroomClass) ? classroom_current_participant($classId) : null;
+$classroomMode = $classId && $classroomClass && $classroomParticipant;
+$classroomUrl = $classroomClass ? ('/classroom.php?class_id=' . (int)$classroomClass['id']) : '';
+
+if ($classId && $classroomClass && !$classroomParticipant) {
+    header('Location: /join.php?code=' . urlencode((string)$classroomClass['invite_code']));
+    exit;
+}
+
 $classroomHasQuiz = false;
-if ($classId && $classroomParticipant) {
+if ($classroomMode) {
     $stmt = elevaro_db()->prepare("SELECT COUNT(*) FROM teacher_class_quizzes WHERE class_id = :class_id AND quiz_id = :quiz_id");
     $stmt->execute(['class_id' => $classId, 'quiz_id' => (int)$quiz['id']]);
     $classroomHasQuiz = (int)$stmt->fetchColumn() > 0;
@@ -94,15 +104,16 @@ $hasListeningAudio = $listeningMode && $listeningAudioPath !== '';
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/quiz.css?v=<?= filemtime(__DIR__ . '/assets/css/quiz.css') ?>">
   <link rel="stylesheet" href="assets/css/design-system.css">
-  <?php if ($classId && $classroomParticipant): ?><link rel="stylesheet" href="assets/css/classroom.css?v=<?= filemtime(__DIR__ . '/assets/css/classroom.css') ?>"><?php endif; ?>
+  <?php if ($classroomMode): ?><link rel="stylesheet" href="assets/css/classroom.css?v=<?= filemtime(__DIR__ . '/assets/css/classroom.css') ?>"><?php endif; ?>
 </head>
-<body class="quiz-page <?= ($classId && $classroomParticipant) ? 'quiz-classroom-mode' : '' ?>">
+<body class="quiz-page <?= $classroomMode ? 'quiz-classroom-mode' : '' ?>">
 
-<?php if ($classId && $classroomParticipant && $classroomClass): ?>
-<nav class="classroom-quiz-topbar">
-  <a class="classroom-back" href="/classroom.php?class_id=<?= (int)$classId ?>">← Klassenraum</a>
-  <div class="classroom-quiz-room">🏫 <?= qh(classroom_label($classroomClass)) ?></div>
-  <div class="classroom-quiz-me"><span class="avatar-bubble <?= qh($classroomParticipant['avatar_type'] ?? 'emoji') ?> <?= qh($classroomParticipant['avatar_gradient'] ?? 'grad-1') ?>"><?= qh($classroomParticipant['avatar_emoji'] ?? '🙂') ?></span><?= qh($classroomParticipant['display_name']) ?></div>
+<?php if ($classroomMode && $classroomClass): ?>
+<nav class="classroom-topbar classroom-quiz-topbar">
+  <a class="brand" href="<?= qh($classroomUrl) ?>" aria-label="Zurück in den Klassenraum">Elevaro</a>
+  <a class="class-pill" href="<?= qh($classroomUrl) ?>">🏫 <?= qh(classroom_label($classroomClass)) ?></a>
+  <a class="classroom-back" href="<?= qh($classroomUrl) ?>">← Klassenraum</a>
+  <div class="me-pill"><span class="avatar-bubble <?= qh($classroomParticipant['avatar_type'] ?? 'emoji') ?> <?= qh($classroomParticipant['avatar_gradient'] ?? 'grad-1') ?>"><?= qh($classroomParticipant['avatar_emoji'] ?? '🙂') ?></span><?= qh($classroomParticipant['display_name']) ?></div>
 </nav>
 <?php else: ?>
 <nav class="navbar navbar-expand-lg bg-white border-bottom">
@@ -268,7 +279,7 @@ $hasListeningAudio = $listeningMode && $listeningAudioPath !== '';
           <ul id="weakList" class="mb-0"></ul>
         </div>
 
-        <?php if (!($classId && $classroomParticipant)): ?>
+        <?php if (!$classroomMode): ?>
         <div id="resultConversionCard" class="result-conversion-card text-start">
           <span class="conversion-kicker">Dein nächster Schritt</span>
           <h3>Quizz dich zu besseren Noten</h3>
@@ -293,13 +304,13 @@ $hasListeningAudio = $listeningMode && $listeningAudioPath !== '';
         <div class="d-flex justify-content-center gap-3 flex-wrap mt-4">
           <button id="restartBtn" class="btn btn-primary">Nochmal spielen</button>
           <button id="weakBtn" class="btn btn-outline-primary d-none">Wackelkandidaten üben</button>
-          <?php if ($classId && $classroomParticipant): ?><a href="/classroom.php?class_id=<?= (int)$classId ?>" class="btn btn-light">Zurück in den Klassenraum</a><?php else: ?><a href="recommendations.php" class="btn btn-light">Weitere Quizze</a><?php endif; ?>
+          <?php if ($classroomMode): ?><a href="<?= qh($classroomUrl) ?>" class="btn btn-light">Zurück in den Klassenraum</a><?php else: ?><a href="recommendations.php" class="btn btn-light">Weitere Quizze</a><?php endif; ?>
         </div>
       </div>
 
     </div>
   </div>
-<?php if (!($classId && $classroomParticipant)): ?>
+<?php if (!$classroomMode): ?>
 <div class="result-cta text-center mt-4">
 <a class="btn btn-primary" href="/paywall.php">Premium freischalten</a>
 </div>
@@ -328,7 +339,7 @@ window.ELEVARO_QUIZ = {
   classroomId: <?= (int)$classId ?>,
   classroomDuelId: <?= (int)$classroomDuelId ?>,
   classroomSessionId: null,
-  classroomMode: <?= ($classId && $classroomParticipant) ? 'true' : 'false' ?>
+  classroomMode: <?= $classroomMode ? 'true' : 'false' ?>
 };
 </script>
 <script src="assets/js/quiz.js?v=<?= filemtime(__DIR__ . '/assets/js/quiz.js') ?>"></script>

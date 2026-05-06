@@ -32,7 +32,7 @@ $gradientOptions = classroom_gradient_options();
 </head>
 <body class="classroom-page" data-class-id="<?= (int)$class['id'] ?>">
 <nav class="classroom-topbar">
-  <a class="brand" href="/">Elevaro</a>
+  <a class="brand" href="/classroom.php?class_id=<?= (int)$class['id'] ?>">Elevaro</a>
   <div class="class-pill">🏫 <?= classroom_h(classroom_label($class)) ?></div>
   <button class="me-pill avatar-settings-toggle" type="button" aria-haspopup="dialog"><span class="avatar-bubble <?= classroom_h($participant['avatar_type'] ?? 'emoji') ?> <?= classroom_h($participant['avatar_gradient'] ?? 'grad-1') ?>"><?= classroom_h($participant['avatar_emoji']) ?></span><?= classroom_h($participant['display_name']) ?><small>ändern</small></button>
 </nav>
