@@ -512,8 +512,24 @@ function classroom_pick_duel_question_ids(int $classId, int $limit = 10): array
 {
     classroom_ensure_schema();
     $limit = max(8, min(10, $limit));
-    $stmt = classroom_db()->prepare("\n        SELECT q.id\n        FROM teacher_class_quizzes tcq\n        JOIN questions q ON q.quiz_id = tcq.quiz_id\n        WHERE tcq.class_id = :class_id\n          AND q.status = 'published'\n        ORDER BY RAND()\n        LIMIT {$limit}\n    ");
+
+    // Duelle nutzen bewusst den gesamten vom Lehrer bereitgestellten Klassenraum-Pool.
+    // Es wird also kein einzelnes Quiz als Quelle genommen, sondern alle aktiven
+    // Quizze, die der Klasse zugewiesen sind. DISTINCT verhindert doppelte Fragen,
+    // falls ein Quiz versehentlich mehrfach zugewiesen wurde.
+    $stmt = classroom_db()->prepare("
+        SELECT DISTINCT q.id
+        FROM teacher_class_quizzes tcq
+        JOIN quizzes quiz ON quiz.id = tcq.quiz_id
+        JOIN questions q ON q.quiz_id = quiz.id
+        WHERE tcq.class_id = :class_id
+          AND quiz.is_active = 1
+          AND q.status = 'published'
+        ORDER BY RAND()
+        LIMIT {$limit}
+    ");
     $stmt->execute(['class_id' => $classId]);
+
     return array_map('intval', array_column($stmt->fetchAll(), 'id'));
 }
 
