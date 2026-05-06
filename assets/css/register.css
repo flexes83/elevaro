@@ -426,3 +426,24 @@ body.register-page {
         min-height: 56px;
     }
 }
+
+
+.register-logo-clean {
+    font-size: clamp(2rem, 3vw, 2.8rem);
+    font-weight: 1000;
+    letter-spacing: -.06em;
+}
+
+.register-logo-clean span {
+    display: inline-block;
+}
+
+.register-beta-note {
+    position: relative;
+    z-index: 1;
+    margin-top: 34px;
+    color: rgba(255,255,255,.66);
+    font-size: .92rem;
+    font-weight: 700;
+    letter-spacing: .01em;
+}

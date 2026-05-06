@@ -72,16 +72,15 @@ function reg_h($value): string
 <main class="register-shell">
     <section class="register-card register-card-teacher">
         <aside class="register-hero-panel">
-            <a href="/" class="register-logo" aria-label="Elevaro Startseite">
-                <span class="register-logo-mark">e</span>
+            <a href="/" class="register-logo register-logo-clean" aria-label="Elevaro Startseite">
                 <span>Elevaro</span>
             </a>
 
             <div class="register-hero-content">
                 <span class="register-badge">Kostenloser Beta-Zugang</span>
-                <h1>Teste Elevaro mit deiner Klasse.</h1>
+                <h1>Unterrichtsmaterialien werden zu interaktiven Quizzes.</h1>
                 <p>
-                    Elevaro befindet sich aktuell in einer kleinen Beta mit ausgewählten Lehrkräften. Erstelle Klassenräume, teile Quizzes per QR-Code und gib uns Feedback aus dem echten Unterricht.
+                    Erstelle aus Arbeitsblättern, Buchseiten oder PDFs in wenigen Minuten interaktive Quizzes für deinen Unterricht. Teile Klassenräume per QR-Code und teste Elevaro aktuell kostenlos im kleinen Lehrkräfte-Kreis.
                 </p>
 
                 <div class="register-benefits">
@@ -92,15 +91,19 @@ function reg_h($value): string
                     </div>
                     <div class="register-benefit">
                         <span>🧠</span>
-                        <strong>Gemeinsam verbessern</strong>
-                        <small>Dein Feedback hilft, Elevaro schulnah weiterzuentwickeln.</small>
+                        <strong>KI-Quiz-Wizard</strong>
+                        <small>Arbeitsblatt hochladen → fertiges Quiz erhalten.</small>
                     </div>
                     <div class="register-benefit">
                         <span>🎮</span>
-                        <strong>Lebendiger Klassenraum</strong>
-                        <small>Quizzes, Duelle und Fortschritte an einem Ort.</small>
+                        <strong>Klassenräume & Duelle</strong>
+                        <small>Quizzes gemeinsam spielen, Fortschritte sehen und gegeneinander antreten.</small>
                     </div>
+                
+                <div class="register-beta-note">
+                    Kostenloser Zugang während der Beta • Kein Payment erforderlich
                 </div>
+</div>
             </div>
         </aside>
 
