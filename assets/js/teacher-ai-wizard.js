@@ -25,8 +25,19 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload || {})
     }).then(async res => {
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.ok) throw new Error(json.error || 'Anfrage fehlgeschlagen.');
+      const text = await res.text();
+      let json = {};
+      try {
+        json = text ? JSON.parse(text) : {};
+      } catch (e) {
+        const preview = text.replace(/\s+/g, ' ').slice(0, 500);
+        throw new Error(preview ? 'Serverantwort war kein JSON: ' + preview : 'Serverantwort war leer.');
+      }
+
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || 'Anfrage fehlgeschlagen.');
+      }
+
       return json;
     });
   }
@@ -341,15 +352,15 @@
   $('#aiPublishQuiz')?.addEventListener('click', async () => {
     try {
       const btn = $('#aiPublishQuiz');
-      btn.disabled = true; btn.textContent = 'Veröffentliche...';
+      btn.disabled = true; btn.textContent = 'Veröffentliche Quiz...';
       const payload = readPayload();
       if (!state.imagePath) {
         btn.textContent = 'Erstelle Quizbild...';
         try { await generateImage(false); } catch (e) {}
-        btn.textContent = 'Veröffentliche...';
+        btn.textContent = 'Veröffentliche Quiz...';
       }
       const res = await apiJson('/teacher/api/ai_wizard_publish.php', { draft_id: state.draftId, payload });
-      toast('Quiz wurde veröffentlicht.');
+      toast(res.image_pending ? 'Quiz wurde veröffentlicht. Das Bild wird später ergänzt.' : 'Quiz wurde veröffentlicht.');
       window.location.href = res.class_quizzes_url || '/teacher/quizzes.php';
     } catch (err) {
       toast(err.message || String(err));
