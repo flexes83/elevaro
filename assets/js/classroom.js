@@ -58,6 +58,13 @@
         return `<div class="duel-item"><strong>${escapeHtml(d.title)}</strong><small>${escapeHtml(d.quiz_title)}</small>${action}</div>`;
       }).join('') : '<div class="duel-empty">Fordere jemanden aus der Online-Liste heraus.</div>';
     }
+    const acceptedDuel = (data.duels || []).find((d) => d.status === 'accepted' && d.url);
+    if (acceptedDuel && !sessionStorage.getItem('elevaro_duel_redirect_' + acceptedDuel.id)) {
+      sessionStorage.setItem('elevaro_duel_redirect_' + acceptedDuel.id, '1');
+      window.location.href = acceptedDuel.url;
+      return;
+    }
+
     if (data.me?.avatar) {
       document.querySelectorAll('.me-pill .avatar-bubble').forEach((el) => {
         el.outerHTML = avatarMarkup(data.me.avatar);
@@ -139,5 +146,5 @@
   initialsInput?.addEventListener('input', syncInitialPreview);
   document.querySelector('[data-gradient]')?.classList.add('active');
   syncInitialPreview();
-  setInterval(() => request().catch(() => {}), 12000);
+  setInterval(() => request().catch(() => {}), 2000);
 })();

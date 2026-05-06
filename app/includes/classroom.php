@@ -67,6 +67,15 @@ function classroom_ensure_schema(): void
         status VARCHAR(32) NOT NULL DEFAULT 'pending',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         responded_at DATETIME NULL,
+        expires_at DATETIME NULL,
+        started_at DATETIME NULL,
+        question_ids TEXT NULL,
+        challenger_score INT UNSIGNED NOT NULL DEFAULT 0,
+        challenged_score INT UNSIGNED NOT NULL DEFAULT 0,
+        challenger_correct INT UNSIGNED NOT NULL DEFAULT 0,
+        challenged_correct INT UNSIGNED NOT NULL DEFAULT 0,
+        challenger_finished_at DATETIME NULL,
+        challenged_finished_at DATETIME NULL,
         KEY idx_classroom_duels_class (class_id, created_at),
         KEY idx_classroom_duels_challenged (challenged_participant_id, status),
         KEY idx_classroom_duels_challenger (challenger_participant_id, status)
@@ -75,11 +84,37 @@ function classroom_ensure_schema(): void
     foreach ([
         'quiz_id' => "ALTER TABLE classroom_duel_challenges ADD COLUMN quiz_id INT UNSIGNED NULL AFTER challenged_participant_id",
         'responded_at' => "ALTER TABLE classroom_duel_challenges ADD COLUMN responded_at DATETIME NULL AFTER created_at",
+        'expires_at' => "ALTER TABLE classroom_duel_challenges ADD COLUMN expires_at DATETIME NULL AFTER responded_at",
+        'started_at' => "ALTER TABLE classroom_duel_challenges ADD COLUMN started_at DATETIME NULL AFTER expires_at",
+        'question_ids' => "ALTER TABLE classroom_duel_challenges ADD COLUMN question_ids TEXT NULL AFTER started_at",
+        'challenger_score' => "ALTER TABLE classroom_duel_challenges ADD COLUMN challenger_score INT UNSIGNED NOT NULL DEFAULT 0 AFTER question_ids",
+        'challenged_score' => "ALTER TABLE classroom_duel_challenges ADD COLUMN challenged_score INT UNSIGNED NOT NULL DEFAULT 0 AFTER challenger_score",
+        'challenger_correct' => "ALTER TABLE classroom_duel_challenges ADD COLUMN challenger_correct INT UNSIGNED NOT NULL DEFAULT 0 AFTER challenged_score",
+        'challenged_correct' => "ALTER TABLE classroom_duel_challenges ADD COLUMN challenged_correct INT UNSIGNED NOT NULL DEFAULT 0 AFTER challenger_correct",
+        'challenger_finished_at' => "ALTER TABLE classroom_duel_challenges ADD COLUMN challenger_finished_at DATETIME NULL AFTER challenged_correct",
+        'challenged_finished_at' => "ALTER TABLE classroom_duel_challenges ADD COLUMN challenged_finished_at DATETIME NULL AFTER challenger_finished_at",
     ] as $column => $sql) {
         if (!elevaro_access_column_exists('classroom_duel_challenges', $column)) {
             try { $pdo->exec($sql); } catch (Throwable $e) {}
         }
     }
+
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS classroom_duel_answers (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        duel_id INT UNSIGNED NOT NULL,
+        class_id INT UNSIGNED NOT NULL,
+        participant_id INT UNSIGNED NOT NULL,
+        question_id INT UNSIGNED NOT NULL,
+        selected_answer TEXT NULL,
+        correct_answer TEXT NULL,
+        is_correct TINYINT(1) NOT NULL DEFAULT 0,
+        response_time_ms INT UNSIGNED NULL,
+        answered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_duel_participant_question (duel_id, participant_id, question_id),
+        KEY idx_classroom_duel_answers_duel (duel_id),
+        KEY idx_classroom_duel_answers_participant (participant_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS classroom_quiz_sessions (
         id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -435,31 +470,65 @@ function classroom_first_quiz(int $classId): ?array
 
 function classroom_create_duel(int $classId, array $challenger, int $targetId): void
 {
+    classroom_ensure_schema();
     $pdo = classroom_db();
     $stmt = $pdo->prepare("SELECT * FROM classroom_participants WHERE id = :id AND class_id = :class_id LIMIT 1");
     $stmt->execute(['id' => $targetId, 'class_id' => $classId]);
     $target = $stmt->fetch();
     if (!$target || (int)$target['id'] === (int)$challenger['id']) return;
 
-    $stmt = $pdo->prepare("SELECT id FROM classroom_duel_challenges WHERE class_id = :class_id AND challenger_participant_id = :challenger AND challenged_participant_id = :challenged AND status = 'pending' AND created_at >= (NOW() - INTERVAL 2 MINUTE) LIMIT 1");
+    // Abgelaufene offene Anfragen aufräumen, damit sie in der UI verschwinden.
+    $pdo->prepare("UPDATE classroom_duel_challenges SET status = 'expired', responded_at = NOW() WHERE class_id = :class_id AND status = 'pending' AND expires_at IS NOT NULL AND expires_at < NOW()")
+        ->execute(['class_id' => $classId]);
+
+    $stmt = $pdo->prepare("SELECT id FROM classroom_duel_challenges WHERE class_id = :class_id AND challenger_participant_id = :challenger AND challenged_participant_id = :challenged AND status = 'pending' AND (expires_at IS NULL OR expires_at >= NOW()) LIMIT 1");
     $stmt->execute(['class_id' => $classId, 'challenger' => (int)$challenger['id'], 'challenged' => $targetId]);
     if ($stmt->fetch()) return;
 
-    $quiz = classroom_first_quiz($classId);
-    $pdo->prepare("INSERT INTO classroom_duel_challenges (class_id, challenger_participant_id, challenged_participant_id, quiz_id) VALUES (:class_id, :challenger, :challenged, :quiz_id)")
-        ->execute(['class_id' => $classId, 'challenger' => (int)$challenger['id'], 'challenged' => $targetId, 'quiz_id' => $quiz ? (int)$quiz['id'] : null]);
+    $questionIds = classroom_pick_duel_question_ids($classId, 10);
+    if (!$questionIds) return;
+
+    $firstQuizId = classroom_quiz_id_for_question((int)$questionIds[0]);
+    $pdo->prepare("INSERT INTO classroom_duel_challenges (class_id, challenger_participant_id, challenged_participant_id, quiz_id, question_ids, expires_at) VALUES (:class_id, :challenger, :challenged, :quiz_id, :question_ids, DATE_ADD(NOW(), INTERVAL 5 MINUTE))")
+        ->execute([
+            'class_id' => $classId,
+            'challenger' => (int)$challenger['id'],
+            'challenged' => $targetId,
+            'quiz_id' => $firstQuizId ?: null,
+            'question_ids' => json_encode($questionIds),
+        ]);
     classroom_log_activity($classId, (int)$challenger['id'], 'duel', $challenger['display_name'] . ' fordert ' . $target['display_name'] . ' zum Quizduell heraus.', '');
+}
+
+function classroom_quiz_id_for_question(int $questionId): ?int
+{
+    $stmt = classroom_db()->prepare("SELECT quiz_id FROM questions WHERE id = :id LIMIT 1");
+    $stmt->execute(['id' => $questionId]);
+    $quizId = (int)$stmt->fetchColumn();
+    return $quizId > 0 ? $quizId : null;
+}
+
+function classroom_pick_duel_question_ids(int $classId, int $limit = 10): array
+{
+    classroom_ensure_schema();
+    $limit = max(8, min(10, $limit));
+    $stmt = classroom_db()->prepare("\n        SELECT q.id\n        FROM teacher_class_quizzes tcq\n        JOIN questions q ON q.quiz_id = tcq.quiz_id\n        WHERE tcq.class_id = :class_id\n          AND q.status = 'published'\n        ORDER BY RAND()\n        LIMIT {$limit}\n    ");
+    $stmt->execute(['class_id' => $classId]);
+    return array_map('intval', array_column($stmt->fetchAll(), 'id'));
+}
+
+function classroom_duel_question_ids(array $duel): array
+{
+    $raw = (string)($duel['question_ids'] ?? '');
+    $ids = $raw !== '' ? json_decode($raw, true) : [];
+    if (!is_array($ids)) return [];
+    return array_values(array_filter(array_map('intval', $ids)));
 }
 
 function classroom_duel_url(array $duel): ?string
 {
-    $quizId = (int)($duel['quiz_id'] ?? 0);
-    if (!$quizId) return null;
-    $stmt = classroom_db()->prepare("SELECT quiz_key FROM quizzes WHERE id = :id AND is_active = 1 LIMIT 1");
-    $stmt->execute(['id' => $quizId]);
-    $quizKey = (string)($stmt->fetchColumn() ?: '');
-    if ($quizKey === '') return null;
-    return '/quiz.php?key=' . urlencode($quizKey) . '&class_id=' . (int)$duel['class_id'] . '&duel_id=' . (int)$duel['id'];
+    if (empty($duel['id']) || empty($duel['class_id'])) return null;
+    return '/duel.php?class_id=' . (int)$duel['class_id'] . '&duel_id=' . (int)$duel['id'];
 }
 
 function classroom_duels_for_participant(int $classId, int $participantId): array
@@ -474,8 +543,10 @@ function classroom_duels_for_participant(int $classId, int $participantId): arra
         LEFT JOIN quizzes q ON q.id = d.quiz_id
         WHERE d.class_id = :class_id
           AND (d.challenger_participant_id = :participant_id_challenger OR d.challenged_participant_id = :participant_id_challenged)
-          AND d.status IN ('pending','accepted')
-          AND d.created_at >= (NOW() - INTERVAL 20 MINUTE)
+          AND (
+            (d.status = 'pending' AND (d.expires_at IS NULL OR d.expires_at >= NOW()))
+            OR (d.status = 'accepted' AND (d.started_at IS NULL OR d.started_at >= (NOW() - INTERVAL 2 MINUTE)))
+          )
         ORDER BY d.created_at DESC, d.id DESC
         LIMIT 10
     ");
@@ -485,17 +556,34 @@ function classroom_duels_for_participant(int $classId, int $participantId): arra
 
 function classroom_respond_duel(int $classId, int $participantId, int $duelId, string $status): ?array
 {
+    classroom_ensure_schema();
     $status = $status === 'accepted' ? 'accepted' : 'declined';
-    $stmt = classroom_db()->prepare("SELECT d.*, c.display_name AS challenger_name, p.display_name AS challenged_name FROM classroom_duel_challenges d JOIN classroom_participants c ON c.id = d.challenger_participant_id JOIN classroom_participants p ON p.id = d.challenged_participant_id WHERE d.id = :id AND d.class_id = :class_id AND d.challenged_participant_id = :participant_id AND d.status = 'pending' LIMIT 1");
+    $stmt = classroom_db()->prepare("SELECT d.*, c.display_name AS challenger_name, p.display_name AS challenged_name FROM classroom_duel_challenges d JOIN classroom_participants c ON c.id = d.challenger_participant_id JOIN classroom_participants p ON p.id = d.challenged_participant_id WHERE d.id = :id AND d.class_id = :class_id AND d.challenged_participant_id = :participant_id AND d.status = 'pending' AND (d.expires_at IS NULL OR d.expires_at >= NOW()) LIMIT 1");
     $stmt->execute(['id' => $duelId, 'class_id' => $classId, 'participant_id' => $participantId]);
     $duel = $stmt->fetch();
     if (!$duel) return null;
-    classroom_db()->prepare("UPDATE classroom_duel_challenges SET status = :status, responded_at = NOW() WHERE id = :id")->execute(['status' => $status, 'id' => $duelId]);
+
+    if ($status === 'accepted') {
+        $questionIds = classroom_duel_question_ids($duel);
+        if (!$questionIds) {
+            $questionIds = classroom_pick_duel_question_ids($classId, 10);
+            $duel['question_ids'] = json_encode($questionIds);
+        }
+        if (!$questionIds) return null;
+        $firstQuizId = (int)($duel['quiz_id'] ?? 0) ?: classroom_quiz_id_for_question((int)$questionIds[0]);
+        classroom_db()->prepare("UPDATE classroom_duel_challenges SET status = 'accepted', responded_at = NOW(), started_at = NOW(), quiz_id = :quiz_id, question_ids = :question_ids WHERE id = :id")
+            ->execute(['quiz_id' => $firstQuizId ?: null, 'question_ids' => json_encode($questionIds), 'id' => $duelId]);
+    } else {
+        classroom_db()->prepare("UPDATE classroom_duel_challenges SET status = 'declined', responded_at = NOW() WHERE id = :id")
+            ->execute(['id' => $duelId]);
+    }
+
     $title = $status === 'accepted'
         ? $duel['challenged_name'] . ' nimmt das Quizduell gegen ' . $duel['challenger_name'] . ' an.'
         : $duel['challenged_name'] . ' lehnt das Quizduell ab.';
     classroom_log_activity($classId, $participantId, 'duel_' . $status, $title, '');
     $duel['status'] = $status;
+    $duel['started_at'] = $status === 'accepted' ? date('Y-m-d H:i:s') : ($duel['started_at'] ?? null);
     return $duel;
 }
 
@@ -722,6 +810,210 @@ function classroom_duel_result(int $duelId, int $participantId): ?array
         'other_points' => $other ? (int)$other['score_points'] : null,
         'other_correct' => $other ? (int)$other['correct_answers'] : null,
     ];
+}
+
+
+function classroom_duel_by_id(int $classId, int $duelId): ?array
+{
+    classroom_ensure_schema();
+    $stmt = classroom_db()->prepare("\n        SELECT d.*, c.display_name AS challenger_name, c.avatar_emoji AS challenger_avatar, c.avatar_type AS challenger_avatar_type, c.avatar_gradient AS challenger_avatar_gradient,\n               p.display_name AS challenged_name, p.avatar_emoji AS challenged_avatar, p.avatar_type AS challenged_avatar_type, p.avatar_gradient AS challenged_avatar_gradient\n        FROM classroom_duel_challenges d\n        JOIN classroom_participants c ON c.id = d.challenger_participant_id\n        JOIN classroom_participants p ON p.id = d.challenged_participant_id\n        WHERE d.id = :id AND d.class_id = :class_id\n        LIMIT 1\n    ");
+    $stmt->execute(['id' => $duelId, 'class_id' => $classId]);
+    return $stmt->fetch() ?: null;
+}
+
+function classroom_participant_in_duel(array $duel, int $participantId): bool
+{
+    return (int)$duel['challenger_participant_id'] === $participantId || (int)$duel['challenged_participant_id'] === $participantId;
+}
+
+function classroom_duel_questions_payload(array $duel): array
+{
+    $ids = classroom_duel_question_ids($duel);
+    if (!$ids) return [];
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $stmt = classroom_db()->prepare("\n        SELECT q.*, quiz.title AS quiz_title, quiz.quiz_key\n        FROM questions q\n        JOIN quizzes quiz ON quiz.id = q.quiz_id\n        WHERE q.id IN ({$placeholders})\n          AND q.status = 'published'\n    ");
+    $stmt->execute($ids);
+    $rows = [];
+    foreach ($stmt->fetchAll() as $row) $rows[(int)$row['id']] = $row;
+    if (!$rows) return [];
+
+    $optionsStmt = classroom_db()->prepare("\n        SELECT *\n        FROM question_options\n        WHERE question_id IN ({$placeholders})\n        ORDER BY question_id ASC, sort_order ASC, id ASC\n    ");
+    $optionsStmt->execute($ids);
+    $optionsByQuestion = [];
+    foreach ($optionsStmt->fetchAll() as $option) {
+        $qid = (int)$option['question_id'];
+        $optionsByQuestion[$qid][] = [
+            'text' => (string)$option['option_text'],
+            'label' => (string)$option['option_text'],
+            'media' => [
+                'type' => $option['media_type'] ?? 'none',
+                'path' => $option['media_path'] ?? null,
+                'alt' => $option['media_alt'] ?? null,
+                'credit' => $option['media_credit'] ?? null,
+                'source' => $option['media_source'] ?? null,
+            ],
+        ];
+    }
+
+    $payload = [];
+    foreach ($ids as $id) {
+        if (empty($rows[$id])) continue;
+        $q = $rows[$id];
+        $options = $optionsByQuestion[$id] ?? [];
+        if (count($options) > 1) shuffle($options);
+        $payload[] = [
+            'id' => $id,
+            'quiz_id' => (int)$q['quiz_id'],
+            'quiz_title' => (string)($q['quiz_title'] ?? ''),
+            'type' => (string)$q['type'],
+            'question' => (string)$q['question_text'],
+            'options' => $options,
+            'answer' => (string)$q['correct_answer'],
+            'fact' => (string)($q['explanation'] ?? ''),
+            'media' => [
+                'type' => $q['media_type'] ?? 'none',
+                'path' => $q['media_path'] ?? null,
+                'alt' => $q['media_alt'] ?? null,
+                'credit' => $q['media_credit'] ?? null,
+                'source' => $q['media_source'] ?? null,
+            ],
+            'audio' => [
+                'text' => $q['audio_text'] ?? null,
+                'path' => $q['audio_path'] ?? null,
+                'status' => $q['audio_status'] ?? 'none',
+            ],
+        ];
+    }
+    return $payload;
+}
+
+function classroom_duel_answers(int $duelId): array
+{
+    $stmt = classroom_db()->prepare("SELECT * FROM classroom_duel_answers WHERE duel_id = :duel_id ORDER BY answered_at ASC, id ASC");
+    $stmt->execute(['duel_id' => $duelId]);
+    return $stmt->fetchAll();
+}
+
+function classroom_record_duel_answer(int $classId, int $duelId, int $participantId, int $questionId, string $selectedAnswer, ?int $responseTimeMs = null): array
+{
+    classroom_ensure_schema();
+    $duel = classroom_duel_by_id($classId, $duelId);
+    if (!$duel || $duel['status'] !== 'accepted' || !classroom_participant_in_duel($duel, $participantId)) {
+        throw new RuntimeException('Dieses Duell ist nicht aktiv.');
+    }
+    $ids = classroom_duel_question_ids($duel);
+    if (!in_array($questionId, $ids, true)) {
+        throw new RuntimeException('Diese Frage gehört nicht zum Duell.');
+    }
+
+    $stmt = classroom_db()->prepare("SELECT correct_answer FROM questions WHERE id = :id LIMIT 1");
+    $stmt->execute(['id' => $questionId]);
+    $correctAnswer = (string)($stmt->fetchColumn() ?: '');
+    $isCorrect = $selectedAnswer !== '' && $selectedAnswer === $correctAnswer;
+
+    $pdo = classroom_db();
+    $stmt = $pdo->prepare("\n        INSERT INTO classroom_duel_answers (duel_id, class_id, participant_id, question_id, selected_answer, correct_answer, is_correct, response_time_ms)\n        VALUES (:duel_id, :class_id, :participant_id, :question_id, :selected_answer, :correct_answer, :is_correct, :response_time_ms)\n        ON DUPLICATE KEY UPDATE selected_answer = selected_answer\n    ");
+    $stmt->execute([
+        'duel_id' => $duelId,
+        'class_id' => $classId,
+        'participant_id' => $participantId,
+        'question_id' => $questionId,
+        'selected_answer' => $selectedAnswer,
+        'correct_answer' => $correctAnswer,
+        'is_correct' => $isCorrect ? 1 : 0,
+        'response_time_ms' => $responseTimeMs,
+    ]);
+
+    classroom_update_duel_score($duelId);
+    return ['selected_answer' => $selectedAnswer, 'correct_answer' => $correctAnswer, 'is_correct' => $isCorrect];
+}
+
+function classroom_update_duel_score(int $duelId): void
+{
+    $stmt = classroom_db()->prepare("SELECT * FROM classroom_duel_challenges WHERE id = :id LIMIT 1");
+    $stmt->execute(['id' => $duelId]);
+    $duel = $stmt->fetch();
+    if (!$duel) return;
+    $answers = classroom_duel_answers($duelId);
+    $challengerCorrect = 0; $challengedCorrect = 0;
+    foreach ($answers as $a) {
+        if (!$a['is_correct']) continue;
+        if ((int)$a['participant_id'] === (int)$duel['challenger_participant_id']) $challengerCorrect++;
+        if ((int)$a['participant_id'] === (int)$duel['challenged_participant_id']) $challengedCorrect++;
+    }
+    $total = count(classroom_duel_question_ids($duel));
+    $challengerAnswered = 0; $challengedAnswered = 0;
+    foreach ($answers as $a) {
+        if ((int)$a['participant_id'] === (int)$duel['challenger_participant_id']) $challengerAnswered++;
+        if ((int)$a['participant_id'] === (int)$duel['challenged_participant_id']) $challengedAnswered++;
+    }
+    classroom_db()->prepare("\n        UPDATE classroom_duel_challenges\n        SET challenger_correct = :challenger_correct,\n            challenged_correct = :challenged_correct,\n            challenger_score = :challenger_score,\n            challenged_score = :challenged_score,\n            challenger_finished_at = IF(:challenger_done = 1 AND challenger_finished_at IS NULL, NOW(), challenger_finished_at),\n            challenged_finished_at = IF(:challenged_done = 1 AND challenged_finished_at IS NULL, NOW(), challenged_finished_at)\n        WHERE id = :id\n    ")->execute([
+        'challenger_correct' => $challengerCorrect,
+        'challenged_correct' => $challengedCorrect,
+        'challenger_score' => $challengerCorrect * 10,
+        'challenged_score' => $challengedCorrect * 10,
+        'challenger_done' => ($total > 0 && $challengerAnswered >= $total) ? 1 : 0,
+        'challenged_done' => ($total > 0 && $challengedAnswered >= $total) ? 1 : 0,
+        'id' => $duelId,
+    ]);
+}
+
+function classroom_duel_state(int $classId, int $duelId, int $participantId): array
+{
+    $duel = classroom_duel_by_id($classId, $duelId);
+    if (!$duel || !classroom_participant_in_duel($duel, $participantId)) {
+        throw new RuntimeException('Duell nicht gefunden.');
+    }
+    $answers = classroom_duel_answers($duelId);
+    $byQuestion = [];
+    foreach ($answers as $a) {
+        $byQuestion[(int)$a['question_id']][(int)$a['participant_id']] = [
+            'participant_id' => (int)$a['participant_id'],
+            'selected_answer' => (string)$a['selected_answer'],
+            'correct_answer' => (string)$a['correct_answer'],
+            'is_correct' => (bool)$a['is_correct'],
+            'answered_at' => (string)$a['answered_at'],
+        ];
+    }
+    $questionCount = count(classroom_duel_question_ids($duel));
+    $challengerDone = !empty($duel['challenger_finished_at']);
+    $challengedDone = !empty($duel['challenged_finished_at']);
+    $finished = $questionCount > 0 && $challengerDone && $challengedDone;
+    $myIsChallenger = (int)$duel['challenger_participant_id'] === $participantId;
+    $myCorrect = $myIsChallenger ? (int)$duel['challenger_correct'] : (int)$duel['challenged_correct'];
+    $otherCorrect = $myIsChallenger ? (int)$duel['challenged_correct'] : (int)$duel['challenger_correct'];
+    $outcome = 'waiting';
+    if ($finished) {
+        $outcome = $myCorrect === $otherCorrect ? 'draw' : ($myCorrect > $otherCorrect ? 'won' : 'lost');
+    }
+    return [
+        'duel' => [
+            'id' => (int)$duel['id'],
+            'status' => (string)$duel['status'],
+            'started_at' => (string)($duel['started_at'] ?? ''),
+            'question_count' => $questionCount,
+            'finished' => $finished,
+            'outcome' => $outcome,
+            'my_correct' => $myCorrect,
+            'other_correct' => $otherCorrect,
+            'challenger_correct' => (int)$duel['challenger_correct'],
+            'challenged_correct' => (int)$duel['challenged_correct'],
+        ],
+        'answers' => $byQuestion,
+    ];
+}
+
+function classroom_create_rematch(int $classId, int $participantId, int $duelId): ?int
+{
+    $duel = classroom_duel_by_id($classId, $duelId);
+    if (!$duel || !classroom_participant_in_duel($duel, $participantId)) return null;
+    $targetId = (int)$duel['challenger_participant_id'] === $participantId ? (int)$duel['challenged_participant_id'] : (int)$duel['challenger_participant_id'];
+    $stmt = classroom_db()->prepare("SELECT * FROM classroom_participants WHERE id = :id AND class_id = :class_id LIMIT 1");
+    $stmt->execute(['id' => $participantId, 'class_id' => $classId]);
+    $me = $stmt->fetch();
+    if (!$me) return null;
+    classroom_create_duel($classId, $me, $targetId);
+    return $targetId;
 }
 
 function classroom_highscores(int $classId, ?int $quizId = null, int $limit = 10): array
