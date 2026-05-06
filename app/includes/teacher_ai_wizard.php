@@ -2,6 +2,54 @@
 
 declare(strict_types=1);
 
+
+function elevaro_teacher_ai_debug_enabled(): bool
+{
+    return defined('ELEVARO_AI_WIZARD_DEBUG') && ELEVARO_AI_WIZARD_DEBUG === true;
+}
+
+function elevaro_teacher_ai_debug_dir(): string
+{
+    $dir = dirname(__DIR__, 2) . '/storage/ai_wizard_debug';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    return $dir;
+}
+
+function elevaro_teacher_ai_debug_log(string $stage, array $context = []): void
+{
+    if (!elevaro_teacher_ai_debug_enabled()) {
+        return;
+    }
+
+    $dir = elevaro_teacher_ai_debug_dir();
+    $line = '[' . date('Y-m-d H:i:s') . '] ' . $stage . ' ' . json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL;
+    @file_put_contents($dir . '/debug.log', $line, FILE_APPEND);
+}
+
+function elevaro_teacher_ai_debug_dump_response(string $stage, string $content, array $meta = []): string
+{
+    if (!elevaro_teacher_ai_debug_enabled()) {
+        return '';
+    }
+
+    $dir = elevaro_teacher_ai_debug_dir();
+    $safeStage = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $stage);
+    $file = $safeStage . '_' . date('Ymd_His') . '_' . substr(sha1($content . microtime(true)), 0, 8) . '.txt';
+
+    $header = "STAGE: {$stage}\n";
+    $header .= "TIME: " . date('c') . "\n";
+    $header .= "LENGTH: " . strlen($content) . " bytes\n";
+    $header .= "META: " . json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n";
+    $header .= str_repeat('-', 80) . "\n\n";
+
+    @file_put_contents($dir . '/' . $file, $header . $content);
+
+    return $file;
+}
+
+
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/openai_client.php';
 require_once __DIR__ . '/image_tools.php';
@@ -500,7 +548,7 @@ function elevaro_teacher_ai_generation_schema(): array
     ];
 }
 
-function elevaro_teacher_ai_decode_openai_json(string $content): array
+function elevaro_teacher_ai_decode_openai_json(string $content, string $debugStage = 'unknown'): array
 {
     $content = trim($content);
     $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
@@ -542,10 +590,16 @@ function elevaro_teacher_ai_decode_openai_json(string $content): array
 
     $preview = mb_substr(preg_replace('/\s+/', ' ', $content), 0, 700);
     $looksTruncated = (strpos($content, '{') !== false && strrpos($content, '}') !== strlen(rtrim($content)) - 1);
+    $dumpFile = elevaro_teacher_ai_debug_dump_response($debugStage . '_invalid_json', $content, [
+        'looks_truncated' => $looksTruncated,
+        'first_char' => mb_substr($content, 0, 1),
+        'last_char' => mb_substr(rtrim($content), -1),
+    ]);
     $hint = $looksTruncated
-        ? ' Die Antwort wirkt abgeschnitten. Bitte starte die Generierung erneut; die Ausgabe-Länge wurde in diesem Patch erhöht.'
+        ? ' Die Antwort wirkt abgeschnitten.'
         : '';
-    throw new RuntimeException('OpenAI-Antwort war kein valides JSON.' . $hint . ' Antwortauszug: ' . $preview);
+    $debugHint = $dumpFile ? ' Debug-Datei: storage/ai_wizard_debug/' . $dumpFile . '.' : '';
+    throw new RuntimeException('OpenAI-Antwort war kein valides JSON.' . $hint . $debugHint . ' Antwortauszug: ' . $preview);
 }
 
 function elevaro_teacher_ai_normalize_payload(array $payload, string $mode): array
@@ -840,7 +894,7 @@ if (!function_exists('elevaro_teacher_ai_poll_background_draft')) {
         if ($content === '') {
             throw new RuntimeException('OpenAI hat keine auswertbare Antwort geliefert.');
         }
-        $json = elevaro_teacher_ai_decode_openai_json($content);
+        $json = elevaro_teacher_ai_decode_openai_json($content, $debugStage ?? 'unknown');
         $payload = elevaro_teacher_ai_normalize_payload($json, (string)($draft['mode'] ?? 'quiz'));
 
         $stmt = elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts

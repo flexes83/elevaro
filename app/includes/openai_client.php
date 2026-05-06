@@ -239,8 +239,20 @@ if (!function_exists('elevaro_openai_responses_json')) {
         if ($content === '') {
             throw new RuntimeException('OpenAI response did not contain text content.');
         }
+        $debugStage = (string)($config['debug_stage'] ?? 'responses_json');
+        if (function_exists('elevaro_teacher_ai_debug_log')) {
+            elevaro_teacher_ai_debug_log('openai_response_received', [
+                'stage' => $debugStage,
+                'content_length' => strlen($content),
+                'response_keys' => is_array($raw) ? array_keys($raw) : [],
+                'status' => $raw['status'] ?? null,
+                'finish_reason' => $raw['output'][0]['finish_reason'] ?? null,
+                'incomplete_details' => $raw['incomplete_details'] ?? null,
+            ]);
+        }
+
         if (function_exists('elevaro_teacher_ai_decode_openai_json')) {
-            $json = elevaro_teacher_ai_decode_openai_json($content);
+            $json = elevaro_teacher_ai_decode_openai_json($content, $debugStage);
         } else {
             $json = json_decode($content, true);
             if (!is_array($json)) {
