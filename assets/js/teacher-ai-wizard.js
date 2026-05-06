@@ -47,7 +47,8 @@
     'Inhalte werden pädagogisch sortiert...',
     'Fragen werden altersgerecht formuliert...',
     'Antwortmöglichkeiten werden geprüft...',
-    'Der Quizentwurf wird vorbereitet...'
+    'Plausibilität und fachliche Richtigkeit werden geprüft...',
+    'Der Quizentwurf wird finalisiert...'
   ];
   let loadingTimer = null;
   function startLoadingCopy() {
@@ -77,7 +78,9 @@
     if (!status) return 12;
     if (status === 'analysis_done') return 28;
     const match = String(status).match(/^questions_(\d+)/);
-    if (match) return 28 + Math.round((Number(match[1]) / 6) * 62);
+    if (match) return 28 + Math.round((Number(match[1]) / 6) * 58);
+    if (status === 'plausibility') return 93;
+    if (status === 'done') return 100;
     return 14;
   }
 
@@ -139,6 +142,7 @@
     $('#aiImagePrompt').value = p.image_prompt || '';
     $('#aiListeningText').value = p.listening_text || '';
     $('#aiListeningBox').classList.toggle('d-none', p.mode !== 'listening');
+    renderPlausibilityReview();
     renderQuestions();
     updatePublishSummary();
   }
@@ -166,6 +170,46 @@
       questions
     };
     return state.payload;
+  }
+
+
+  function renderPlausibilityReview() {
+    const p = state.payload || {};
+    let box = $('#aiPlausibilityReview');
+    const questionEditor = $('#aiQuestionEditor');
+    if (!questionEditor) return;
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'aiPlausibilityReview';
+      questionEditor.parentNode.insertBefore(box, questionEditor);
+    }
+
+    const review = p.plausibility_review || null;
+    if (!review) {
+      box.innerHTML = '';
+      box.classList.add('d-none');
+      return;
+    }
+
+    box.classList.remove('d-none');
+    const issues = Array.isArray(review.issues) ? review.issues : [];
+    const notes = Array.isArray(review.teacher_notes) ? review.teacher_notes : [];
+    const status = review.overall_status === 'ok' ? 'Sieht gut aus' : 'Bitte kurz prüfen';
+    const issueHtml = issues.length
+      ? `<ul>${issues.slice(0, 8).map(i => `<li><strong>Frage ${Number(i.question_number || 0)}:</strong> ${esc(i.message || '')}${i.suggestion ? `<br><small>${esc(i.suggestion)}</small>` : ''}</li>`).join('')}</ul>`
+      : '<p>Keine kritischen Auffälligkeiten gefunden.</p>';
+    const noteHtml = notes.length ? `<div class="ai-plausibility-notes">${notes.slice(0, 4).map(n => `<span>${esc(n)}</span>`).join('')}</div>` : '';
+
+    box.innerHTML = `
+      <div class="ai-plausibility-card ${review.overall_status === 'ok' ? 'is-ok' : 'needs-review'}">
+        <div class="ai-plausibility-head">
+          <span>✅ Plausibilitätsprüfung</span>
+          <strong>${esc(status)}</strong>
+        </div>
+        <p>${esc(review.coverage_summary || 'Die Fragen wurden fachlich, didaktisch und auf Materialbezug geprüft.')}</p>
+        ${issueHtml}
+        ${noteHtml}
+      </div>`;
   }
 
   function renderQuestions() {
