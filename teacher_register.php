@@ -4,7 +4,7 @@ require_once __DIR__ . '/app/includes/auth.php';
 auth_start_session();
 
 if (auth_is_logged_in()) {
-    header('Location: /teacher/dashboard.php');
+    header('Location: /teacher_dashboard.php');
     exit;
 }
 
@@ -40,9 +40,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'has_active_access' => 1,
         ], true);
 
-        auth_login_by_user_id($userId);
+        auth_force_login_user_id($userId);
 
-        header('Location: /teacher/dashboard.php?welcome=1');
+        header('Location: /teacher_dashboard.php?welcome=1');
         exit;
 
     } catch (Throwable $e) {
@@ -165,7 +165,7 @@ function reg_h($value): string
 
                 <div class="register-footer">
                     Bereits registriert?
-                    <a href="/login.php?return=/teacher/dashboard.php">Zum Login</a>
+                    <a href="/login.php?return=/teacher_dashboard.php">Zum Login</a>
                 </div>
             </form>
         </div>

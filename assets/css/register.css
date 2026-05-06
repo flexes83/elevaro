@@ -457,9 +457,7 @@ body.register-page {
 .teacher-register-page .register-hero-content h1 {
     max-width: 610px;
     font-size: clamp(3.15rem, 5.4vw, 5.75rem);
-    line-height: .91;
-    letter-spacing: -.085em;
-    font-weight: 850;
+    line-height: .91;    font-weight: 850;
     text-wrap: balance;
 }
 
@@ -472,9 +470,7 @@ body.register-page {
 
 .teacher-register-page .register-logo-clean {
     font-size: clamp(1.95rem, 2.5vw, 2.45rem);
-    font-weight: 850;
-    letter-spacing: -.075em;
-}
+    font-weight: 850;}
 
 .teacher-register-page .register-badge {
     letter-spacing: .095em;
@@ -496,9 +492,7 @@ body.register-page {
 }
 
 .teacher-register-page .register-benefit strong {
-    font-size: 1.02rem;
-    letter-spacing: -.025em;
-}
+    font-size: 1.02rem;}
 
 .teacher-register-page .register-benefit small {
     font-size: .93rem;
@@ -524,7 +518,13 @@ body.register-page {
 
 @media (max-width: 640px) {
     .teacher-register-page .register-hero-content h1 {
-        font-size: clamp(2.45rem, 12vw, 3.65rem);
-        letter-spacing: -.075em;
-    }
+        font-size: clamp(2.45rem, 12vw, 3.65rem);    }
+}
+
+
+/* Teacher register: neutralize over-tight lettering */
+.teacher-register-page .register-hero-content h1,
+.teacher-register-page .register-logo-clean,
+.teacher-register-page .register-logo-clean span {
+    letter-spacing: normal;
 }
