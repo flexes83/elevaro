@@ -63,6 +63,35 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
               </label>
             </div>
 
+            <label class="form-label fw-bold mt-4">Was soll aus dem Material entstehen?</label>
+            <div class="ai-intent-grid">
+              <label class="ai-intent-card is-selected">
+                <input type="radio" name="material_goal" value="auto" checked>
+                <strong>KI entscheiden lassen</strong>
+                <small>Erkennt automatisch, ob es ein Lesetext, Arbeitsblatt, Vokabelliste oder Grammatikübung ist.</small>
+              </label>
+              <label class="ai-intent-card">
+                <input type="radio" name="material_goal" value="content">
+                <strong>Inhalt abfragen</strong>
+                <small>Für Sachtexte, Lesetexte oder Themenblätter.</small>
+              </label>
+              <label class="ai-intent-card">
+                <input type="radio" name="material_goal" value="practice">
+                <strong>Ähnliche Übungen</strong>
+                <small>Für Arbeitsblätter, Lückentexte oder Aufgabenformate.</small>
+              </label>
+              <label class="ai-intent-card">
+                <input type="radio" name="material_goal" value="vocabulary">
+                <strong>Vokabeltraining</strong>
+                <small>Für Fremdsprachen, Wortlisten und Satzergänzungen.</small>
+              </label>
+              <label class="ai-intent-card">
+                <input type="radio" name="material_goal" value="grammar">
+                <strong>Grammatiktraining</strong>
+                <small>Für Pronomen, Zeiten, Satzbau und ähnliche Strukturen.</small>
+              </label>
+            </div>
+
             <label class="form-label fw-bold mt-4">Material hochladen</label>
             <input class="form-control form-control-lg" type="file" name="source_files[]" multiple accept="application/pdf,image/jpeg,image/png,image/webp">
             <div class="form-text">PDF, JPG, PNG oder WebP. Fotos vom Arbeitsblatt oder Buchseite sind okay.</div>
@@ -86,6 +115,7 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
               <li>Klasse, Schulart, Fach und Klassenstufe</li>
               <li>dein hochgeladenes Material</li>
               <li>deine Zusatzanweisungen</li>
+              <li>ob Inhalte abgefragt oder ähnliche Übungen erstellt werden sollen</li>
               <li>bei Listening: Ziel Sprache + Sprechertext</li>
             </ul>
             <div class="ai-warning">Wichtig: Die KI erstellt einen Entwurf. Vor Veröffentlichung bitte Fragen und Antworten prüfen.</div>
@@ -102,7 +132,7 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
       </div>
       <h3>Elevaro baut dein Quiz</h3>
       <p id="aiWizardProgressText">Material wird gelesen und didaktisch sortiert...</p>
-      <div class="ai-progress"><i id="aiWizardProgressBar"></i></div>
+      <div class="ai-progress"><i></i></div>
       <div class="ai-progress-list">
         <span data-loading-copy>📄 Quelle verstehen</span>
         <span data-loading-copy>🧠 Fragen entwickeln</span>

@@ -1077,6 +1077,22 @@ if (!function_exists('elevaro_teacher_ai_analysis_schema')) {
                 'language' => ['type' => 'string'],
                 'source_summary' => ['type' => 'string'],
                 'usable_material_note' => ['type' => 'string'],
+                'material_type' => ['type' => 'string', 'enum' => ['reading_text', 'worksheet', 'vocabulary_list', 'grammar_exercise', 'mixed', 'image_based_task']],
+                'task_intent' => ['type' => 'string', 'enum' => ['quiz_about_content', 'practice_same_skill', 'vocabulary_training', 'grammar_training', 'listening_comprehension']],
+                'target_language' => ['type' => 'string'],
+                'content_map' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'additionalProperties' => false,
+                        'properties' => [
+                            'area' => ['type' => 'string'],
+                            'learning_goal' => ['type' => 'string'],
+                            'question_strategy' => ['type' => 'string'],
+                        ],
+                        'required' => ['area', 'learning_goal', 'question_strategy'],
+                    ],
+                ],
                 'topics' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'difficulty_progression' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'image_prompt' => ['type' => 'string'],
@@ -1096,7 +1112,7 @@ if (!function_exists('elevaro_teacher_ai_analysis_schema')) {
                     ],
                 ],
             ],
-            'required' => ['title', 'description', 'mode', 'language', 'source_summary', 'usable_material_note', 'topics', 'difficulty_progression', 'image_prompt', 'listening_text', 'question_plan'],
+            'required' => ['title', 'description', 'mode', 'language', 'source_summary', 'usable_material_note', 'material_type', 'task_intent', 'target_language', 'content_map', 'topics', 'difficulty_progression', 'image_prompt', 'listening_text', 'question_plan'],
         ];
     }
 }
@@ -1182,17 +1198,22 @@ if (!function_exists('elevaro_teacher_ai_split_build_analysis_prompt')) {
         $fileList = array_map(static fn($file) => '- ' . (string)($file['original_name'] ?? 'Material') . ' (' . (string)($file['mime'] ?? 'Datei') . ')', $files);
 
         return trim("Analysiere das Unterrichtsmaterial für einen Elevaro-KI-Quiz-Wizard.\n\n" .
-            "Klassenkontext:\n- Klasse: {$grade}\n- Schulart/Level: {$school} / {$level}\n- Fach: {$subject}\n- Modus: " . ($mode === 'listening' ? 'Listening + Comprehension' : 'normales Multiple-Choice-Quiz') . "\n- Sprache der Fragen: {$language}\n\n" .
+            "Klassenkontext:\n- Klasse: {$grade}\n- Schulart/Level: {$school} / {$level}\n- Fach: {$subject}\n- Modus: " . ($mode === 'listening' ? 'Listening + Comprehension' : 'normales Multiple-Choice-Quiz') . "\n- Erwartete Sprache der Fragen: {$language}\n\n" .
             "Dateien:\n" . ($fileList ? implode("\n", $fileList) : '[Keine Datei hochgeladen.]') . "\n\n" .
             "Lehrertext / Aufgabenstellung:\n" . ($sourceText !== '' ? $sourceText : '[Kein zusätzlicher Text eingetragen.]') . "\n\n" .
             "Zusatzwunsch des Lehrers:\n" . ($extraPrompt !== '' ? $extraPrompt : '[Keine Zusatzanweisung.]') . "\n\n" .
-            "Aufgabe für diesen Schritt: Erstelle KEINE fertigen Fragen. Analysiere nur die Quelle. " .
-            "Fasse alle sicher lesbaren Inhalte vollständig und quellengebunden zusammen. " .
-            "Erstelle eine belastbare Themen-/Fragenplanung für 30 spätere Multiple-Choice-Fragen in 6 Blöcken à 5 Fragen, sodass die relevanten Inhalte möglichst vollständig und ausgewogen abgedeckt werden. " .
-            "description ist eine kurze, motivierende Quizbeschreibung für Schülerinnen und Schüler, keine Beschreibung der hochgeladenen Quelle. " .
-            "image_prompt beschreibt ein passendes Elevaro-Quizbild im bestehenden modernen, freundlichen, spielerisch-edukativen Stil für die Zielgruppe; beschreibe NICHT das PDF, Arbeitsblatt oder Handschriften. " .
-            "Der Klassenkontext darf nur Niveau und Sprache steuern, aber keine Fakten ergänzen. Wenn Inhalte unleserlich sind, benenne das offen. " .
-            "Bei Listening: Erstelle zusätzlich einen Sprechertext in der Zielsprache, ausschließlich aus dem Material abgeleitet.");
+            "Aufgabe für diesen Schritt: Erstelle KEINE fertigen Fragen. Analysiere nur die Quelle und entscheide zuerst, welche Art von Material vorliegt.\n" .
+            "Klassifiziere material_type und task_intent besonders sorgfältig:\n" .
+            "- reading_text + quiz_about_content: Der Inhalt selbst soll verstanden und abgefragt werden.\n" .
+            "- worksheet, grammar_exercise oder vocabulary_list: Das Blatt ist meist Übungsmaterial. Dann darf NICHT zufälliger Beispielsatz-Inhalt abgefragt werden. Stattdessen sollen die geübten Lernziele, Vokabeln, Satzmuster, Grammatikstrukturen oder Kompetenzen trainiert werden.\n" .
+            "- Bei Fremdsprachen-Arbeitsblättern: Übersetze die späteren Fragen nicht automatisch ins Deutsche. Bewahre die Sprache und den Aufgabentyp des Materials, sofern der Lehrer nichts anderes verlangt.\n" .
+            "- Bei Lückentexten: Erkenne, ob es um Vokabeln, Grammatik, Wortpaare, Monate, Ordnungszahlen, Datum, Pronomen o. ä. geht. Frage nicht nach irrelevanten Inhalten aus Beispielsätzen.\n\n" .
+            "Erstelle eine content_map mit den wichtigsten Lernzielen und Frage-Strategien. Diese content_map ist die verbindliche Grundlage für die späteren 30 Fragen und soll die relevanten Inhalte bzw. Kompetenzen möglichst vollständig abdecken.\n" .
+            "Erstelle eine belastbare Fragenplanung für 30 spätere Multiple-Choice-Fragen in 6 Blöcken à 5 Fragen. Verteile die Blöcke über die content_map, damit nichts Wesentliches verloren geht.\n" .
+            "description ist eine kurze, motivierende Quizbeschreibung für Schülerinnen und Schüler, keine Beschreibung der hochgeladenen Quelle.\n" .
+            "image_prompt beschreibt ein passendes Elevaro-Quizbild im bestehenden modernen, freundlichen, spielerisch-edukativen Stil für die Zielgruppe; beschreibe NICHT das PDF, Arbeitsblatt oder Handschriften.\n" .
+            "Der Klassenkontext darf Niveau und Sprache steuern, aber keine Fakten ergänzen. Wenn Inhalte unleserlich sind, benenne das offen.\n" .
+            "Bei Listening: Erstelle zusätzlich einen Sprechertext in der Zielsprache, ausschließlich aus dem Material bzw. den erkannten Lernzielen abgeleitet.");
     }
 }
 
@@ -1201,30 +1222,45 @@ if (!function_exists('elevaro_teacher_ai_split_build_questions_prompt')) {
     {
         $start = $blockIndex * $blockSize + 1;
         $end = $start + $blockSize - 1;
-        $language = (string)($analysis['language'] ?? elevaro_teacher_ai_language_for_class($class, $mode));
+        $language = (string)($analysis['target_language'] ?? $analysis['language'] ?? elevaro_teacher_ai_language_for_class($class, $mode));
+        $materialType = (string)($analysis['material_type'] ?? 'mixed');
+        $taskIntent = (string)($analysis['task_intent'] ?? 'quiz_about_content');
         $existing = array_map(static fn($q) => (string)($q['question'] ?? ''), $existingQuestions);
         $focus = '';
         foreach (($analysis['question_plan'] ?? []) as $plan) {
             if ((int)($plan['block'] ?? 0) === $blockIndex + 1) {
-                $focus .= '- Fokus: ' . (string)($plan['focus'] ?? '') . ' | Schwierigkeit: ' . (string)($plan['difficulty'] ?? '') . ' | Quelle: ' . (string)($plan['source_reference'] ?? '') . "\n";
+                $focus .= '- Fokus: ' . (string)($plan['focus'] ?? '') . ' | Schwierigkeit: ' . (string)($plan['difficulty'] ?? '') . ' | interne Quelle: ' . (string)($plan['source_reference'] ?? '') . "\n";
             }
         }
-        if ($focus === '') $focus = '- Nutze die Analyse und das Originalmaterial für diesen Block.\n';
+        if ($focus === '') $focus = '- Nutze content_map, Analyse und Originalmaterial für diesen Block.\n';
+
+        $worksheetRules = '';
+        if (in_array($taskIntent, ['practice_same_skill', 'vocabulary_training', 'grammar_training'], true) || in_array($materialType, ['worksheet', 'grammar_exercise', 'vocabulary_list'], true)) {
+            $worksheetRules = "\nSpezialregeln für Arbeitsblätter / Sprachübungen:\n" .
+                "- Erzeuge Übungsfragen zum gleichen Lernziel, nicht Verständnisfragen über zufällige Beispielsatz-Inhalte.\n" .
+                "- Wenn das Material englische Übungen enthält, bleiben Frage, Antwortoptionen und Erklärung grundsätzlich auf Englisch, sofern der Lehrer nichts anderes verlangt.\n" .
+                "- Bei Lückentexten sollen die Schülerinnen und Schüler die passende Ergänzung wählen.\n" .
+                "- Frage NICHT: 'In welcher Jahreszeit kommen die Blumen heraus?', wenn der Satz nur Vokabelmaterial für 'spring' ist. Frage stattdessen z. B. nach der passenden englischen Vokabel oder Satzergänzung.\n" .
+                "- Erstelle gern neue, gleichartige Beispielsätze, damit nicht nur die Lösungen des Arbeitsblatts abgefragt werden.\n";
+        }
 
         return trim("Erstelle Fragen {$start} bis {$end} für ein Elevaro-Schülerquiz.\n\n" .
-            "Sprache: {$language}\n" .
-            "Modus: {$mode}\n\n" .
+            "Sprache der sichtbaren Fragen: {$language}\n" .
+            "Modus: {$mode}\n" .
+            "Materialtyp: {$materialType}\n" .
+            "Aufgabenabsicht: {$taskIntent}\n\n" .
             "Verbindliche Materialanalyse:\n" . json_encode($analysis, JSON_UNESCAPED_UNICODE) . "\n\n" .
             "Block-Fokus:\n{$focus}\n" .
-            "Bereits erzeugte Fragen, die NICHT wiederholt werden dürfen:\n" . ($existing ? implode("\n", array_slice($existing, -20)) : '[Noch keine]') . "\n\n" .
-            "Lehrertext / Zusatzwunsch als Zusatzkontext:\n" . ($sourceText !== '' ? $sourceText : '[leer]') . "\n" . ($extraPrompt !== '' ? $extraPrompt : '') . "\n\n" .
+            "Bereits erzeugte Fragen, die NICHT wiederholt werden dürfen:\n" . ($existing ? implode("\n", array_slice($existing, -24)) : '[Noch keine]') . "\n\n" .
+            "Lehrertext / Zusatzwunsch als Zusatzkontext:\n" . ($sourceText !== '' ? $sourceText : '[leer]') . "\n" . ($extraPrompt !== '' ? $extraPrompt : '') . "\n" .
+            $worksheetRules . "\n" .
             "Erzeuge exakt {$blockSize} neue Multiple-Choice-Fragen. Jede Frage hat exakt 4 Optionen und genau eine richtige Antwort. " .
-            "Alle Fragen müssen eindeutig aus Originalmaterial oder Analyse ableitbar sein. Prüfe im Zweifel wieder das direkt angehängte PDF/Bildmaterial. " .
+            "Alle Fragen müssen aus Originalmaterial, content_map oder Analyse ableitbar sein. Prüfe im Zweifel wieder das direkt angehängte PDF/Bildmaterial. " .
             "Die Schwierigkeit soll über alle 6 Blöcke sanft ansteigen: Block 1 sehr leicht, Blöcke 2–3 leicht bis mittel, Blöcke 4–5 mittel, Block 6 anspruchsvoller. " .
-            "Wichtig: In Frage, Antwortoptionen und Erklärung dürfen keine Materialverweise stehen wie 'laut Mindmap', 'im Arbeitsblatt', 'auf der Seite', 'in der Quelle' oder ähnliche Formulierungen, weil Schülerinnen und Schüler das Material später nicht sehen. source_reference darf intern knapp bleiben.");
+            "Decke in diesem Block den angegebenen Fokus ab und vermeide Wiederholungen. " .
+            "Wichtig: In Frage, Antwortoptionen und Erklärung dürfen keine Materialverweise stehen wie 'laut Mindmap', 'im Arbeitsblatt', 'auf der Seite', 'in der Quelle', 'im Material' oder ähnliche Formulierungen, weil Schülerinnen und Schüler das Material später nicht sehen. source_reference darf intern knapp bleiben.");
     }
 }
-
 
 if (!function_exists('elevaro_teacher_ai_plausibility_schema')) {
     function elevaro_teacher_ai_plausibility_schema(): array
@@ -1310,8 +1346,9 @@ if (!function_exists('elevaro_teacher_ai_build_plausibility_prompt')) {
             "Aufgaben:\n" .
             "1. Prüfe, ob die Fragen die relevanten Inhalte ausgewogen abdecken.\n" .
             "2. Markiere nur echte Probleme: nicht ableitbar, fachlich falsch, mehrdeutig, doppelt oder zu schwer/zu leicht.\n" .
-            "3. Achte auf sichtbare Materialverweise wie 'laut Mindmap', 'im Arbeitsblatt', 'auf der Seite' oder 'in der Quelle'. Schüler sehen das Material später nicht.\n" .
-            "4. Gib nur kurze Lehrerhinweise und Issues zurück. Schreibe NICHT alle Fragen neu aus. Liefere ausschließlich valides JSON.");
+            "3. Achte auf sichtbare Materialverweise wie 'laut Mindmap', 'im Arbeitsblatt', 'auf der Seite', 'im Material' oder 'in der Quelle'. Schüler sehen das Material später nicht.\n" .
+            "4. Wenn material_type ein Arbeitsblatt, eine Grammatikübung oder Vokabelliste ist: Prüfe, ob die Fragen das Lernziel trainieren und nicht zufällige Beispielsatz-Inhalte abfragen oder unnötig übersetzen.\n" .
+            "5. Gib nur kurze Lehrerhinweise und Issues zurück. Schreibe NICHT alle Fragen neu aus. Liefere ausschließlich valides JSON.");
     }
 }
 
@@ -1369,6 +1406,8 @@ if (!function_exists('elevaro_teacher_ai_split_base_payload')) {
             'listening_text' => $mode === 'listening' ? (string)($analysis['listening_text'] ?? '') : '',
             'image_prompt' => (string)($analysis['image_prompt'] ?? ''),
             'questions' => $questions,
+            'material_type' => (string)($analysis['material_type'] ?? ''),
+            'task_intent' => (string)($analysis['task_intent'] ?? ''),
         ], $mode);
     }
 }

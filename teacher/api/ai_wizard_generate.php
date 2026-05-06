@@ -12,6 +12,19 @@ try {
     elevaro_teacher_ai_class_for_teacher($classId, $teacherId);
     $sourceText = trim((string)($_POST['source_text'] ?? ''));
     $extraPrompt = trim((string)($_POST['extra_prompt'] ?? ''));
+    $materialGoal = (string)($_POST['material_goal'] ?? 'auto');
+    $goalHints = [
+        'auto' => 'Materialziel: KI entscheidet anhand des Materials, ob Inhalte abgefragt oder ähnliche Übungen erstellt werden sollen.',
+        'content' => 'Materialziel: Inhalte verstehen und abfragen. Erstelle Fragen zum fachlichen Inhalt, nicht nur zum Aufgabenformat.',
+        'practice' => 'Materialziel: Ähnliche Übungen erstellen. Trainiere den gleichen Aufgabentyp bzw. die gleiche Kompetenz, statt zufällige Beispielsatz-Inhalte abzufragen.',
+        'vocabulary' => 'Materialziel: Vokabeltraining. Bewahre bei Fremdsprachen die Zielsprache und erstelle passende Vokabel-/Satzergänzungsfragen.',
+        'grammar' => 'Materialziel: Grammatiktraining. Trainiere die zugrunde liegende Struktur, z. B. Pronomen, Zeitformen oder Satzbau.',
+    ];
+    if (isset($goalHints[$materialGoal])) {
+        $extraPrompt = trim($extraPrompt . "
+
+" . $goalHints[$materialGoal]);
+    }
     $files = elevaro_teacher_ai_collect_files('source_files');
 
     if ($sourceText === '' && !$files) {

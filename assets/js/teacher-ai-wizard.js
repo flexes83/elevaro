@@ -31,21 +31,28 @@
     });
   }
 
-  $$('.ai-mode-card').forEach(card => {
-    card.addEventListener('click', () => {
-      $$('.ai-mode-card').forEach(c => c.classList.remove('is-selected'));
-      card.classList.add('is-selected');
-      const input = $('input', card);
-      if (input) input.checked = true;
+  function wireChoiceCards(selector) {
+    $$(selector).forEach(card => {
+      card.addEventListener('click', () => {
+        const input = $('input', card);
+        if (!input) return;
+        const name = input.name;
+        $$(`${selector} input[name="${name}"]`).forEach(i => i.closest(selector)?.classList.remove('is-selected'));
+        card.classList.add('is-selected');
+        input.checked = true;
+      });
     });
-  });
+  }
+  wireChoiceCards('.ai-mode-card');
+  wireChoiceCards('.ai-intent-card');
 
   const loadingTexts = [
-    'Inhalte werden extrahiert...',
-    'Wichtige Themen werden erkannt...',
-    'Inhalte werden pädagogisch sortiert...',
-    'Fragen werden altersgerecht formuliert...',
-    'Antwortmöglichkeiten werden geprüft...',
+    'Material wird gelesen und strukturiert...',
+    'Die KI erkennt, ob es um Inhalte oder Übungen geht...',
+    'Lernziele werden herausgearbeitet...',
+    'Relevante Themen werden pädagogisch sortiert...',
+    'Fragen werden passend zum Aufgabentyp formuliert...',
+    'Antwortmöglichkeiten werden didaktisch geprüft...',
     'Der Quizentwurf wird vorbereitet...'
   ];
   let loadingTimer = null;
@@ -81,9 +88,9 @@
 
   function progressFromStatus(status) {
     if (!status) return 12;
-    if (status === 'analysis_done') return 28;
+    if (status === 'analysis_done') return 25;
     const match = String(status).match(/^questions_(\d+)/);
-    if (match) return 28 + Math.round((Number(match[1]) / 6) * 58);
+    if (match) return 25 + Math.round((Number(match[1]) / 6) * 62);
     if (status === 'plausibility') return 93;
     if (status === 'done') return 100;
     return 14;
