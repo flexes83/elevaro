@@ -78,9 +78,9 @@ function reg_h($value): string
 
             <div class="register-hero-content">
                 <span class="register-badge">Kostenloser Beta-Zugang</span>
-                <h1>Unterrichtsmaterialien werden zu interaktiven Quizzes.</h1>
+                <h1>Arbeitsblätter werden zu interaktiven Quizzes.</h1>
                 <p>
-                    Erstelle aus Arbeitsblättern, Buchseiten oder PDFs in wenigen Minuten interaktive Quizzes für deinen Unterricht. Teile Klassenräume per QR-Code und teste Elevaro aktuell kostenlos im kleinen Lehrkräfte-Kreis.
+                    Lade Arbeitsblätter, Buchseiten oder PDFs hoch und erstelle daraus in wenigen Minuten spielbare Quizzes für deinen Unterricht. Aktuell kostenlos im kleinen Lehrkräfte-Kreis.
                 </p>
 
                 <div class="register-benefits">

@@ -81,7 +81,7 @@ function elevaro_frontend_header(string $variant = 'light', array $options = [])
             <a class="nav-link" href="/#eltern">Für Eltern</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="/#lehrer">Für Lehrer</a>
+            <a class="nav-link" href="/teacher_register.php">Für Lehrkräfte</a>
           </li>
           <li class="nav-item">
             <a class="nav-link" href="/paywall.php">Preise</a>
