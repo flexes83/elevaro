@@ -12,6 +12,24 @@ function elevaro_teacher_ai_wizard_db(): PDO
     return elevaro_db();
 }
 
+function elevaro_teacher_ai_wizard_column_exists(string $table, string $column): bool
+{
+    try {
+        $stmt = elevaro_teacher_ai_wizard_db()->prepare("SHOW COLUMNS FROM `{$table}` LIKE :column");
+        $stmt->execute(['column' => $column]);
+        return (bool)$stmt->fetch();
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+function elevaro_teacher_ai_wizard_add_column_if_missing(string $table, string $column, string $definition): void
+{
+    if (!elevaro_teacher_ai_wizard_column_exists($table, $column)) {
+        elevaro_teacher_ai_wizard_db()->exec("ALTER TABLE `{$table}` ADD COLUMN {$definition}");
+    }
+}
+
 function elevaro_teacher_ai_wizard_ensure_schema(): void
 {
     static $done = false;
@@ -40,6 +58,20 @@ function elevaro_teacher_ai_wizard_ensure_schema(): void
         KEY idx_teacher_ai_drafts_class (class_id),
         KEY idx_teacher_ai_drafts_published (published_quiz_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    // Bestehende Installationen können die Tabelle bereits aus einer früheren Migration haben.
+    // Deshalb ergänzen wir fehlende Spalten defensiv, statt bei INSERTs später mit 400/500 zu scheitern.
+    elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'mode', "mode VARCHAR(40) NOT NULL DEFAULT 'quiz' AFTER class_id");
+    elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'status', "status VARCHAR(40) NOT NULL DEFAULT 'draft' AFTER mode");
+    elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'source_title', "source_title VARCHAR(255) NULL AFTER status");
+    elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'source_text', "source_text MEDIUMTEXT NULL AFTER source_title");
+    elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'source_files_json', "source_files_json LONGTEXT NULL AFTER source_text");
+    elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'prompt', "prompt MEDIUMTEXT NULL AFTER source_files_json");
+    elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'generated_payload_json', "generated_payload_json LONGTEXT NULL AFTER prompt");
+    elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'image_prompt', "image_prompt TEXT NULL AFTER generated_payload_json");
+    elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'image_path', "image_path VARCHAR(255) NULL AFTER image_prompt");
+    elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'image_status', "image_status VARCHAR(40) NOT NULL DEFAULT 'none' AFTER image_path");
+    elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'published_quiz_id', "published_quiz_id INT UNSIGNED NULL AFTER image_status");
 }
 
 function elevaro_teacher_ai_h($value): string
@@ -154,8 +186,14 @@ function elevaro_teacher_ai_collect_files(string $field = 'source_files'): array
         if (!move_uploaded_file($tmp, $absolute)) throw new RuntimeException('Datei konnte nicht gespeichert werden.');
 
         $text = '';
+        $pdfPreviewImages = [];
         if ($mime === 'application/pdf') {
             $text = elevaro_teacher_ai_extract_pdf_text($absolute);
+            // Wichtig für eingescannte PDFs / abfotografierte Buchseiten als PDF:
+            // Wenn kein Text extrahierbar ist, senden wir die ersten Seiten als Bilder an das Vision-Modell.
+            if (mb_strlen(trim($text), 'UTF-8') < 80) {
+                $pdfPreviewImages = elevaro_teacher_ai_extract_pdf_preview_images($absolute, 4);
+            }
         }
 
         $stored[] = [
@@ -165,6 +203,7 @@ function elevaro_teacher_ai_collect_files(string $field = 'source_files'): array
             'mime' => $mime,
             'size' => $size,
             'extracted_text' => $text,
+            'pdf_preview_images' => $pdfPreviewImages,
         ];
     }
     return $stored;
@@ -186,19 +225,158 @@ function elevaro_teacher_ai_extract_pdf_text(string $absolutePath): string
     return trim(mb_substr($text, 0, 18000, 'UTF-8'));
 }
 
-function elevaro_teacher_ai_file_to_data_url(array $file): ?string
+function elevaro_teacher_ai_extract_pdf_preview_images(string $absolutePath, int $maxPages = 4): array
 {
-    $mime = (string)($file['mime'] ?? '');
-    if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) return null;
-    $absolute = (string)($file['absolute_path'] ?? '');
+    $maxPages = max(1, min(6, $maxPages));
+    $dir = elevaro_teacher_ai_upload_dir() . '/pdf_pages';
+    if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) return [];
+
+    $prefix = $dir . '/page-' . date('His') . '-' . bin2hex(random_bytes(3));
+    $created = [];
+
+    $pdftoppm = trim((string)@shell_exec('command -v pdftoppm 2>/dev/null'));
+    if ($pdftoppm !== '') {
+        $cmd = escapeshellcmd($pdftoppm) . ' -f 1 -l ' . $maxPages . ' -jpeg -r 150 ' . escapeshellarg($absolutePath) . ' ' . escapeshellarg($prefix) . ' 2>/dev/null';
+        @shell_exec($cmd);
+        $created = glob($prefix . '-*.jpg') ?: [];
+    }
+
+    // Fallback für Server mit ImageMagick statt Poppler. Funktioniert nur, wenn PDF-Rendering erlaubt ist.
+    if (!$created) {
+        $magick = trim((string)@shell_exec('command -v magick 2>/dev/null')) ?: trim((string)@shell_exec('command -v convert 2>/dev/null'));
+        if ($magick !== '') {
+            $out = $prefix . '-%02d.jpg';
+            $cmd = escapeshellcmd($magick) . ' ' . escapeshellarg($absolutePath . '[0-' . ($maxPages - 1) . ']') . ' -density 150 -quality 82 ' . escapeshellarg($out) . ' 2>/dev/null';
+            @shell_exec($cmd);
+            $created = glob($prefix . '-*.jpg') ?: [];
+        }
+    }
+
+    sort($created);
+    return array_slice(array_values(array_filter($created, static fn($file) => is_file($file) && filesize($file) > 0)), 0, $maxPages);
+}
+
+function elevaro_teacher_ai_absolute_file_to_data_url(string $absolute, string $mime = 'image/jpeg'): ?string
+{
     if ($absolute === '' || !is_file($absolute)) return null;
     $binary = file_get_contents($absolute);
     if ($binary === false) return null;
     return 'data:' . $mime . ';base64,' . base64_encode($binary);
 }
 
+function elevaro_teacher_ai_file_to_data_url(array $file): ?string
+{
+    $mime = (string)($file['mime'] ?? '');
+    if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) return null;
+    $absolute = (string)($file['absolute_path'] ?? '');
+    return elevaro_teacher_ai_absolute_file_to_data_url($absolute, $mime);
+}
+
+function elevaro_teacher_ai_has_readable_material(string $sourceText, array $files): bool
+{
+    if (mb_strlen(trim($sourceText), 'UTF-8') >= 40) return true;
+    foreach ($files as $file) {
+        if ((string)($file['mime'] ?? '') === 'application/pdf') return true;
+        if (mb_strlen(trim((string)($file['extracted_text'] ?? '')), 'UTF-8') >= 80) return true;
+        if (in_array((string)($file['mime'] ?? ''), ['image/jpeg', 'image/png', 'image/webp'], true)) return true;
+        if (!empty($file['pdf_preview_images'])) return true;
+    }
+    return false;
+}
+
+function elevaro_teacher_ai_responses_content_for_material(array $files): array
+{
+    $content = [];
+    foreach ($files as $file) {
+        $mime = (string)($file['mime'] ?? '');
+        $name = (string)($file['original_name'] ?? 'Material');
+        $absolute = (string)($file['absolute_path'] ?? '');
+
+        if ($mime === 'application/pdf' && $absolute !== '' && is_file($absolute)) {
+            $fileId = elevaro_openai_upload_file($absolute, 'application/pdf', 'user_data');
+            $content[] = ['type' => 'input_text', 'text' => 'Direkt hochgeladenes PDF des Lehrers: ' . $name . '. Lies alle sichtbaren Inhalte, auch Scans, abfotografierte Seiten, Layout, Tabellen und handschriftliche Notizen, soweit erkennbar.'];
+            $content[] = ['type' => 'input_file', 'file_id' => $fileId];
+            continue;
+        }
+
+        $dataUrl = elevaro_teacher_ai_file_to_data_url($file);
+        if ($dataUrl) {
+            $content[] = ['type' => 'input_text', 'text' => 'Bildmaterial des Lehrers: ' . $name . '. Lies Text, Aufgaben, Tabellen und handschriftliche Notizen, soweit erkennbar.'];
+            $content[] = ['type' => 'input_image', 'image_url' => $dataUrl, 'detail' => 'high'];
+        }
+    }
+    return $content;
+}
+
+function elevaro_teacher_ai_build_generation_prompt(array $class, string $mode, string $sourceText, string $extraPrompt, array $files): string
+{
+    $subject = elevaro_teacher_ai_subject_label($class['subject_code'] ?? '');
+    $grade = (string)($class['grade'] ?? '');
+    $level = (string)($class['level_key'] ?? '');
+    $school = (string)($class['school_type_code'] ?? '');
+    $language = elevaro_teacher_ai_language_for_class($class, $mode);
+
+    $fileList = [];
+    foreach ($files as $file) {
+        $fileList[] = '- ' . (string)($file['original_name'] ?? 'Material') . ' (' . (string)($file['mime'] ?? 'Datei') . ')';
+    }
+
+    return trim("Erstelle ein Schülerquiz für den Elevaro-Klassenraum.
+
+Klassenkontext:
+- Klasse: {$grade}
+- Schulart/Level: {$school} / {$level}
+- Fach: {$subject}
+- Modus: " . ($mode === 'listening' ? 'Listening + Comprehension' : 'normales Multiple-Choice-Quiz') . "
+- Sprache der Fragen: {$language}
+
+Vom Lehrer hochgeladene Dateien:
+" . ($fileList ? implode("\n", $fileList) : '[Keine Datei hochgeladen.]') . "
+
+Zusätzlicher Lehrertext / Aufgabenstellung:
+" . ($sourceText !== '' ? $sourceText : '[Kein zusätzlicher Text eingetragen.]') . "
+
+Zusatzwunsch des Lehrers:
+" . ($extraPrompt !== '' ? $extraPrompt : '[Keine Zusatzanweisung.]') . "
+
+Aufgabe:
+- Analysiere zuerst das direkt bereitgestellte Material. PDFs und Bilder sind die Primärquelle.
+- Berücksichtige bei PDFs auch visuelle Seiteninhalte, Scans, Fotos von Buchseiten, Tabellen, Aufgabenstellungen und handschriftliche Notizen, soweit lesbar.
+- Erstelle ein fertiges Quiz mit 30 Fragen, davon eher leichte Fragen am Anfang und schwerere später.
+- Jede Frage hat exakt 4 Antwortoptionen.
+- Genau eine Antwort ist richtig.
+- Erkläre knapp, warum die Antwort richtig ist.
+- Strikte Quellenbindung: Jede Frage muss eindeutig aus dem hochgeladenen Material oder dem ausdrücklich eingegebenen Lehrertext ableitbar sein.
+- Der Klassenkontext dient nur zur Anpassung von Niveau und Sprache, nicht als Ersatzquelle für Fakten.
+- Wenn zu wenig Material lesbar ist: Erstelle nur Fragen zu sicher lesbaren Inhalten und erwähne die Einschränkung in der Beschreibung. Erfinde keine Inhalte.
+- Formuliere altersgerecht.
+- Bei Fremdsprachen/Listening: Fragen und Antworten in der Zielsprache.
+- Bei Listening zusätzlich einen Sprechertext in der Zielsprache erstellen. Dieser Sprechertext muss inhaltlich auf dem Material basieren.
+- Erstelle außerdem eine kurze Quizbeschreibung und einen konkreten Bildprompt für ein freundliches, modernes Lernkarten-Bild.");
+}
+
+function elevaro_teacher_ai_generate_from_material(array $class, string $mode, string $sourceText, string $extraPrompt, array $files): array
+{
+    if (!elevaro_teacher_ai_has_readable_material($sourceText, $files)) {
+        throw new RuntimeException('Bitte lade ein PDF/Bild hoch oder gib Material als Text ein. Ohne Unterrichtsmaterial wird kein Quiz generiert, damit keine Fantasiefragen entstehen.');
+    }
+
+    $prompt = elevaro_teacher_ai_build_generation_prompt($class, $mode, $sourceText, $extraPrompt, $files);
+    $content = [['type' => 'input_text', 'text' => $prompt]];
+    $content = array_merge($content, elevaro_teacher_ai_responses_content_for_material($files));
+
+    $system = 'Du bist ein erfahrener Lehrer, Fachdidaktiker und Quizautor. Du lieferst ausschließlich valides JSON nach Schema. Du darfst keine Fragen erfinden, die nicht aus dem bereitgestellten Material ableitbar sind. PDFs und Bilder sind als Primärquelle auszuwerten; lies auch sichtbare handschriftliche Notizen, soweit erkennbar.';
+    $result = elevaro_openai_responses_json($system, $content, elevaro_teacher_ai_generation_schema(), 0.22, 300);
+    $result['prompt_log'] = $prompt;
+    return $result;
+}
+
 function elevaro_teacher_ai_build_generation_messages(array $class, string $mode, string $sourceText, string $extraPrompt, array $files): array
 {
+    if (!elevaro_teacher_ai_has_readable_material($sourceText, $files)) {
+        throw new RuntimeException('Das hochgeladene Material konnte nicht zuverlässig gelesen werden. Bitte lade ein PDF mit auswählbarem Text hoch, fotografiere die Seiten als JPG/PNG oder installiere Poppler/pdftotext bzw. pdftoppm auf dem Server. So verhindern wir, dass die KI Fragen ohne Bezug zum Material erfindet.');
+    }
+
     $subject = elevaro_teacher_ai_subject_label($class['subject_code'] ?? '');
     $grade = (string)($class['grade'] ?? '');
     $level = (string)($class['level_key'] ?? '');
@@ -235,11 +413,12 @@ Aufgabe:
 - Jede Frage hat exakt 4 Antwortoptionen.
 - Genau eine Antwort ist richtig.
 - Erkläre knapp, warum die Antwort richtig ist.
-- Verwende ausschließlich Informationen, die aus Material/Klassenkontext sinnvoll ableitbar sind.
-- Bei unklaren oder fehlenden Fakten: keine erfundenen Details.
+- Strikte Quellenbindung: Die Fragen müssen sich inhaltlich auf das hochgeladene Material oder den ausdrücklich eingegebenen Lehrertext beziehen.
+- Der Klassenkontext dient nur zur Anpassung von Niveau und Sprache, nicht als Ersatzquelle für Fakten.
+- Bei unklaren oder fehlenden Fakten: keine erfundenen Details und keine allgemeinen Platzhalterfragen.
 - Formuliere altersgerecht.
 - Bei Fremdsprachen/Listening: Fragen und Antworten in der Zielsprache.
-- Bei Listening zusätzlich einen Sprechertext in der Zielsprache erstellen. Er soll lang genug sein, dass daraus 8–15 Verständnisfragen beantwortet werden können, aber nicht künstlich lang.
+- Bei Listening zusätzlich einen Sprechertext in der Zielsprache erstellen. Dieser Sprechertext muss inhaltlich auf dem Material basieren.
 - Erstelle außerdem eine kurze Quizbeschreibung und einen konkreten Bildprompt für ein freundliches, modernes Lernkarten-Bild.
 ");
 
@@ -247,12 +426,20 @@ Aufgabe:
     foreach ($files as $file) {
         $dataUrl = elevaro_teacher_ai_file_to_data_url($file);
         if ($dataUrl) {
-            $content[] = ['type' => 'image_url', 'image_url' => ['url' => $dataUrl]];
+            $content[] = ['type' => 'text', 'text' => 'Bildmaterial des Lehrers: ' . (string)($file['original_name'] ?? 'Bild') . '. Lies den sichtbaren Inhalt und verwende ihn als Quelle.'];
+            $content[] = ['type' => 'image_url', 'image_url' => ['url' => $dataUrl, 'detail' => 'high']];
+        }
+        foreach ((array)($file['pdf_preview_images'] ?? []) as $idx => $previewPath) {
+            $previewUrl = elevaro_teacher_ai_absolute_file_to_data_url((string)$previewPath, 'image/jpeg');
+            if ($previewUrl) {
+                $content[] = ['type' => 'text', 'text' => 'PDF-Seite ' . ($idx + 1) . ' aus ' . (string)($file['original_name'] ?? 'PDF') . '. Lies den sichtbaren Inhalt und verwende ihn als Quelle.'];
+                $content[] = ['type' => 'image_url', 'image_url' => ['url' => $previewUrl, 'detail' => 'high']];
+            }
         }
     }
 
     return [
-        ['role' => 'system', 'content' => 'Du bist ein erfahrener Lehrer, Fachdidaktiker und Quizautor. Du lieferst ausschließlich valides JSON nach Schema. Keine Halluzinationen, keine erfundenen aktuellen Fakten.'],
+        ['role' => 'system', 'content' => 'Du bist ein erfahrener Lehrer, Fachdidaktiker und Quizautor. Du lieferst ausschließlich valides JSON nach Schema. Du darfst keine Fragen erfinden, die nicht aus dem bereitgestellten Material ableitbar sind. Wenn Bildmaterial vorhanden ist, lies es sorgfältig wie ein Arbeitsblatt.'],
         ['role' => 'user', 'content' => $content],
     ];
 }
@@ -343,6 +530,8 @@ function elevaro_teacher_ai_create_draft(int $teacherId, int $classId, string $m
         'source_text' => $sourceText,
         'source_files_json' => json_encode(array_map(static function ($file) {
             unset($file['absolute_path']);
+            unset($file['pdf_preview_images']);
+            unset($file['openai_file_id']);
             return $file;
         }, $files), JSON_UNESCAPED_UNICODE),
         'prompt' => $promptLog,

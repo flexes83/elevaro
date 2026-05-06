@@ -16,10 +16,9 @@ try {
         throw new RuntimeException('Bitte Material hochladen oder einen Text/eine Aufgabenstellung eingeben.');
     }
 
-    $messages = elevaro_teacher_ai_build_generation_messages($class, $mode, $sourceText, $extraPrompt, $files);
-    $result = elevaro_openai_chat_json_flexible($messages, elevaro_teacher_ai_generation_schema(), 0.38, 220);
+    $result = elevaro_teacher_ai_generate_from_material($class, $mode, $sourceText, $extraPrompt, $files);
     $payload = elevaro_teacher_ai_normalize_payload($result['json'], $mode);
-    $draftId = elevaro_teacher_ai_create_draft($teacherId, $classId, $mode, $sourceText, $extraPrompt, $files, $payload, $result['content']);
+    $draftId = elevaro_teacher_ai_create_draft($teacherId, $classId, $mode, $sourceText, $extraPrompt, $files, $payload, $result['prompt_log'] ?? $result['content']);
 
     elevaro_teacher_ai_json_response([
         'ok' => true,
