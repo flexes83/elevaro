@@ -1,11 +1,14 @@
 <?php
 require_once __DIR__ . '/app/includes/classroom.php';
 
+$code = strtoupper(trim((string)($_GET['code'] ?? '')));
 $classId = (int)($_GET['class_id'] ?? 0);
-$class = $classId ? classroom_by_id($classId) : null;
+$class = $code !== '' ? classroom_by_code($code) : ($classId ? classroom_by_id($classId) : null);
 if (!$class) { http_response_code(404); echo 'Klassenraum nicht gefunden.'; exit; }
 $participant = classroom_current_participant((int)$class['id']);
 if (!$participant) {
+    // QR-Code und geteilter Link dürfen direkt auf classroom.php zeigen.
+    // Wer noch keine Klassenraum-Session hat, landet im niedrigschwelligen Namens-Join.
     header('Location: /join.php?code=' . urlencode((string)$class['invite_code']));
     exit;
 }

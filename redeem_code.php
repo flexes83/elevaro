@@ -2,6 +2,16 @@
 
 require_once __DIR__ . '/app/includes/auth.php';
 require_once __DIR__ . '/app/includes/access.php';
+require_once __DIR__ . '/app/includes/classroom.php';
+
+$incomingCode = strtoupper(trim((string)($_GET['code'] ?? $_POST['code'] ?? '')));
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' && $incomingCode !== '') {
+    $class = classroom_by_code($incomingCode);
+    if ($class) {
+        header('Location: /classroom.php?code=' . urlencode((string)$class['invite_code']));
+        exit;
+    }
+}
 
 if (!auth_is_logged_in()) {
     $codeParam = trim((string)($_GET['code'] ?? ''));

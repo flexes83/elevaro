@@ -6,6 +6,7 @@ require_once __DIR__ . '/../app/includes/db.php';
 require_once __DIR__ . '/../app/includes/auth.php';
 require_once __DIR__ . '/../app/includes/access.php';
 require_once __DIR__ . '/../app/includes/curriculum.php';
+require_once __DIR__ . '/../app/includes/classroom.php';
 
 auth_require_login();
 
@@ -66,6 +67,7 @@ function teacher_ensure_schema(): void
         subject_code VARCHAR(64) NOT NULL,
         invite_code VARCHAR(24) NOT NULL,
         is_active TINYINT(1) NOT NULL DEFAULT 1,
+        allow_guest_join TINYINT(1) NOT NULL DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         UNIQUE KEY uniq_teacher_class_code (invite_code),
@@ -163,22 +165,32 @@ function teacher_class_quiz_count(int $classId): int
 
 function teacher_class_student_count(int $classId): int
 {
+    $registered = 0;
     if (teacher_table_exists('teacher_class_students')) {
         $stmt = teacher_db()->prepare("SELECT COUNT(*) FROM teacher_class_students WHERE class_id = :class_id");
         $stmt->execute(['class_id' => $classId]);
-        return (int)$stmt->fetchColumn();
+        $registered += (int)$stmt->fetchColumn();
+    } elseif (teacher_table_exists('class_code_users')) {
+        $stmt = teacher_db()->prepare("SELECT COUNT(*) FROM class_code_users ccu JOIN class_codes cc ON cc.id = ccu.class_code_id WHERE cc.class_id = :class_id");
+        $stmt->execute(['class_id' => $classId]);
+        $registered += (int)$stmt->fetchColumn();
     }
 
-    $stmt = teacher_db()->prepare("SELECT COUNT(*) FROM class_code_users ccu JOIN class_codes cc ON cc.id = ccu.class_code_id WHERE cc.class_id = :class_id");
-    $stmt->execute(['class_id' => $classId]);
-    return (int)$stmt->fetchColumn();
+    $guests = 0;
+    if (teacher_table_exists('classroom_participants')) {
+        $stmt = teacher_db()->prepare("SELECT COUNT(*) FROM classroom_participants WHERE class_id = :class_id AND user_id IS NULL");
+        $stmt->execute(['class_id' => $classId]);
+        $guests = (int)$stmt->fetchColumn();
+    }
+
+    return $registered + $guests;
 }
 
 function teacher_invite_url(array $class): string
 {
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'] ?? 'elevaro.app';
-    return $scheme . '://' . $host . '/redeem_code.php?code=' . urlencode((string)$class['invite_code']);
+    return classroom_join_url($class);
 }
 
 function teacher_class_label(array $class): string

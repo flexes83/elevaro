@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/app/includes/quiz_repository.php';
 require_once __DIR__ . '/app/includes/access.php';
+require_once __DIR__ . '/app/includes/classroom.php';
 
 $quizKey = $_GET['key'] ?? 'mathe_klasse5_bruchrechnen';
 $quiz = elevaro_get_quiz_payload($quizKey);
@@ -12,8 +13,25 @@ if (!$quiz) {
 }
 
 $currentUser = auth_user();
-$userIsPremium = elevaro_user_has_premium_for_quiz($currentUser, (int)$quiz['id']);
-$userCanContinue = elevaro_can_start_additional_quiz($currentUser);
+$classId = (int)($_GET['class_id'] ?? 0);
+$classroomParticipant = $classId ? classroom_current_participant($classId) : null;
+$classroomHasQuiz = false;
+if ($classId && $classroomParticipant) {
+    $stmt = elevaro_db()->prepare("SELECT COUNT(*) FROM teacher_class_quizzes WHERE class_id = :class_id AND quiz_id = :quiz_id");
+    $stmt->execute(['class_id' => $classId, 'quiz_id' => (int)$quiz['id']]);
+    $classroomHasQuiz = (int)$stmt->fetchColumn() > 0;
+    if ($classroomHasQuiz) {
+        classroom_touch((int)$classroomParticipant['id']);
+        auth_start_session();
+        $logKey = 'classroom_quiz_started_' . $classId . '_' . (int)$quiz['id'];
+        if (empty($_SESSION[$logKey])) {
+            classroom_log_activity($classId, (int)$classroomParticipant['id'], 'quiz_start', $classroomParticipant['display_name'] . ' startet „' . $quiz['title'] . '”.');
+            $_SESSION[$logKey] = time();
+        }
+    }
+}
+$userIsPremium = $classroomHasQuiz || elevaro_user_has_premium_for_quiz($currentUser, (int)$quiz['id']);
+$userCanContinue = $classroomHasQuiz || elevaro_can_start_additional_quiz($currentUser);
 
 if (empty($quiz['questions'])) {
     http_response_code(404);
@@ -262,7 +280,7 @@ $hasListeningAudio = $listeningMode && $listeningAudioPath !== '';
         <div class="d-flex justify-content-center gap-3 flex-wrap mt-4">
           <button id="restartBtn" class="btn btn-primary">Nochmal spielen</button>
           <button id="weakBtn" class="btn btn-outline-primary d-none">Wackelkandidaten üben</button>
-          <a href="recommendations.php" class="btn btn-light">Weitere Quizze</a>
+          <?php if ($classId && $classroomParticipant): ?><a href="/classroom.php?class_id=<?= (int)$classId ?>" class="btn btn-light">Zurück in den Klassenraum</a><?php else: ?><a href="recommendations.php" class="btn btn-light">Weitere Quizze</a><?php endif; ?>
         </div>
       </div>
 
@@ -291,7 +309,9 @@ window.ELEVARO_QUIZ = {
   userIsPremium: <?= $userIsPremium ? 'true' : 'false' ?>,
   userCanContinue: <?= $userCanContinue ? 'true' : 'false' ?>,
   roundQuestionCount: <?= (int)count($quiz['questions']) ?>,
-  poolQuestionCount: <?= (int)$total ?>
+  poolQuestionCount: <?= (int)$total ?>,
+  classroomId: <?= (int)$classId ?>,
+  classroomMode: <?= ($classId && $classroomParticipant) ? 'true' : 'false' ?>
 };
 </script>
 <script src="assets/js/quiz.js?v=<?= filemtime(__DIR__ . '/assets/js/quiz.js') ?>"></script>

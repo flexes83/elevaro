@@ -26,7 +26,7 @@ teacher_header('Lehrer-Dashboard', 'Klassen, Schüler und Premium-Quizsets verwa
     <div class="col-lg-7">
       <div class="card card-soft"><div class="card-body p-4">
         <h2 class="h5 fw-bold">Einladung für <?= teacher_h(teacher_class_label($class)) ?></h2>
-        <p class="text-muted">Schüler registrieren sich kostenlos und geben nur diesen Klassencode ein. Danach sind die zugewiesenen Klassen-Quizzes auf Premium-Niveau nutzbar, alle anderen Quizzes bleiben Free.</p>
+        <p class="text-muted">Schüler treten per QR-Code oder Link bei und geben nur ihren Namen ein. Ein Konto ist optional – ideal für den schnellen Einsatz im Unterricht.</p>
         <div class="invite-code mb-3"><?= teacher_h($class['invite_code']) ?></div>
         <div class="input-group">
           <input class="form-control" value="<?= teacher_h(teacher_invite_url($class)) ?>" readonly>
@@ -41,6 +41,7 @@ teacher_header('Lehrer-Dashboard', 'Klassen, Schüler und Premium-Quizsets verwa
           <a class="btn btn-primary" href="quizzes.php?class_id=<?= (int)$class['id'] ?>">📝 Quizzes hinzufügen</a>
           <a class="btn btn-light" href="students.php?class_id=<?= (int)$class['id'] ?>">👧 Schüler ansehen</a>
           <a class="btn btn-light" href="settings.php?class_id=<?= (int)$class['id'] ?>">⚙️ Einladung & QR-Code</a>
+          <a class="btn btn-light" href="<?= teacher_h(teacher_invite_url($class)) ?>" target="_blank">👀 Klassenraum ansehen</a>
         </div>
       </div></div>
     </div>
