@@ -94,9 +94,17 @@ $hasListeningAudio = $listeningMode && $listeningAudioPath !== '';
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/quiz.css?v=<?= filemtime(__DIR__ . '/assets/css/quiz.css') ?>">
   <link rel="stylesheet" href="assets/css/design-system.css">
+  <?php if ($classId && $classroomParticipant): ?><link rel="stylesheet" href="assets/css/classroom.css?v=<?= filemtime(__DIR__ . '/assets/css/classroom.css') ?>"><?php endif; ?>
 </head>
-<body class="quiz-page">
+<body class="quiz-page <?= ($classId && $classroomParticipant) ? 'quiz-classroom-mode' : '' ?>">
 
+<?php if ($classId && $classroomParticipant && $classroomClass): ?>
+<nav class="classroom-quiz-topbar">
+  <a class="classroom-back" href="/classroom.php?class_id=<?= (int)$classId ?>">← Klassenraum</a>
+  <div class="classroom-quiz-room">🏫 <?= qh(classroom_label($classroomClass)) ?></div>
+  <div class="classroom-quiz-me"><span class="avatar-bubble <?= qh($classroomParticipant['avatar_type'] ?? 'emoji') ?> <?= qh($classroomParticipant['avatar_gradient'] ?? 'grad-1') ?>"><?= qh($classroomParticipant['avatar_emoji'] ?? '🙂') ?></span><?= qh($classroomParticipant['display_name']) ?></div>
+</nav>
+<?php else: ?>
 <nav class="navbar navbar-expand-lg bg-white border-bottom">
   <div class="container">
     <a class="navbar-brand fw-bold" href="/">Elevaro</a>
@@ -106,6 +114,7 @@ $hasListeningAudio = $listeningMode && $listeningAudioPath !== '';
     </div>
   </div>
 </nav>
+<?php endif; ?>
 
 <main class="quiz-wrap">
   <div class="container">
@@ -259,6 +268,7 @@ $hasListeningAudio = $listeningMode && $listeningAudioPath !== '';
           <ul id="weakList" class="mb-0"></ul>
         </div>
 
+        <?php if (!($classId && $classroomParticipant)): ?>
         <div id="resultConversionCard" class="result-conversion-card text-start">
           <span class="conversion-kicker">Dein nächster Schritt</span>
           <h3>Quizz dich zu besseren Noten</h3>
@@ -276,6 +286,9 @@ $hasListeningAudio = $listeningMode && $listeningAudioPath !== '';
             <?php endif; ?>
           </div>
         </div>
+        <?php else: ?>
+        <div id="duelResultBox" class="duel-result-box d-none text-start"></div>
+        <?php endif; ?>
 
         <div class="d-flex justify-content-center gap-3 flex-wrap mt-4">
           <button id="restartBtn" class="btn btn-primary">Nochmal spielen</button>
@@ -286,9 +299,11 @@ $hasListeningAudio = $listeningMode && $listeningAudioPath !== '';
 
     </div>
   </div>
+<?php if (!($classId && $classroomParticipant)): ?>
 <div class="result-cta text-center mt-4">
 <a class="btn btn-primary" href="/paywall.php">Premium freischalten</a>
-</div></main>
+</div>
+<?php endif; ?></main>
 
 <script>
 window.ELEVARO_QUIZ = {
@@ -311,6 +326,8 @@ window.ELEVARO_QUIZ = {
   roundQuestionCount: <?= (int)count($quiz['questions']) ?>,
   poolQuestionCount: <?= (int)$total ?>,
   classroomId: <?= (int)$classId ?>,
+  classroomDuelId: <?= (int)$classroomDuelId ?>,
+  classroomSessionId: null,
   classroomMode: <?= ($classId && $classroomParticipant) ? 'true' : 'false' ?>
 };
 </script>

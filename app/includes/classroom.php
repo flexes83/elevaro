@@ -81,6 +81,55 @@ function classroom_ensure_schema(): void
         }
     }
 
+    $pdo->exec("CREATE TABLE IF NOT EXISTS classroom_quiz_sessions (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        class_id INT UNSIGNED NOT NULL,
+        participant_id INT UNSIGNED NOT NULL,
+        quiz_id INT UNSIGNED NOT NULL,
+        duel_id INT UNSIGNED NULL,
+        session_token VARCHAR(120) NULL,
+        started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        completed_at DATETIME NULL,
+        total_questions INT UNSIGNED NOT NULL DEFAULT 0,
+        answered_questions INT UNSIGNED NOT NULL DEFAULT 0,
+        correct_answers INT UNSIGNED NOT NULL DEFAULT 0,
+        wrong_answers INT UNSIGNED NOT NULL DEFAULT 0,
+        score_points INT UNSIGNED NOT NULL DEFAULT 0,
+        best_streak INT UNSIGNED NOT NULL DEFAULT 0,
+        percent_score DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+        KEY idx_classroom_quiz_sessions_class (class_id, completed_at),
+        KEY idx_classroom_quiz_sessions_participant (participant_id, completed_at),
+        KEY idx_classroom_quiz_sessions_duel (duel_id),
+        KEY idx_classroom_quiz_sessions_quiz (quiz_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    foreach ([
+        'duel_id' => "ALTER TABLE classroom_quiz_sessions ADD COLUMN duel_id INT UNSIGNED NULL AFTER quiz_id",
+        'best_streak' => "ALTER TABLE classroom_quiz_sessions ADD COLUMN best_streak INT UNSIGNED NOT NULL DEFAULT 0 AFTER score_points",
+        'percent_score' => "ALTER TABLE classroom_quiz_sessions ADD COLUMN percent_score DECIMAL(5,2) NOT NULL DEFAULT 0.00 AFTER best_streak",
+    ] as $column => $sql) {
+        if (!elevaro_access_column_exists('classroom_quiz_sessions', $column)) {
+            try { $pdo->exec($sql); } catch (Throwable $e) {}
+        }
+    }
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS classroom_answer_events (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        class_id INT UNSIGNED NOT NULL,
+        participant_id INT UNSIGNED NOT NULL,
+        quiz_session_id INT UNSIGNED NULL,
+        quiz_id INT UNSIGNED NOT NULL,
+        question_id INT UNSIGNED NOT NULL,
+        selected_answer TEXT NULL,
+        correct_answer TEXT NULL,
+        is_correct TINYINT(1) NOT NULL DEFAULT 0,
+        points INT UNSIGNED NOT NULL DEFAULT 0,
+        answered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        KEY idx_classroom_answer_session (quiz_session_id),
+        KEY idx_classroom_answer_class (class_id, answered_at),
+        KEY idx_classroom_answer_participant (participant_id, answered_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
     if (elevaro_access_column_exists('teacher_classes', 'allow_guest_join') === false) {
         try { $pdo->exec("ALTER TABLE teacher_classes ADD COLUMN allow_guest_join TINYINT(1) NOT NULL DEFAULT 1 AFTER is_active"); } catch (Throwable $e) {}
     }
@@ -380,6 +429,202 @@ function classroom_respond_duel(int $classId, int $participantId, int $duelId, s
     classroom_log_activity($classId, $participantId, 'duel_' . $status, $title, '');
     $duel['status'] = $status;
     return $duel;
+}
+
+function classroom_participant_has_quiz_access(int $classId, int $participantId, int $quizId): bool
+{
+    if (!$classId || !$participantId || !$quizId) return false;
+    $participant = classroom_current_participant($classId);
+    if (!$participant || (int)$participant['id'] !== $participantId) return false;
+
+    $stmt = classroom_db()->prepare("SELECT COUNT(*) FROM teacher_class_quizzes WHERE class_id = :class_id AND quiz_id = :quiz_id");
+    $stmt->execute(['class_id' => $classId, 'quiz_id' => $quizId]);
+    return (int)$stmt->fetchColumn() > 0;
+}
+
+function classroom_duel_for_quiz(int $classId, int $participantId, int $duelId, int $quizId): ?array
+{
+    if (!$duelId) return null;
+    $stmt = classroom_db()->prepare("\n        SELECT d.*,\n               c.display_name AS challenger_name, c.avatar_emoji AS challenger_avatar, c.avatar_type AS challenger_avatar_type, c.avatar_gradient AS challenger_avatar_gradient,\n               p.display_name AS challenged_name, p.avatar_emoji AS challenged_avatar, p.avatar_type AS challenged_avatar_type, p.avatar_gradient AS challenged_avatar_gradient\n        FROM classroom_duel_challenges d\n        JOIN classroom_participants c ON c.id = d.challenger_participant_id\n        JOIN classroom_participants p ON p.id = d.challenged_participant_id\n        WHERE d.id = :id\n          AND d.class_id = :class_id\n          AND d.quiz_id = :quiz_id\n          AND d.status = 'accepted'\n          AND (d.challenger_participant_id = :participant_a OR d.challenged_participant_id = :participant_b)\n        LIMIT 1\n    ");
+    $stmt->execute([
+        'id' => $duelId,
+        'class_id' => $classId,
+        'quiz_id' => $quizId,
+        'participant_a' => $participantId,
+        'participant_b' => $participantId,
+    ]);
+    return $stmt->fetch() ?: null;
+}
+
+function classroom_start_quiz_session(int $classId, int $participantId, int $quizId, ?string $sessionToken = null, ?int $roundQuestionCount = null, ?int $duelId = null): int
+{
+    classroom_ensure_schema();
+    if (!classroom_participant_has_quiz_access($classId, $participantId, $quizId)) {
+        throw new RuntimeException('Dieses Quiz ist für diesen Klassenraum nicht freigegeben.');
+    }
+    if ($duelId && !classroom_duel_for_quiz($classId, $participantId, $duelId, $quizId)) {
+        throw new RuntimeException('Dieses Quizduell ist nicht mehr aktiv.');
+    }
+
+    $total = $roundQuestionCount;
+    if ($total === null || $total <= 0) {
+        $stmt = classroom_db()->prepare("SELECT COUNT(*) FROM questions WHERE quiz_id = :quiz_id AND status = 'published'");
+        $stmt->execute(['quiz_id' => $quizId]);
+        $total = (int)$stmt->fetchColumn();
+    }
+
+    $stmt = classroom_db()->prepare("\n        INSERT INTO classroom_quiz_sessions (class_id, participant_id, quiz_id, duel_id, session_token, total_questions)\n        VALUES (:class_id, :participant_id, :quiz_id, :duel_id, :session_token, :total_questions)\n    ");
+    $stmt->execute([
+        'class_id' => $classId,
+        'participant_id' => $participantId,
+        'quiz_id' => $quizId,
+        'duel_id' => $duelId ?: null,
+        'session_token' => $sessionToken,
+        'total_questions' => max(0, (int)$total),
+    ]);
+    return (int)classroom_db()->lastInsertId();
+}
+
+function classroom_record_answer(int $classId, int $participantId, int $sessionId, int $quizId, int $questionId, string $selectedAnswer, string $correctAnswer, bool $isCorrect, int $points = 0): void
+{
+    classroom_ensure_schema();
+    $stmt = classroom_db()->prepare("SELECT * FROM classroom_quiz_sessions WHERE id = :id AND class_id = :class_id AND participant_id = :participant_id AND quiz_id = :quiz_id LIMIT 1");
+    $stmt->execute(['id' => $sessionId, 'class_id' => $classId, 'participant_id' => $participantId, 'quiz_id' => $quizId]);
+    $session = $stmt->fetch();
+    if (!$session) throw new RuntimeException('Klassenraum-Quizrunde nicht gefunden.');
+
+    $pdo = classroom_db();
+    $pdo->beginTransaction();
+    try {
+        $stmt = $pdo->prepare("\n            INSERT INTO classroom_answer_events (class_id, participant_id, quiz_session_id, quiz_id, question_id, selected_answer, correct_answer, is_correct, points)\n            VALUES (:class_id, :participant_id, :quiz_session_id, :quiz_id, :question_id, :selected_answer, :correct_answer, :is_correct, :points)\n        ");
+        $stmt->execute([
+            'class_id' => $classId,
+            'participant_id' => $participantId,
+            'quiz_session_id' => $sessionId,
+            'quiz_id' => $quizId,
+            'question_id' => $questionId,
+            'selected_answer' => $selectedAnswer,
+            'correct_answer' => $correctAnswer,
+            'is_correct' => $isCorrect ? 1 : 0,
+            'points' => max(0, $points),
+        ]);
+
+        $stmt = $pdo->prepare("\n            UPDATE classroom_quiz_sessions\n            SET answered_questions = answered_questions + 1,\n                correct_answers = correct_answers + :correct_increment,\n                wrong_answers = wrong_answers + :wrong_increment,\n                score_points = score_points + :points\n            WHERE id = :session_id\n        ");
+        $stmt->execute([
+            'correct_increment' => $isCorrect ? 1 : 0,
+            'wrong_increment' => $isCorrect ? 0 : 1,
+            'points' => max(0, $points),
+            'session_id' => $sessionId,
+        ]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        throw $e;
+    }
+}
+
+function classroom_complete_quiz_session(int $classId, int $participantId, int $sessionId, int $score, int $total, int $points, int $bestStreak): array
+{
+    classroom_ensure_schema();
+    $percent = $total > 0 ? round(($score / $total) * 100, 2) : 0.0;
+    $stmt = classroom_db()->prepare("\n        UPDATE classroom_quiz_sessions\n        SET completed_at = IFNULL(completed_at, NOW()),\n            total_questions = :total_questions,\n            correct_answers = :correct_answers,\n            wrong_answers = GREATEST(:total_questions - :correct_answers, 0),\n            score_points = GREATEST(score_points, :score_points),\n            best_streak = :best_streak,\n            percent_score = :percent_score\n        WHERE id = :id\n          AND class_id = :class_id\n          AND participant_id = :participant_id\n    ");
+    $stmt->execute([
+        'total_questions' => max(0, $total),
+        'correct_answers' => max(0, $score),
+        'score_points' => max(0, $points),
+        'best_streak' => max(0, $bestStreak),
+        'percent_score' => $percent,
+        'id' => $sessionId,
+        'class_id' => $classId,
+        'participant_id' => $participantId,
+    ]);
+
+    $stmt = classroom_db()->prepare("SELECT s.*, p.display_name, q.title AS quiz_title FROM classroom_quiz_sessions s JOIN classroom_participants p ON p.id = s.participant_id JOIN quizzes q ON q.id = s.quiz_id WHERE s.id = :id LIMIT 1");
+    $stmt->execute(['id' => $sessionId]);
+    $session = $stmt->fetch() ?: [];
+
+    if ($session) {
+        classroom_log_activity(
+            $classId,
+            $participantId,
+            !empty($session['duel_id']) ? 'duel_finished' : 'quiz_finished',
+            $session['display_name'] . ' hat „' . $session['quiz_title'] . '” mit ' . (int)$session['score_points'] . ' Punkten beendet.',
+            ''
+        );
+    }
+
+    $duelResult = null;
+    if (!empty($session['duel_id'])) {
+        $duelResult = classroom_duel_result((int)$session['duel_id'], $participantId);
+    }
+
+    return [
+        'session' => $session,
+        'duel_result' => $duelResult,
+    ];
+}
+
+function classroom_duel_result(int $duelId, int $participantId): ?array
+{
+    $stmt = classroom_db()->prepare("\n        SELECT d.*, c.display_name AS challenger_name, p.display_name AS challenged_name\n        FROM classroom_duel_challenges d\n        JOIN classroom_participants c ON c.id = d.challenger_participant_id\n        JOIN classroom_participants p ON p.id = d.challenged_participant_id\n        WHERE d.id = :id\n        LIMIT 1\n    ");
+    $stmt->execute(['id' => $duelId]);
+    $duel = $stmt->fetch();
+    if (!$duel) return null;
+
+    $stmt = classroom_db()->prepare("\n        SELECT s.*, p.display_name\n        FROM classroom_quiz_sessions s\n        JOIN classroom_participants p ON p.id = s.participant_id\n        WHERE s.duel_id = :duel_id\n          AND s.completed_at IS NOT NULL\n          AND s.participant_id IN (:challenger, :challenged)\n        ORDER BY s.completed_at ASC\n    ");
+    $stmt->execute([
+        'duel_id' => $duelId,
+        'challenger' => (int)$duel['challenger_participant_id'],
+        'challenged' => (int)$duel['challenged_participant_id'],
+    ]);
+    $sessions = $stmt->fetchAll();
+
+    $own = null; $other = null;
+    foreach ($sessions as $s) {
+        if ((int)$s['participant_id'] === $participantId) $own = $s;
+        else $other = $s;
+    }
+    if (!$own) return null;
+
+    $pending = count($sessions) < 2;
+    $winnerId = null;
+    if (!$pending && $other) {
+        $ownPoints = (int)$own['score_points'];
+        $otherPoints = (int)$other['score_points'];
+        if ($ownPoints > $otherPoints) $winnerId = (int)$own['participant_id'];
+        elseif ($otherPoints > $ownPoints) $winnerId = (int)$other['participant_id'];
+        else {
+            $ownCorrect = (int)$own['correct_answers'];
+            $otherCorrect = (int)$other['correct_answers'];
+            if ($ownCorrect > $otherCorrect) $winnerId = (int)$own['participant_id'];
+            elseif ($otherCorrect > $ownCorrect) $winnerId = (int)$other['participant_id'];
+        }
+    }
+
+    return [
+        'pending' => $pending,
+        'outcome' => $pending ? 'waiting' : ($winnerId === null ? 'draw' : ($winnerId === $participantId ? 'won' : 'lost')),
+        'own_name' => (string)$own['display_name'],
+        'own_points' => (int)$own['score_points'],
+        'own_correct' => (int)$own['correct_answers'],
+        'other_name' => $other['display_name'] ?? ($participantId === (int)$duel['challenger_participant_id'] ? $duel['challenged_name'] : $duel['challenger_name']),
+        'other_points' => $other ? (int)$other['score_points'] : null,
+        'other_correct' => $other ? (int)$other['correct_answers'] : null,
+    ];
+}
+
+function classroom_highscores(int $classId, ?int $quizId = null, int $limit = 10): array
+{
+    classroom_ensure_schema();
+    $where = "s.class_id = :class_id AND s.completed_at IS NOT NULL";
+    $params = ['class_id' => $classId];
+    if ($quizId) {
+        $where .= " AND s.quiz_id = :quiz_id";
+        $params['quiz_id'] = $quizId;
+    }
+    $stmt = classroom_db()->prepare("\n        SELECT p.display_name, p.avatar_emoji, p.avatar_type, p.avatar_gradient, q.title AS quiz_title,\n               MAX(s.score_points) AS best_points, MAX(s.correct_answers) AS best_correct, MAX(s.percent_score) AS best_percent, COUNT(*) AS rounds\n        FROM classroom_quiz_sessions s\n        JOIN classroom_participants p ON p.id = s.participant_id\n        JOIN quizzes q ON q.id = s.quiz_id\n        WHERE {$where}\n        GROUP BY s.participant_id, s.quiz_id, p.display_name, p.avatar_emoji, p.avatar_type, p.avatar_gradient, q.title\n        ORDER BY best_points DESC, best_correct DESC, best_percent DESC, p.display_name ASC\n        LIMIT " . max(1, min(30, $limit)) . "\n    ");
+    $stmt->execute($params);
+    return $stmt->fetchAll();
 }
 
 classroom_ensure_schema();

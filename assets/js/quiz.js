@@ -8,6 +8,7 @@
   let weakQuestions = [];
   let questionStartedAt = null;
   let quizSessionId = null;
+  let classroomSessionId = window.ELEVARO_QUIZ.classroomSessionId || null;
   let currentStreak = 0;
   let bestStreak = 0;
   let totalPoints = 0;
@@ -54,7 +55,7 @@
   }
 
   function requirePremiumForRepeat() {
-    if (window.ELEVARO_QUIZ.userIsPremium || window.ELEVARO_QUIZ.userCanContinue) {
+    if (window.ELEVARO_QUIZ.classroomMode || window.ELEVARO_QUIZ.userIsPremium || window.ELEVARO_QUIZ.userCanContinue) {
       return true;
     }
     redirectToPaywall();
@@ -468,6 +469,10 @@
         correct_answer: question.answer,
         is_correct: isCorrect,
         session_id: quizSessionId || null,
+        quiz_session_id: quizSessionId || null,
+        classroom_session_id: classroomSessionId || null,
+        class_id: window.ELEVARO_QUIZ.classroomMode ? window.ELEVARO_QUIZ.classroomId : 0,
+        duel_id: window.ELEVARO_QUIZ.classroomDuelId || 0,
         session_token: sessionId,
         response_time_ms: responseTimeMs,
         points
@@ -494,7 +499,9 @@
       body: JSON.stringify({
         quiz_id: window.ELEVARO_QUIZ.dbId,
         session_token: sessionId,
-        question_count: questions.length
+        question_count: questions.length,
+        class_id: window.ELEVARO_QUIZ.classroomMode ? window.ELEVARO_QUIZ.classroomId : 0,
+        duel_id: window.ELEVARO_QUIZ.classroomDuelId || 0
       })
     })
       .then(response => {
@@ -505,21 +512,80 @@
         if (data && data.success && data.quiz_session_id) {
           quizSessionId = data.quiz_session_id;
         }
+        if (data && data.success && data.classroom_session_id) {
+          classroomSessionId = data.classroom_session_id;
+          window.ELEVARO_QUIZ.classroomSessionId = data.classroom_session_id;
+        }
       })
       .catch(() => {});
   }
 
   function completeQuizSession() {
-    if (!quizSessionId) return;
+    if (!quizSessionId && !classroomSessionId) return;
 
     fetch('api/quiz_complete.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
       body: JSON.stringify({
-        quiz_session_id: quizSessionId
+        quiz_session_id: quizSessionId || null,
+        classroom_session_id: classroomSessionId || null,
+        class_id: window.ELEVARO_QUIZ.classroomMode ? window.ELEVARO_QUIZ.classroomId : 0,
+        duel_id: window.ELEVARO_QUIZ.classroomDuelId || 0,
+        score,
+        total: questions.length,
+        points: totalPoints,
+        best_streak: bestStreak
       })
-    }).catch(() => {});
+    })
+      .then(response => response.json().catch(() => null))
+      .then(data => {
+        if (data && data.success && data.duel_result) {
+          renderDuelResult(data.duel_result);
+        }
+      })
+      .catch(() => {});
+  }
+
+  function renderDuelResult(result) {
+    const box = document.getElementById('duelResultBox');
+    if (!box) return;
+
+    let headline = 'Duell beendet';
+    let icon = '⚔️';
+    let text = 'Dein Ergebnis wurde gespeichert.';
+
+    if (result.outcome === 'waiting') {
+      headline = 'Du hast vorgelegt';
+      icon = '⏳';
+      text = `${escapeHtml(result.other_name || 'Dein Gegner')} ist noch dran.`;
+    } else if (result.outcome === 'won') {
+      headline = 'Du hast gewonnen!';
+      icon = '🏆';
+      text = `Stark! Du liegst vor ${escapeHtml(result.other_name || 'deinem Gegner')}.`;
+      celebrateResult('confetti');
+    } else if (result.outcome === 'lost') {
+      headline = 'Du hast verloren';
+      icon = '💪';
+      text = `${escapeHtml(result.other_name || 'Dein Gegner')} war diesmal vorne. Nächste Runde!`;
+    } else if (result.outcome === 'draw') {
+      headline = 'Unentschieden';
+      icon = '🤝';
+      text = 'Ihr wart gleich stark.';
+    }
+
+    box.innerHTML = `
+      <div class="duel-result-icon">${icon}</div>
+      <div>
+        <strong>${headline}</strong>
+        <p>${text}</p>
+        <div class="duel-scoreline">
+          <span>Du: <b>${Number(result.own_points || 0)}</b> Punkte · ${Number(result.own_correct || 0)} richtig</span>
+          <span>${escapeHtml(result.other_name || 'Gegner')}: <b>${result.other_points === null || result.other_points === undefined ? '…' : Number(result.other_points)}</b> Punkte${result.other_correct === null || result.other_correct === undefined ? '' : ' · ' + Number(result.other_correct) + ' richtig'}</span>
+        </div>
+      </div>
+    `;
+    box.classList.remove('d-none');
   }
 
   function updateMiniHud() {

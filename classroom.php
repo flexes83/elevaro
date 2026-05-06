@@ -17,6 +17,7 @@ $quizzes = classroom_assigned_quizzes((int)$class['id']);
 $online = classroom_online_participants((int)$class['id']);
 $activities = classroom_recent_activities((int)$class['id']);
 $duels = classroom_duels_for_participant((int)$class['id'], (int)$participant['id']);
+$highscores = classroom_highscores((int)$class['id']);
 $avatarOptions = classroom_avatar_options();
 $gradientOptions = classroom_gradient_options();
 ?>
@@ -102,6 +103,25 @@ $gradientOptions = classroom_gradient_options();
               <?php endif; ?>
             </div>
           <?php endforeach; ?>
+        </div>
+      </section>
+      <section class="side-card">
+        <div class="section-head compact"><h2>Klassen-Highscore</h2></div>
+        <div class="classroom-highscore-list">
+          <?php foreach ($highscores as $i => $row): ?>
+            <div class="highscore-row">
+              <span class="highscore-rank"><?= (int)$i + 1 ?></span>
+              <span class="avatar-bubble <?= classroom_h($row['avatar_type'] ?? 'emoji') ?> <?= classroom_h($row['avatar_gradient'] ?? 'grad-1') ?>"><?= classroom_h($row['avatar_emoji'] ?? '🙂') ?></span>
+              <div>
+                <strong><?= classroom_h($row['display_name']) ?></strong>
+                <small><?= classroom_h($row['quiz_title']) ?></small>
+              </div>
+              <b><?= (int)$row['best_points'] ?></b>
+            </div>
+          <?php endforeach; ?>
+          <?php if (!$highscores): ?>
+            <div class="empty-mini-state">Noch keine Ergebnisse. Starte ein Quiz und hol dir den ersten Platz.</div>
+          <?php endif; ?>
         </div>
       </section>
       <section class="side-card">

@@ -1,76 +1,86 @@
 <?php
 
-require_once __DIR__ . '/../app/includes/quiz_repository.php';
+declare(strict_types=1);
+
 require_once __DIR__ . '/../app/includes/user_data.php';
+require_once __DIR__ . '/../app/includes/classroom.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['success' => false, 'error' => 'method_not_allowed'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 try {
     $payload = json_decode(file_get_contents('php://input') ?: '[]', true);
+
     if (!is_array($payload)) {
-        throw new RuntimeException('Invalid JSON payload.');
+        throw new RuntimeException('Invalid JSON.');
     }
 
     $quizId = (int)($payload['quiz_id'] ?? 0);
     $questionId = (int)($payload['question_id'] ?? 0);
+    $sessionId = isset($payload['quiz_session_id']) ? (int)$payload['quiz_session_id'] : (isset($payload['session_id']) ? (int)$payload['session_id'] : null);
+    $classroomSessionId = (int)($payload['classroom_session_id'] ?? 0);
+    $classId = (int)($payload['class_id'] ?? 0);
     $selectedAnswer = (string)($payload['selected_answer'] ?? '');
     $correctAnswer = (string)($payload['correct_answer'] ?? '');
-    $isCorrect = !empty($payload['is_correct']);
-    $sessionId = isset($payload['session_id']) && is_numeric($payload['session_id']) ? (int)$payload['session_id'] : null;
-    $legacySessionId = isset($payload['session_token']) ? (string)$payload['session_token'] : (isset($payload['session_id']) ? (string)$payload['session_id'] : null);
-    $responseTimeMs = isset($payload['response_time_ms']) ? (int)$payload['response_time_ms'] : null;
-    $points = isset($payload['points']) ? (int)$payload['points'] : ($isCorrect ? 10 : 0);
+    $isCorrect = (bool)($payload['is_correct'] ?? false);
+    $points = (int)($payload['points'] ?? 0);
 
     if (!$quizId || !$questionId) {
-        throw new RuntimeException('Missing quiz_id or question_id.');
+        throw new RuntimeException('quiz_id und question_id sind erforderlich.');
     }
 
-    try {
-        elevaro_record_answer_event($quizId, $questionId, $selectedAnswer, $isCorrect, $legacySessionId, $responseTimeMs);
-    } catch (Throwable $legacyError) {
-        error_log('Elevaro legacy answer tracking failed: ' . $legacyError->getMessage());
-    }
-
-    $progress = null;
-    $userId = elevaro_current_user_id();
-    $userError = null;
-
-    if ($userId) {
-        try {
-            $progress = elevaro_record_user_answer(
-                $userId,
-                $quizId,
-                $questionId,
-                $selectedAnswer,
-                $correctAnswer,
-                $isCorrect,
-                $sessionId,
-                $points,
-                $responseTimeMs
-            );
-        } catch (Throwable $e) {
-            $userError = $e->getMessage();
-            error_log('Elevaro user stats failed: ' . $e->getMessage());
+    if ($classId && $classroomSessionId) {
+        $participant = classroom_current_participant($classId);
+        if (!$participant) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'classroom_not_joined'], JSON_UNESCAPED_UNICODE);
+            exit;
         }
+
+        classroom_record_answer(
+            $classId,
+            (int)$participant['id'],
+            $classroomSessionId,
+            $quizId,
+            $questionId,
+            $selectedAnswer,
+            $correctAnswer,
+            $isCorrect,
+            $points
+        );
+
+        echo json_encode(['success' => true, 'classroom' => true], JSON_UNESCAPED_UNICODE);
+        exit;
     }
+
+    $userId = elevaro_current_user_id();
+    if (!$userId) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'not_logged_in'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $progress = elevaro_record_user_answer(
+        $userId,
+        $quizId,
+        $questionId,
+        $selectedAnswer,
+        $correctAnswer,
+        $isCorrect,
+        $sessionId,
+        $points
+    );
 
     echo json_encode([
         'success' => true,
-        'logged_in' => (bool)$userId,
-        'user_id' => $userId,
-        'user_stats_error' => $userError,
         'progress' => $progress,
-        'tables' => [
-            'user_answer_events' => elevaro_table_exists('user_answer_events'),
-            'user_question_progress' => elevaro_table_exists('user_question_progress'),
-            'user_quiz_sessions' => elevaro_table_exists('user_quiz_sessions'),
-        ],
     ], JSON_UNESCAPED_UNICODE);
-
 } catch (Throwable $e) {
-    http_response_code(400);
-    echo json_encode([
-        'success' => false,
-        'message' => $e->getMessage()
-    ], JSON_UNESCAPED_UNICODE);
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
