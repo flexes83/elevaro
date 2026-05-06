@@ -356,13 +356,13 @@ function classroom_duels_for_participant(int $classId, int $participantId): arra
         JOIN classroom_participants challenged ON challenged.id = d.challenged_participant_id
         LEFT JOIN quizzes q ON q.id = d.quiz_id
         WHERE d.class_id = :class_id
-          AND (d.challenger_participant_id = :participant_id OR d.challenged_participant_id = :participant_id)
+          AND (d.challenger_participant_id = :participant_id_challenger OR d.challenged_participant_id = :participant_id_challenged)
           AND d.status IN ('pending','accepted')
           AND d.created_at >= (NOW() - INTERVAL 20 MINUTE)
         ORDER BY d.created_at DESC, d.id DESC
         LIMIT 10
     ");
-    $stmt->execute(['class_id' => $classId, 'participant_id' => $participantId]);
+    $stmt->execute(['class_id' => $classId, 'participant_id_challenger' => $participantId, 'participant_id_challenged' => $participantId]);
     return $stmt->fetchAll();
 }
 
