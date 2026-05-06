@@ -13,7 +13,7 @@ if (!$participant) {
     exit;
 }
 classroom_touch((int)$participant['id']);
-$quizzes = classroom_assigned_quizzes((int)$class['id']);
+$quizzes = classroom_assigned_quizzes((int)$class['id'], (int)$participant['id']);
 $online = classroom_online_participants((int)$class['id']);
 $activities = classroom_recent_activities((int)$class['id']);
 $duels = classroom_duels_for_participant((int)$class['id'], (int)$participant['id']);
@@ -28,6 +28,7 @@ $gradientOptions = classroom_gradient_options();
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= classroom_h(classroom_label($class)) ?> – Elevaro Klassenraum</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/quiz-card.css?v=<?= filemtime(__DIR__ . '/assets/css/quiz-card.css') ?>">
   <link rel="stylesheet" href="/assets/css/classroom.css?v=<?= filemtime(__DIR__ . '/assets/css/classroom.css') ?>">
 </head>
 <body class="classroom-page" data-class-id="<?= (int)$class['id'] ?>">
@@ -55,16 +56,58 @@ $gradientOptions = classroom_gradient_options();
       <div class="section-head">
         <div><span class="eyebrow">Bereitgestellt</span><h2>Quizzes & Aufgaben</h2></div>
       </div>
-      <div class="quiz-room-list">
+      <div class="classroom-quiz-card-grid elevaro-quiz-grid">
         <?php foreach ($quizzes as $quiz): ?>
-          <article class="room-quiz-card">
-            <div class="quiz-emoji"><?= classroom_h($quiz['theme_emoji'] ?? '🎯') ?></div>
-            <div>
-              <h3><?= classroom_h($quiz['title']) ?></h3>
-              <p><?= classroom_h($quiz['description'] ?? 'Kurzes Quiz zum Üben und Wiederholen.') ?></p>
-              <div class="quiz-meta"><span><?= (int)($quiz['grade'] ?? 0) ? classroom_h($quiz['grade'] . '. Klasse') : 'Klassenquiz' ?></span><span>Premium freigeschaltet</span></div>
+          <?php
+            $emoji = $quiz['theme_emoji'] ?: '🎯';
+            $imagePath = (string)($quiz['image_path'] ?? '');
+            $imageStatus = (string)($quiz['image_status'] ?? '');
+            $hasImage = $imagePath !== '' && (!$imageStatus || in_array($imageStatus, ['approved','generated','selected'], true));
+            $bestPercent = isset($quiz['best_percent']) ? (float)$quiz['best_percent'] : 0.0;
+            $bestCorrect = isset($quiz['best_correct']) ? (int)$quiz['best_correct'] : 0;
+            $bestTotal = isset($quiz['best_total']) ? (int)$quiz['best_total'] : 0;
+            $roundsPlayed = isset($quiz['rounds_played']) ? (int)$quiz['rounds_played'] : 0;
+            $greenDeg = max(0, min(360, $bestPercent * 3.6));
+            $redDeg = $roundsPlayed > 0 ? max(0, 360 - $greenDeg) : 0;
+            $quizUrl = '/quiz.php?key=' . urlencode((string)$quiz['quiz_key']) . '&class_id=' . (int)$class['id'];
+          ?>
+          <article class="elevaro-quiz-card classroom-quiz-card">
+            <div class="elevaro-quiz-card-media" style="--quiz-card-c1: <?= classroom_h($quiz['theme_color_1'] ?: '#6d5dfc') ?>; --quiz-card-c2: <?= classroom_h($quiz['theme_color_2'] ?: '#20c997') ?>;">
+              <?php if ($hasImage): ?>
+                <img class="elevaro-quiz-card-img" src="<?= classroom_h($imagePath) ?>" alt="">
+              <?php else: ?>
+                <span class="elevaro-quiz-card-fallback"><?= classroom_h($emoji) ?></span>
+              <?php endif; ?>
+
+              <span class="elevaro-quiz-card-badge">
+                <?= classroom_h($quiz['subject_name'] ?? 'Klassenquiz') ?>
+                <?php if (!empty($quiz['grade'])): ?> · <?= (int)$quiz['grade'] ?>. Klasse<?php endif; ?>
+              </span>
+
+              <span class="elevaro-quiz-card-donut <?= $roundsPlayed > 0 ? '' : 'is-empty' ?>" style="--quiz-donut-green: <?= (float)$greenDeg ?>deg; --quiz-donut-red: <?= (float)$redDeg ?>deg;" title="<?= $roundsPlayed > 0 ? classroom_h('Bester Versuch: ' . round($bestPercent) . '%') : 'Noch nicht gespielt' ?>">
+                <span class="elevaro-quiz-card-donut-label"><?= $roundsPlayed > 0 ? (int)round($bestPercent) . '%' : '' ?></span>
+              </span>
             </div>
-            <a class="btn btn-primary" href="/quiz.php?key=<?= urlencode((string)$quiz['quiz_key']) ?>&class_id=<?= (int)$class['id'] ?>">Starten</a>
+
+            <div class="elevaro-quiz-card-body">
+              <h3 class="elevaro-quiz-card-title"><?= classroom_h($quiz['title']) ?></h3>
+              <p class="elevaro-quiz-card-description"><?= classroom_h($quiz['description'] ?? 'Kurzes Quiz zum Üben und Wiederholen.') ?></p>
+
+              <div class="classroom-card-progress">
+                <?php if ($roundsPlayed > 0): ?>
+                  <span>🏆 Bester Versuch: <strong><?= (int)$bestCorrect ?>/<?= (int)$bestTotal ?></strong></span>
+                  <span><?= (int)$roundsPlayed ?> Runde<?= $roundsPlayed === 1 ? '' : 'n' ?></span>
+                <?php else: ?>
+                  <span>✨ Noch offen</span>
+                  <span>Hol dir Punkte für den Klassen-Highscore</span>
+                <?php endif; ?>
+              </div>
+
+              <div class="elevaro-quiz-card-footer">
+                <a class="btn btn-primary" href="<?= classroom_h($quizUrl) ?>"><?= $roundsPlayed > 0 ? 'Nochmal spielen' : 'Quiz starten' ?></a>
+                <span class="elevaro-quiz-card-meta"><?= $roundsPlayed > 0 ? (int)($quiz['best_points'] ?? 0) . ' Punkte' : 'neu' ?></span>
+              </div>
+            </div>
           </article>
         <?php endforeach; ?>
         <?php if (!$quizzes): ?>

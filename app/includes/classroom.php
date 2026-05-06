@@ -352,10 +352,48 @@ function classroom_recent_activities(int $classId, int $limit = 20): array
     return $stmt->fetchAll();
 }
 
-function classroom_assigned_quizzes(int $classId): array
+function classroom_assigned_quizzes(int $classId, ?int $participantId = null): array
 {
-    $stmt = classroom_db()->prepare("SELECT q.* FROM teacher_class_quizzes tcq JOIN quizzes q ON q.id = tcq.quiz_id WHERE tcq.class_id = :class_id AND q.is_active = 1 ORDER BY tcq.sort_order, q.title");
-    $stmt->execute(['class_id' => $classId]);
+    $sql = "
+        SELECT
+            q.*,
+            subj.name AS subject_name,
+            subj.code AS subject_code,
+            best.best_points,
+            best.best_correct,
+            best.best_total,
+            best.best_percent,
+            best.rounds_played,
+            best.last_completed_at
+        FROM teacher_class_quizzes tcq
+        JOIN quizzes q ON q.id = tcq.quiz_id
+        LEFT JOIN subjects subj ON subj.id = q.subject_id
+        LEFT JOIN (
+            SELECT
+                quiz_id,
+                MAX(score_points) AS best_points,
+                MAX(correct_answers) AS best_correct,
+                MAX(total_questions) AS best_total,
+                MAX(percent_score) AS best_percent,
+                COUNT(*) AS rounds_played,
+                MAX(completed_at) AS last_completed_at
+            FROM classroom_quiz_sessions
+            WHERE class_id = :progress_class_id
+              AND participant_id = :progress_participant_id
+              AND completed_at IS NOT NULL
+            GROUP BY quiz_id
+        ) best ON best.quiz_id = q.id
+        WHERE tcq.class_id = :class_id
+          AND q.is_active = 1
+        ORDER BY tcq.sort_order, q.title
+    ";
+
+    $stmt = classroom_db()->prepare($sql);
+    $stmt->execute([
+        'class_id' => $classId,
+        'progress_class_id' => $classId,
+        'progress_participant_id' => $participantId ?: 0,
+    ]);
     return $stmt->fetchAll();
 }
 
@@ -569,10 +607,11 @@ function classroom_complete_quiz_session(int $classId, int $participantId, int $
 {
     classroom_ensure_schema();
     $percent = $total > 0 ? round(($score / $total) * 100, 2) : 0.0;
-    $stmt = classroom_db()->prepare("\n        UPDATE classroom_quiz_sessions\n        SET completed_at = IFNULL(completed_at, NOW()),\n            total_questions = :total_questions,\n            correct_answers = :correct_answers,\n            wrong_answers = GREATEST(:total_questions - :correct_answers, 0),\n            score_points = GREATEST(score_points, :score_points),\n            best_streak = :best_streak,\n            percent_score = :percent_score\n        WHERE id = :id\n          AND class_id = :class_id\n          AND participant_id = :participant_id\n    ");
+    $stmt = classroom_db()->prepare("\n        UPDATE classroom_quiz_sessions\n        SET completed_at = IFNULL(completed_at, NOW()),\n            total_questions = :total_questions,\n            correct_answers = :correct_answers,\n            wrong_answers = :wrong_answers,\n            score_points = GREATEST(score_points, :score_points),\n            best_streak = :best_streak,\n            percent_score = :percent_score\n        WHERE id = :id\n          AND class_id = :class_id\n          AND participant_id = :participant_id\n    ");
     $stmt->execute([
         'total_questions' => max(0, $total),
         'correct_answers' => max(0, $score),
+        'wrong_answers' => max(0, $total - $score),
         'score_points' => max(0, $points),
         'best_streak' => max(0, $bestStreak),
         'percent_score' => $percent,

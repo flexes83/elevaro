@@ -181,3 +181,71 @@
     justify-content: center;
   }
 }
+
+/* Klassenraum quiz cards */
+.classroom-quiz-card-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  justify-content: stretch;
+  gap: 1rem;
+}
+
+.classroom-quiz-card {
+  min-width: 0;
+  box-shadow: 0 18px 48px rgba(23,32,51,.08);
+}
+
+.classroom-quiz-card .elevaro-quiz-card-media {
+  height: 210px;
+  min-height: 210px;
+}
+
+.classroom-card-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin-top: 1rem;
+}
+
+.classroom-card-progress span {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  padding: .38rem .62rem;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid rgba(15,23,42,.07);
+  color: #64748b;
+  font-size: .78rem;
+  font-weight: 850;
+}
+
+.classroom-card-progress strong {
+  color: #172033;
+}
+
+.classroom-quiz-card .elevaro-quiz-card-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+@media (min-width: 1180px) {
+  .classroom-layout {
+    width: min(1320px, 100%);
+  }
+
+  .classroom-grid {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .classroom-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .room-sidebar {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+}
