@@ -16,6 +16,9 @@ classroom_touch((int)$participant['id']);
 $quizzes = classroom_assigned_quizzes((int)$class['id']);
 $online = classroom_online_participants((int)$class['id']);
 $activities = classroom_recent_activities((int)$class['id']);
+$duels = classroom_duels_for_participant((int)$class['id'], (int)$participant['id']);
+$avatarOptions = classroom_avatar_options();
+$gradientOptions = classroom_gradient_options();
 ?>
 <!doctype html>
 <html lang="de">
@@ -30,7 +33,7 @@ $activities = classroom_recent_activities((int)$class['id']);
 <nav class="classroom-topbar">
   <a class="brand" href="/">Elevaro</a>
   <div class="class-pill">🏫 <?= classroom_h(classroom_label($class)) ?></div>
-  <div class="me-pill"><span><?= classroom_h($participant['avatar_emoji']) ?></span><?= classroom_h($participant['display_name']) ?></div>
+  <button class="me-pill avatar-settings-toggle" type="button" aria-haspopup="dialog"><span class="avatar-bubble <?= classroom_h($participant['avatar_type'] ?? 'emoji') ?> <?= classroom_h($participant['avatar_gradient'] ?? 'grad-1') ?>"><?= classroom_h($participant['avatar_emoji']) ?></span><?= classroom_h($participant['display_name']) ?><small>ändern</small></button>
 </nav>
 <main class="classroom-layout">
   <section class="classroom-hero">
@@ -41,7 +44,7 @@ $activities = classroom_recent_activities((int)$class['id']);
     </div>
     <div class="room-pulse-card">
       <div class="pulse-dot"></div>
-      <strong><?= count($online) ?></strong>
+      <strong id="onlineCount"><?= count($online) ?></strong>
       <span>gerade aktiv</span>
     </div>
   </section>
@@ -75,9 +78,29 @@ $activities = classroom_recent_activities((int)$class['id']);
         <div id="onlineList" class="online-list">
           <?php foreach ($online as $p): ?>
             <button class="online-person" type="button" data-participant-id="<?= (int)$p['id'] ?>" <?= (int)$p['id']===(int)$participant['id']?'disabled':'' ?>>
-              <span class="avatar"><?= classroom_h($p['avatar_emoji']) ?></span><span><?= classroom_h($p['display_name']) ?></span>
+              <span class="avatar avatar-bubble <?= classroom_h($p['avatar_type'] ?? 'emoji') ?> <?= classroom_h($p['avatar_gradient'] ?? 'grad-1') ?>"><?= classroom_h($p['avatar_emoji']) ?></span><span><?= classroom_h($p['display_name']) ?></span>
               <?php if ((int)$p['id'] !== (int)$participant['id']): ?><small>Duell</small><?php else: ?><small>du</small><?php endif; ?>
             </button>
+          <?php endforeach; ?>
+        </div>
+      </section>
+      
+      <section class="side-card" id="duelCard">
+        <div class="section-head compact"><h2>Quizduelle</h2></div>
+        <div id="duelList" class="duel-list">
+          <?php foreach ($duels as $duel): ?>
+            <?php $isChallenged = (int)$duel['challenged_participant_id'] === (int)$participant['id']; $url = classroom_duel_url($duel); ?>
+            <div class="duel-item">
+              <strong><?= classroom_h($isChallenged ? ($duel['challenger_name'] . ' fordert dich heraus') : ('Duell mit ' . $duel['challenged_name'])) ?></strong>
+              <small><?= classroom_h($duel['quiz_title'] ?: 'Erstes Klassenquiz') ?></small>
+              <?php if ($duel['status'] === 'pending' && $isChallenged): ?>
+                <div class="duel-actions"><button class="btn btn-sm btn-primary" data-duel-action="accept" data-duel-id="<?= (int)$duel['id'] ?>">Annehmen</button><button class="btn btn-sm btn-light" data-duel-action="decline" data-duel-id="<?= (int)$duel['id'] ?>">Ablehnen</button></div>
+              <?php elseif ($duel['status'] === 'accepted' && $url): ?>
+                <a class="btn btn-sm btn-primary" href="<?= classroom_h($url) ?>">Duell starten</a>
+              <?php else: ?>
+                <span class="duel-waiting">wartet …</span>
+              <?php endif; ?>
+            </div>
           <?php endforeach; ?>
         </div>
       </section>
@@ -85,13 +108,45 @@ $activities = classroom_recent_activities((int)$class['id']);
         <div class="section-head compact"><h2>Was passiert?</h2></div>
         <div id="activityFeed" class="activity-feed">
           <?php foreach ($activities as $a): ?>
-            <div class="activity-item"><span><?= classroom_h($a['avatar_emoji'] ?? '✨') ?></span><div><strong><?= classroom_h($a['title']) ?></strong><small><?= classroom_h(date('H:i', strtotime((string)$a['created_at']))) ?></small></div></div>
+            <div class="activity-item"><span class="avatar-bubble <?= classroom_h($a['avatar_type'] ?? 'emoji') ?> <?= classroom_h($a['avatar_gradient'] ?? 'grad-1') ?>"><?= classroom_h($a['avatar_emoji'] ?? '✨') ?></span><div><strong><?= classroom_h($a['title']) ?></strong><small><?= classroom_h(date('H:i', strtotime((string)$a['created_at']))) ?></small></div></div>
           <?php endforeach; ?>
         </div>
       </section>
     </aside>
   </div>
 </main>
+
+<div class="avatar-modal-backdrop" id="avatarModal" hidden>
+  <div class="avatar-modal" role="dialog" aria-modal="true" aria-labelledby="avatarModalTitle">
+    <button class="avatar-modal-close" type="button" data-avatar-close aria-label="Schließen">×</button>
+    <span class="eyebrow">Dein Zeichen</span>
+    <h2 id="avatarModalTitle">Avatar wählen</h2>
+    <p>Wähle ein eindeutiges Emoji oder nutze deine Initialen. Bereits vergebene Zeichen können nicht doppelt gewählt werden.</p>
+    <div class="avatar-tabs" role="tablist">
+      <button class="active" type="button" data-avatar-tab="emoji">Emoji</button>
+      <button type="button" data-avatar-tab="initials">Initialen</button>
+    </div>
+    <div class="avatar-panel active" data-avatar-panel="emoji">
+      <div class="avatar-choice-grid">
+        <?php foreach ($avatarOptions as $emoji): ?>
+          <button type="button" class="avatar-choice" data-avatar-type="emoji" data-avatar-value="<?= classroom_h($emoji) ?>"><?= classroom_h($emoji) ?></button>
+        <?php endforeach; ?>
+      </div>
+    </div>
+    <div class="avatar-panel" data-avatar-panel="initials">
+      <label class="form-label">Initialen</label>
+      <input class="form-control form-control-lg text-uppercase" id="initialsInput" maxlength="3" value="<?= classroom_h(classroom_initials((string)$participant['display_name'])) ?>">
+      <div class="gradient-grid">
+        <?php foreach ($gradientOptions as $gradient): ?>
+          <button type="button" class="gradient-choice <?= classroom_h($gradient) ?>" data-gradient="<?= classroom_h($gradient) ?>"><span><?= classroom_h(classroom_initials((string)$participant['display_name'])) ?></span></button>
+        <?php endforeach; ?>
+      </div>
+      <button class="btn btn-primary w-100 mt-3" type="button" id="saveInitialsAvatar">Initialen übernehmen</button>
+    </div>
+    <div class="avatar-error" id="avatarError" hidden></div>
+  </div>
+</div>
+
 <script>
 window.ELEVARO_CLASSROOM = {classId: <?= (int)$class['id'] ?>, participantId: <?= (int)$participant['id'] ?>};
 </script>
