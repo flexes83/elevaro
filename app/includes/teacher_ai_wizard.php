@@ -5,16 +5,48 @@ declare(strict_types=1);
 
 function elevaro_teacher_ai_debug_enabled(): bool
 {
-    return defined('ELEVARO_AI_WIZARD_DEBUG') && ELEVARO_AI_WIZARD_DEBUG === true;
+    if (defined('ELEVARO_AI_WIZARD_DEBUG') && ELEVARO_AI_WIZARD_DEBUG === true) {
+        return true;
+    }
+
+    // Praktisch zum Testen, falls die zentrale Config an dieser Stelle nicht greift:
+    // /teacher/ai_wizard.php?class_id=2&ai_debug=1
+    if (isset($_GET['ai_debug']) && (string)$_GET['ai_debug'] === '1') {
+        $_SESSION['elevaro_ai_wizard_debug'] = true;
+        return true;
+    }
+
+    if (!empty($_SESSION['elevaro_ai_wizard_debug'])) {
+        return true;
+    }
+
+    // Notfall-Schalter ohne Codeänderung:
+    // Datei im Projektroot anlegen: storage/ai_wizard_debug.enabled
+    $rootFlag = dirname(__DIR__, 3) . '/storage/ai_wizard_debug.enabled';
+    $appFlag = dirname(__DIR__, 2) . '/storage/ai_wizard_debug.enabled';
+
+    return is_file($rootFlag) || is_file($appFlag);
 }
 
 function elevaro_teacher_ai_debug_dir(): string
 {
-    $dir = dirname(__DIR__, 2) . '/storage/ai_wizard_debug';
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0775, true);
+    $candidates = [
+        dirname(__DIR__, 3) . '/storage/ai_wizard_debug', // Projektroot/storage
+        dirname(__DIR__, 2) . '/storage/ai_wizard_debug', // app/storage
+        sys_get_temp_dir() . '/elevaro_ai_wizard_debug',
+    ];
+
+    foreach ($candidates as $dir) {
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+
+        if (is_dir($dir) && is_writable($dir)) {
+            return $dir;
+        }
     }
-    return $dir;
+
+    return sys_get_temp_dir();
 }
 
 function elevaro_teacher_ai_debug_log(string $stage, array $context = []): void
@@ -25,12 +57,21 @@ function elevaro_teacher_ai_debug_log(string $stage, array $context = []): void
 
     $dir = elevaro_teacher_ai_debug_dir();
     $line = '[' . date('Y-m-d H:i:s') . '] ' . $stage . ' ' . json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL;
-    @file_put_contents($dir . '/debug.log', $line, FILE_APPEND);
+    $target = rtrim($dir, '/') . '/debug.log';
+
+    $written = @file_put_contents($target, $line, FILE_APPEND);
+    if ($written === false) {
+        error_log('[Elevaro AI Wizard Debug] could not write ' . $target . ' :: ' . trim($line));
+    } else {
+        error_log('[Elevaro AI Wizard Debug] wrote ' . $target . ' :: ' . $stage);
+    }
 }
 
 function elevaro_teacher_ai_debug_dump_response(string $stage, string $content, array $meta = []): string
 {
     if (!elevaro_teacher_ai_debug_enabled()) {
+        // JSON-Fehler sollen trotzdem im Serverlog sichtbar sein, auch wenn Debug nicht aktiv ist.
+        error_log('[Elevaro AI Wizard] JSON debug disabled. Stage=' . $stage . ', length=' . strlen($content) . ', preview=' . mb_substr(preg_replace('/\s+/', ' ', $content), 0, 500));
         return '';
     }
 
@@ -40,13 +81,22 @@ function elevaro_teacher_ai_debug_dump_response(string $stage, string $content, 
 
     $header = "STAGE: {$stage}\n";
     $header .= "TIME: " . date('c') . "\n";
+    $header .= "DIR: {$dir}\n";
     $header .= "LENGTH: " . strlen($content) . " bytes\n";
     $header .= "META: " . json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n";
     $header .= str_repeat('-', 80) . "\n\n";
 
-    @file_put_contents($dir . '/' . $file, $header . $content);
+    $target = rtrim($dir, '/') . '/' . $file;
+    $written = @file_put_contents($target, $header . $content);
 
-    return $file;
+    if ($written === false) {
+        error_log('[Elevaro AI Wizard Debug] could not write response dump: ' . $target);
+        error_log('[Elevaro AI Wizard Debug] response preview: ' . mb_substr(preg_replace('/\s+/', ' ', $content), 0, 1200));
+        return '';
+    }
+
+    error_log('[Elevaro AI Wizard Debug] wrote response dump: ' . $target);
+    return $target;
 }
 
 
@@ -548,21 +598,66 @@ function elevaro_teacher_ai_generation_schema(): array
     ];
 }
 
-function elevaro_teacher_ai_decode_openai_json(string $content, string $debugStage = 'unknown'): array
+
+function elevaro_teacher_ai_extract_first_json_object(string $content): ?string
 {
-    $content = trim($content);
-    $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
-    $content = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/u', '', $content);
-    if ($content === '') {
-        throw new RuntimeException('OpenAI hat keine auswertbare Antwort geliefert.');
+    $length = strlen($content);
+    $start = strpos($content, '{');
+    if ($start === false) {
+        return null;
     }
 
-    $decoded = json_decode($content, true);
+    $depth = 0;
+    $inString = false;
+    $escape = false;
+
+    for ($i = $start; $i < $length; $i++) {
+        $char = $content[$i];
+
+        if ($inString) {
+            if ($escape) {
+                $escape = false;
+                continue;
+            }
+            if ($char === '\\') {
+                $escape = true;
+                continue;
+            }
+            if ($char === '"') {
+                $inString = false;
+            }
+            continue;
+        }
+
+        if ($char === '"') {
+            $inString = true;
+            continue;
+        }
+
+        if ($char === '{') {
+            $depth++;
+            continue;
+        }
+
+        if ($char === '}') {
+            $depth--;
+            if ($depth === 0) {
+                return substr($content, $start, $i - $start + 1);
+            }
+        }
+    }
+
+    return null;
+}
+
+function elevaro_teacher_ai_decode_json_candidate(string $candidate): ?array
+{
+    $decoded = json_decode($candidate, true);
     if (is_array($decoded)) {
         return $decoded;
     }
 
-    // Some API responses may return the JSON object as a JSON-encoded string.
+    // Manche Responses enthalten ein JSON-Objekt als JSON-kodierten String.
     if (is_string($decoded)) {
         $decodedAgain = json_decode($decoded, true);
         if (is_array($decodedAgain)) {
@@ -570,26 +665,68 @@ function elevaro_teacher_ai_decode_openai_json(string $content, string $debugSta
         }
     }
 
-    // Some models still wrap JSON in Markdown fences or add a short leading note.
-    if (preg_match('/```(?:json)?\s*(\{.*?\})\s*```/is', $content, $match)) {
-        $decoded = json_decode(trim($match[1]), true);
+    return null;
+}
+
+function elevaro_teacher_ai_decode_openai_json(string $content, string $debugStage = 'unknown'): array
+{
+    $content = trim($content);
+    $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
+    $content = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/u', '', $content);
+    elevaro_teacher_ai_debug_log('decode_attempt', [
+        'stage' => $debugStage,
+        'length' => strlen($content),
+        'starts_with' => mb_substr($content, 0, 160),
+        'ends_with' => mb_substr($content, max(0, mb_strlen($content) - 160)),
+    ]);
+
+    if ($content === '') {
+        elevaro_teacher_ai_debug_dump_response($debugStage . '_empty', $content);
+        throw new RuntimeException('OpenAI hat keine auswertbare Antwort geliefert.');
+    }
+
+    $decoded = elevaro_teacher_ai_decode_json_candidate($content);
+    if (is_array($decoded)) {
+        return $decoded;
+    }
+
+    // Manche Modelle/Background-Responses liefern versehentlich mehrere vollständige
+    // JSON-Objekte direkt hintereinander: { ... }{ ... }. In diesem Fall ist das erste
+    // Objekt bereits vollständig und verwendbar. Wir extrahieren deshalb balanciert nur
+    // das erste Objekt, statt von "abgeschnitten" auszugehen.
+    $firstObject = elevaro_teacher_ai_extract_first_json_object($content);
+    if ($firstObject !== null && $firstObject !== $content) {
+        $decoded = elevaro_teacher_ai_decode_json_candidate($firstObject);
         if (is_array($decoded)) {
+            elevaro_teacher_ai_debug_log('decode_first_json_object_used', [
+                'stage' => $debugStage,
+                'original_length' => strlen($content),
+                'first_object_length' => strlen($firstObject),
+                'remaining_length' => strlen($content) - strlen($firstObject),
+            ]);
             return $decoded;
         }
     }
 
-    $first = strpos($content, '{');
-    $last = strrpos($content, '}');
-    if ($first !== false && $last !== false && $last > $first) {
-        $candidate = substr($content, $first, $last - $first + 1);
-        $decoded = json_decode($candidate, true);
+    // Some models still wrap JSON in Markdown fences or add a short leading note.
+    if (preg_match('/```(?:json)?\s*(.*?)\s*```/is', $content, $match)) {
+        $fenced = trim($match[1]);
+        $decoded = elevaro_teacher_ai_decode_json_candidate($fenced);
         if (is_array($decoded)) {
             return $decoded;
+        }
+        $firstFencedObject = elevaro_teacher_ai_extract_first_json_object($fenced);
+        if ($firstFencedObject !== null) {
+            $decoded = elevaro_teacher_ai_decode_json_candidate($firstFencedObject);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
         }
     }
 
     $preview = mb_substr(preg_replace('/\s+/', ' ', $content), 0, 700);
-    $looksTruncated = (strpos($content, '{') !== false && strrpos($content, '}') !== strlen(rtrim($content)) - 1);
+    $firstBalancedObject = elevaro_teacher_ai_extract_first_json_object($content);
+    $looksTruncated = (strpos($content, '{') !== false && $firstBalancedObject === null);
     $dumpFile = elevaro_teacher_ai_debug_dump_response($debugStage . '_invalid_json', $content, [
         'looks_truncated' => $looksTruncated,
         'first_char' => mb_substr($content, 0, 1),
@@ -598,7 +735,7 @@ function elevaro_teacher_ai_decode_openai_json(string $content, string $debugSta
     $hint = $looksTruncated
         ? ' Die Antwort wirkt abgeschnitten.'
         : '';
-    $debugHint = $dumpFile ? ' Debug-Datei: storage/ai_wizard_debug/' . $dumpFile . '.' : '';
+    $debugHint = $dumpFile ? ' Debug-Datei: ' . $dumpFile . '.' : '';
     throw new RuntimeException('OpenAI-Antwort war kein valides JSON.' . $hint . $debugHint . ' Antwortauszug: ' . $preview);
 }
 
@@ -1051,7 +1188,7 @@ if (!function_exists('elevaro_teacher_ai_split_build_analysis_prompt')) {
             "Zusatzwunsch des Lehrers:\n" . ($extraPrompt !== '' ? $extraPrompt : '[Keine Zusatzanweisung.]') . "\n\n" .
             "Aufgabe für diesen Schritt: Erstelle KEINE fertigen Fragen. Analysiere nur die Quelle. " .
             "Fasse alle sicher lesbaren Inhalte vollständig und quellengebunden zusammen, inklusive handschriftlicher Notizen soweit erkennbar. " .
-            "Erstelle eine belastbare Themen-/Fragenplanung für 30 spätere Multiple-Choice-Fragen in 3 Blöcken à 10 Fragen. " .
+            "Erstelle eine belastbare Themen-/Fragenplanung für 30 spätere Multiple-Choice-Fragen in 6 Blöcken à 5 Fragen. " .
             "Der Klassenkontext darf nur Niveau und Sprache steuern, aber keine Fakten ergänzen. Wenn Inhalte unleserlich sind, benenne das offen. " .
             "Bei Listening: Erstelle zusätzlich einen Sprechertext in der Zielsprache, ausschließlich aus dem Material abgeleitet.");
     }
