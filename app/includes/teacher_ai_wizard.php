@@ -845,8 +845,6 @@ function elevaro_teacher_ai_publish_draft(int $draftId, int $teacherId): int
     $payload = elevaro_teacher_ai_normalize_payload(elevaro_teacher_ai_draft_payload($draft), (string)$draft['mode']);
     if (count($payload['questions']) < 1) throw new RuntimeException('Der Entwurf enthält keine Fragen.');
 
-    elevaro_teacher_ai_split_ensure_schema();
-
     $pdo = elevaro_teacher_ai_wizard_db();
     $pdo->beginTransaction();
     try {
@@ -972,9 +970,9 @@ function elevaro_teacher_ai_publish_draft(int $draftId, int $teacherId): int
         $pdo->prepare("UPDATE teacher_ai_quiz_drafts SET status = 'published', published_quiz_id = :quiz_id WHERE id = :id")
             ->execute(['quiz_id' => $quizId, 'id' => $draftId]);
 
-        if ($pdo->inTransaction()) { $pdo->commit(); }
+        $pdo->commit();
     } catch (Throwable $e) {
-        if ($pdo->inTransaction()) if ($pdo->inTransaction()) { $pdo->rollBack(); }
+        if ($pdo->inTransaction()) $pdo->rollBack();
         throw $e;
     }
 
@@ -1340,171 +1338,31 @@ if (!function_exists('elevaro_teacher_ai_store_curriculum_mapping')) {
 }
 
 if (!function_exists('elevaro_teacher_ai_auto_match_curriculum')) {
-    function elevaro_teacher_ai_curriculum_match_schema(): array
-{
-    return [
-        'type' => 'object',
-        'additionalProperties' => false,
-        'properties' => [
-            'matches' => [
-                'type' => 'array',
-                'minItems' => 1,
-                'maxItems' => 3,
-                'items' => [
-                    'type' => 'object',
-                    'additionalProperties' => false,
-                    'properties' => [
-                        'topic_id' => ['type' => 'integer'],
-                        'subtopic_id' => ['type' => ['integer', 'null']],
-                        'confidence' => ['type' => 'number'],
-                        'reason' => ['type' => 'string'],
-                    ],
-                    'required' => ['topic_id', 'subtopic_id', 'confidence', 'reason'],
-                ],
-            ],
-        ],
-        'required' => ['matches'],
-    ];
-}
-
-function elevaro_teacher_ai_curriculum_match_candidates(array $topics): array
-{
-    $candidates = [];
-
-    foreach ($topics as $topic) {
-        $topicKeywords = json_decode((string)($topic['keywords_json'] ?? '[]'), true);
-        if (!is_array($topicKeywords)) $topicKeywords = [];
-
-        $base = [
-            'topic_id' => (int)$topic['id'],
-            'subtopic_id' => null,
-            'domain' => (string)($topic['domain_title'] ?? ''),
-            'title_short' => (string)(($topic['title_short'] ?? '') ?: ($topic['topic_title'] ?? '')),
-            'title_long' => (string)($topic['title_long'] ?? ''),
-            'description' => (string)($topic['topic_description'] ?? ''),
-            'learning_goal' => (string)($topic['learning_goal'] ?? ''),
-            'keywords' => array_values(array_slice(array_filter(array_map('strval', $topicKeywords)), 0, 12)),
-        ];
-
-        $candidates[] = $base;
-
-        foreach (($topic['subtopics'] ?? []) as $subtopic) {
-            $subKeywords = json_decode((string)($subtopic['keywords_json'] ?? '[]'), true);
-            if (!is_array($subKeywords)) $subKeywords = [];
-
-            $candidates[] = [
-                'topic_id' => (int)$topic['id'],
-                'subtopic_id' => (int)$subtopic['id'],
-                'domain' => (string)($topic['domain_title'] ?? ''),
-                'title_short' => (string)(($subtopic['title_short'] ?? '') ?: ($subtopic['subtopic_title'] ?? '')),
-                'title_long' => (string)($subtopic['title_long'] ?? ''),
-                'parent_topic' => (string)(($topic['title_short'] ?? '') ?: ($topic['topic_title'] ?? '')),
-                'learning_goal' => (string)($subtopic['learning_goal'] ?? ''),
-                'keywords' => array_values(array_slice(array_filter(array_map('strval', array_merge($topicKeywords, $subKeywords))), 0, 16)),
-            ];
+    function elevaro_teacher_ai_auto_match_curriculum(int $quizId, array $class, array $payload): void
+    {
+        $topics=elevaro_teacher_ai_curriculum_topics_for_class($class);
+        if (!$topics) return;
+        $haystack=mb_strtolower(implode(' ',array_filter([
+            $payload['title'] ?? '', $payload['description'] ?? '', implode(' ',(array)($payload['topics'] ?? [])),
+            implode(' ',array_map(static fn($q)=>(string)($q['question'] ?? ''),array_slice((array)($payload['questions'] ?? []),0,10))),
+        ])),'UTF-8');
+        $bestTopic=null; $bestSubtopic=null; $bestScore=0;
+        foreach ($topics as $topic) {
+            $score=0;
+            foreach ([($topic['title_short'] ?? ''),($topic['title_long'] ?? ''),($topic['topic_title'] ?? ''),($topic['domain_title'] ?? '')] as $term) {
+                $term=mb_strtolower(trim((string)$term),'UTF-8'); if ($term !== '' && str_contains($haystack,$term)) $score+=4;
+            }
+            foreach ((json_decode((string)($topic['keywords_json'] ?? '[]'),true) ?: []) as $kw) { $kw=mb_strtolower(trim((string)$kw),'UTF-8'); if ($kw !== '' && str_contains($haystack,$kw)) $score+=2; }
+            foreach (($topic['subtopics'] ?? []) as $sub) {
+                $subScore=$score;
+                foreach ([($sub['title_short'] ?? ''),($sub['title_long'] ?? ''),($sub['subtopic_title'] ?? '')] as $term) { $term=mb_strtolower(trim((string)$term),'UTF-8'); if ($term !== '' && str_contains($haystack,$term)) $subScore+=3; }
+                foreach ((json_decode((string)($sub['keywords_json'] ?? '[]'),true) ?: []) as $kw) { $kw=mb_strtolower(trim((string)$kw),'UTF-8'); if ($kw !== '' && str_contains($haystack,$kw)) $subScore+=2; }
+                if ($subScore > $bestScore) { $bestScore=$subScore; $bestTopic=$topic; $bestSubtopic=$sub; }
+            }
+            if ($score > $bestScore) { $bestScore=$score; $bestTopic=$topic; $bestSubtopic=null; }
         }
+        if ($bestTopic && $bestScore >= 4) elevaro_teacher_ai_store_curriculum_mapping($quizId,(int)$bestTopic['id'],$bestSubtopic ? (int)$bestSubtopic['id'] : null,'auto',min(99,$bestScore*10));
     }
-
-    return $candidates;
-}
-
-function elevaro_teacher_ai_auto_match_curriculum(int $quizId, array $class, array $payload): void
-{
-    $topics = elevaro_teacher_ai_curriculum_topics_for_class($class);
-    if (!$topics) {
-        throw new RuntimeException('Für diese Klasse sind noch keine Lerninhalte hinterlegt. Das Quiz kann deshalb nicht sinnvoll zugeordnet werden.');
-    }
-
-    $candidates = elevaro_teacher_ai_curriculum_match_candidates($topics);
-    if (!$candidates) {
-        throw new RuntimeException('Für diese Klasse sind keine auswertbaren Lerninhalte vorhanden.');
-    }
-
-    $questionsForPrompt = [];
-    foreach (array_slice((array)($payload['questions'] ?? []), 0, 15) as $index => $question) {
-        $questionsForPrompt[] = [
-            'nr' => $index + 1,
-            'question' => (string)($question['question'] ?? ''),
-            'answer' => (string)($question['answer'] ?? ''),
-            'explanation' => (string)($question['explanation'] ?? ''),
-            'listening_segment_text' => (string)($question['listening_segment_text'] ?? ($question['audio']['text'] ?? '')),
-        ];
-    }
-
-    $classContext = [
-        'state_code' => (string)($class['state_code'] ?? ''),
-        'school_type_code' => (string)($class['school_type_code'] ?? ''),
-        'level_key' => (string)($class['level_key'] ?? ''),
-        'grade' => (string)($class['grade'] ?? ''),
-        'subject_code' => (string)($class['subject_code'] ?? ''),
-    ];
-
-    $prompt = [
-        'task' => 'Ordne dieses Quiz den passendsten Lerninhalten der Klasse zu. Wähle nur Kandidaten aus der Kandidatenliste. Speichere lieber wenige sehr passende Treffer als viele ungenaue.',
-        'rules' => [
-            'Mindestens ein Treffer muss gewählt werden.',
-            'Maximal drei Treffer.',
-            'Wenn ein konkreter Skill/Subtopic passt, wähle subtopic_id. Sonst subtopic_id null.',
-            'confidence von 0 bis 100.',
-            'Nur Treffer mit inhaltlichem Bezug zum Quiz wählen.',
-            'Keine neuen Themen erfinden.',
-        ],
-        'class_context' => $classContext,
-        'quiz' => [
-            'title' => (string)($payload['title'] ?? ''),
-            'description' => (string)($payload['description'] ?? ''),
-            'mode' => (string)($payload['mode'] ?? ''),
-            'topics' => (array)($payload['topics'] ?? []),
-            'questions' => $questionsForPrompt,
-        ],
-        'learning_content_candidates' => array_slice($candidates, 0, 180),
-    ];
-
-    $system = 'Du bist ein präziser didaktischer Klassifikator für Lerninhalte. Antworte ausschließlich im JSON-Schema. Nutze nur IDs aus der Kandidatenliste.';
-    $result = elevaro_openai_responses_json(
-        $system,
-        [['type' => 'input_text', 'text' => json_encode($prompt, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)]],
-        elevaro_teacher_ai_curriculum_match_schema(),
-        0.1,
-        120
-    );
-
-    $validTopicIds = [];
-    $validSubtopicIdsByTopic = [];
-    foreach ($topics as $topic) {
-        $topicId = (int)$topic['id'];
-        $validTopicIds[$topicId] = true;
-        foreach (($topic['subtopics'] ?? []) as $subtopic) {
-            $validSubtopicIdsByTopic[$topicId][(int)$subtopic['id']] = true;
-        }
-    }
-
-    $stored = 0;
-    foreach ((array)($result['matches'] ?? []) as $match) {
-        $topicId = (int)($match['topic_id'] ?? 0);
-        $subtopicId = isset($match['subtopic_id']) ? (int)$match['subtopic_id'] : 0;
-        $confidence = max(0.0, min(100.0, (float)($match['confidence'] ?? 0)));
-
-        if (empty($validTopicIds[$topicId])) {
-            continue;
-        }
-
-        if ($subtopicId > 0 && empty($validSubtopicIdsByTopic[$topicId][$subtopicId])) {
-            $subtopicId = 0;
-        }
-
-        if ($confidence < 45.0) {
-            continue;
-        }
-
-        elevaro_teacher_ai_store_curriculum_mapping($quizId, $topicId, $subtopicId ?: null, 'auto', $confidence);
-        $stored++;
-    }
-
-    if ($stored < 1) {
-        throw new RuntimeException('Die KI konnte keinen ausreichend passenden Lerninhalt für dieses Quiz bestimmen.');
-    }
-}
 }
 
 if (!function_exists('elevaro_teacher_ai_create_split_draft')) {
