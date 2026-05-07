@@ -99,7 +99,7 @@
     return;
   }
 
-  function startQuiz  function startQuiz(useWeak = false) {
+  function startQuiz(useWeak = false) {
     questions = (useWeak && userIsPremium) ? [...weakQuestions] : [...originalQuestions];
     index = 0;
     score = 0;
