@@ -764,27 +764,6 @@ $questions = [];
         $question = trim((string)($q['question'] ?? ''));
         $options = array_values(array_filter(array_map(static fn($o) => trim((string)$o), (array)($q['options'] ?? [])), static fn($o) => $o !== ''));
         $answer = trim((string)($q['answer'] ?? ''));
-
-        // Meta-/Arbeitsblattfragen entschärfen
-        if ($mode !== 'listening') {
-            $metaPatterns = [
-                '/^what english word completes/i',
-                '/^which ordinal number/i',
-                '/^what word completes/i',
-                '/^which sentence says/i',
-                '/^what is the word for/i',
-            ];
-
-            foreach ($metaPatterns as $pattern) {
-                if (preg_match($pattern, $question)) {
-                    $question = preg_replace('/^what english word completes this sentence:\s*/i', '', $question);
-                    $question = preg_replace('/^which ordinal number correctly completes the sentence:\s*/i', '', $question);
-                    $question = preg_replace('/^what word completes this sentence:\s*/i', '', $question);
-                    $question = trim($question, " '\":");
-                }
-            }
-        }
-
         if ($question === '' || $answer === '') continue;
         if (!in_array($answer, $options, true)) array_unshift($options, $answer);
         $options = array_values(array_unique($options));
@@ -870,10 +849,6 @@ function elevaro_teacher_ai_publish_draft(int $draftId, int $teacherId): int
     $class = elevaro_teacher_ai_class_for_teacher((int)$draft['class_id'], $teacherId);
     $payload = elevaro_teacher_ai_normalize_payload(elevaro_teacher_ai_draft_payload($draft), (string)$draft['mode']);
     if (count($payload['questions']) < 1) throw new RuntimeException('Der Entwurf enthält keine Fragen.');
-
-    // Wichtig: Schema-/DDL-Prüfungen VOR der Transaktion ausführen.
-    // MySQL committed ALTER/CREATE TABLE implizit und beendet dadurch PDO-Transaktionen.
-    elevaro_teacher_ai_split_ensure_schema();
 
     $pdo = elevaro_teacher_ai_wizard_db();
     $pdo->beginTransaction();
@@ -1008,9 +983,9 @@ function elevaro_teacher_ai_publish_draft(int $draftId, int $teacherId): int
         $pdo->prepare("UPDATE teacher_ai_quiz_drafts SET status = 'published', published_quiz_id = :quiz_id WHERE id = :id")
             ->execute(['quiz_id' => $quizId, 'id' => $draftId]);
 
-        if ($pdo->inTransaction()) { $pdo->commit(); }
+        $pdo->commit();
     } catch (Throwable $e) {
-        if ($pdo->inTransaction()) if ($pdo->inTransaction()) { $pdo->rollBack(); }
+        if ($pdo->inTransaction()) $pdo->rollBack();
         throw $e;
     }
 
@@ -1420,7 +1395,7 @@ if (!function_exists('elevaro_teacher_ai_create_split_draft')) {
 " . elevaro_teacher_ai_curriculum_prompt_block($ctx));
             $extraPrompt = trim($extraPrompt . "
 
-Quelle: Lerninhalt ohne zusätzliches Material. Erstelle ein Quiz auf Basis dieses Lerninhalts, der Langbeschreibung, Lernziele, Keywords und des Klassenkontexts. Keine Quellenverweise im Fragetext. Bei Sprach-/Übungsformaten: natürliche neue Beispielsätze und echte Anwendung statt Meta-Fragen über Aufgabenblätter.");
+Quelle: Lerninhalt ohne zusätzliches Material. Erstelle ein Quiz auf Basis dieses Lerninhalts, der Langbeschreibung, Lernziele, Keywords und des Klassenkontexts. Keine Quellenverweise im Fragetext.");
             $files = [];
         } elseif (!elevaro_teacher_ai_has_readable_material($sourceText, $files)) {
             throw new RuntimeException('Bitte Material hochladen, Text eingeben oder ein Lerninhalt auswählen.');
@@ -1741,6 +1716,81 @@ if (!function_exists('elevaro_teacher_ai_split_base_payload')) {
     }
 }
 
+
+if (!function_exists('elevaro_teacher_ai_analysis_route_payload')) {
+    function elevaro_teacher_ai_analysis_route_payload(array $analysis, string $mode): array
+    {
+        $materialType = (string)($analysis['material_type'] ?? '');
+        $taskIntent = (string)($analysis['task_intent'] ?? '');
+        $exerciseTransform = !empty($analysis['exercise_transform'])
+            || in_array($materialType, ['worksheet', 'grammar_exercise', 'vocabulary_list'], true)
+            || in_array($taskIntent, ['practice_same_skill', 'vocabulary_training', 'grammar_training'], true);
+
+        if ($mode === 'listening') {
+            return [
+                'route' => 'listening',
+                'headline' => 'Listening erkannt',
+                'steps' => [
+                    'Ich erstelle kurze Hörabschnitte.',
+                    'Die Fragen bleiben in Reihenfolge.',
+                    'Jede Frage bezieht sich direkt auf ihren Hörabschnitt.',
+                ],
+            ];
+        }
+
+        if ($exerciseTransform) {
+            $skills = array_values(array_filter(array_map('strval', (array)($analysis['detected_skills'] ?? []))));
+            $skillText = $skills ? ('Erkannte Skills: ' . implode(', ', array_slice($skills, 0, 4))) : 'Ich erkenne die geübten Skills.';
+            return [
+                'route' => 'exercise_transform',
+                'headline' => match ($materialType) {
+                    'vocabulary_list' => 'Vokabeltraining erkannt',
+                    'grammar_exercise' => 'Grammatikübung erkannt',
+                    'worksheet' => 'Arbeitsblatt erkannt',
+                    default => 'Übungsformat erkannt',
+                },
+                'steps' => [
+                    $skillText,
+                    'Ich referenziere nicht auf den Blattinhalt.',
+                    'Stattdessen erstelle ich ähnliche neue Aufgaben.',
+                    'Die Aufgaben bleiben ohne Originalblatt lösbar.',
+                ],
+            ];
+        }
+
+        if (in_array($materialType, ['reading_text', 'mixed'], true) || $taskIntent === 'quiz_about_content') {
+            return [
+                'route' => 'content_quiz',
+                'headline' => 'Lerntext erkannt',
+                'steps' => [
+                    'Ich frage den tatsächlichen Inhalt ab.',
+                    'Ich decke die wichtigsten Aussagen ab.',
+                    'Die Fragen bleiben an den Text gebunden.',
+                ],
+            ];
+        }
+
+        return [
+            'route' => 'general',
+            'headline' => 'Material ausgewertet',
+            'steps' => [
+                'Ich ordne die Quelle didaktisch ein.',
+                'Ich wähle passende Frageformen.',
+                'Ich prüfe, ob die Fragen ohne Zusatzmaterial lösbar sind.',
+            ],
+        ];
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_analysis_route_label')) {
+    function elevaro_teacher_ai_analysis_route_label(array $analysis, string $mode): string
+    {
+        $payload = elevaro_teacher_ai_analysis_route_payload($analysis, $mode);
+        return (string)($payload['headline'] ?? 'Material ausgewertet') . ' – ' . (string)(($payload['steps'][0] ?? 'Fragen werden vorbereitet…'));
+    }
+}
+
+
 if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
     function elevaro_teacher_ai_poll_split_draft(int $draftId, int $teacherId): array
     {
@@ -1787,7 +1837,15 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
                         'id' => $draftId,
                         'teacher_id' => $teacherId,
                     ]);
-                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'analysis_done', 'status_label' => 'Inhalte wurden strukturiert. Die Fragen werden jetzt erstellt…'];
+                                $routeLabel = elevaro_teacher_ai_analysis_route_label($analysis, $mode);
+                return [
+                    'ok' => true,
+                    'done' => false,
+                    'draft_id' => $draftId,
+                    'status' => 'analysis_done',
+                    'status_label' => $routeLabel,
+                    'analysis_route' => elevaro_teacher_ai_analysis_route_payload($analysis, $mode),
+                ];
             }
 
             $blockSize = elevaro_teacher_ai_generation_block_size($mode);
@@ -1824,6 +1882,7 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
             $plausibility = elevaro_teacher_ai_apply_plausibility_review($analysis, $allQuestions, $mode, $files);
             $checkedQuestions = $plausibility['questions'];
             $payload = elevaro_teacher_ai_split_base_payload($analysis, $mode, $checkedQuestions);
+            $payload['analysis_route'] = elevaro_teacher_ai_analysis_route_payload($analysis, $mode);
             $payload['plausibility_review'] = $plausibility['review'];
             $stmt = elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts
                 SET status = 'draft', generation_step = 'done', generated_payload_json = :payload, source_title = :title, image_prompt = :image_prompt, image_status = 'pending'

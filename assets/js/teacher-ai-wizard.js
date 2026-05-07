@@ -157,6 +157,36 @@
   }
   function stopLoadingCopy() { if (loadingTimer) clearInterval(loadingTimer); }
 
+
+  function showAnalysisRoute(route) {
+    if (!route) return;
+    const card = $('#aiRouteCard');
+    const headline = $('#aiRouteHeadline');
+    const steps = $('#aiRouteSteps');
+    if (!card || !headline || !steps) return;
+
+    headline.textContent = route.headline || 'Material erkannt';
+    steps.innerHTML = '';
+
+    (route.steps || []).forEach((stepText, index) => {
+      const li = document.createElement('li');
+      li.textContent = stepText;
+      li.style.animationDelay = `${index * 120}ms`;
+      steps.appendChild(li);
+    });
+
+    card.classList.remove('d-none');
+    card.dataset.route = route.route || 'general';
+  }
+
+  function resetAnalysisRoute() {
+    const card = $('#aiRouteCard');
+    if (!card) return;
+    card.classList.add('d-none');
+    card.removeAttribute('data-route');
+  }
+
+
   function setProgress(percent, label) {
     const bar = document.querySelector('#aiWizardProgressBar');
     const labelEl = $('#aiWizardProgressText');
@@ -196,6 +226,9 @@
       if (res.done) {
         setProgress(100, 'Fertig. Dein Quizentwurf wird geladen…');
         state.payload = res.payload;
+        if (res.payload && res.payload.analysis_route) {
+          showAnalysisRoute(res.payload.analysis_route);
+        }
         return;
       }
       if (res.status && res.status !== lastStatus) {

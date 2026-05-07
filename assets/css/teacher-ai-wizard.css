@@ -340,3 +340,76 @@
   background: rgba(90,79,243,.06);
   border: 1px solid rgba(90,79,243,.13);
 }
+
+
+.ai-route-card {
+  margin: 20px auto 18px;
+  max-width: 720px;
+  text-align: left;
+  padding: 18px 20px;
+  border-radius: 24px;
+  border: 1px solid rgba(90,79,243,.18);
+  background: linear-gradient(135deg, rgba(90,79,243,.08), rgba(0,194,255,.06));
+  box-shadow: 0 18px 45px rgba(23,32,51,.08);
+}
+
+.ai-route-card strong {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 950;
+  color: #172033;
+  margin-bottom: 10px;
+}
+
+.ai-route-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.ai-route-card li {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  color: #4b5563;
+  font-weight: 800;
+  line-height: 1.35;
+  opacity: 0;
+  transform: translateY(5px);
+  animation: aiRouteStepIn .38s ease forwards;
+}
+
+.ai-route-card li::before {
+  content: "✓";
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(90,79,243,.12);
+  color: #5a4ff3;
+  font-size: .8rem;
+  font-weight: 950;
+}
+
+.ai-route-card[data-route="exercise_transform"] {
+  background: linear-gradient(135deg, rgba(255,184,77,.14), rgba(90,79,243,.06));
+  border-color: rgba(255,184,77,.28);
+}
+
+.ai-route-card[data-route="content_quiz"] {
+  background: linear-gradient(135deg, rgba(34,197,94,.10), rgba(90,79,243,.06));
+  border-color: rgba(34,197,94,.22);
+}
+
+.ai-route-card[data-route="listening"] {
+  background: linear-gradient(135deg, rgba(14,165,233,.12), rgba(90,79,243,.06));
+  border-color: rgba(14,165,233,.24);
+}
+
+@keyframes aiRouteStepIn {
+  to { opacity: 1; transform: translateY(0); }
+}

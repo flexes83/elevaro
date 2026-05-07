@@ -192,12 +192,18 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
       </div>
       <h3>Elevaro baut dein Quiz</h3>
       <p id="aiWizardProgressText">Material wird gelesen und didaktisch sortiert...</p>
+      <div class="ai-route-card d-none" id="aiRouteCard">
+        <strong id="aiRouteHeadline">Material wird erkannt</strong>
+        <ul id="aiRouteSteps">
+          <li>Ich analysiere, ob es ein Lerntext oder ein Übungsformat ist.</li>
+        </ul>
+      </div>
       <div class="ai-progress"><i></i></div>
       <div class="ai-progress-list">
         <span data-loading-copy>📄 Quelle verstehen</span>
-        <span data-loading-copy>🧠 Lerninhalte auswerten</span>
+        <span data-loading-copy>🧠 Materialtyp erkennen</span>
+        <span data-loading-copy>🧩 Aufgabenstrategie wählen</span>
         <span data-loading-copy>✅ Antworten prüfen</span>
-        <span data-loading-copy>🎨 Quizbild vorbereiten</span>
       </div>
       <div id="aiWizardErrorBox" class="alert alert-danger d-none mt-4 text-start"></div>
     </div>
