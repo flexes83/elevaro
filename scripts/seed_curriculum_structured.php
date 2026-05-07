@@ -76,12 +76,18 @@ if ($apiKey === '' || str_starts_with($apiKey, 'sk-xxxxxxxx')) {
 }
 
 $model = (string)($options['model'] ?? $openAiConfig['seed_model'] ?? 'gpt-5.5');
+$timeout = isset($options['timeout']) ? max(60, (int)$options['timeout']) : 300;
+$maxOutputTokens = isset($options['max-output-tokens']) ? max(2000, (int)$options['max-output-tokens']) : 9000;
+$complexity = (string)($options['complexity'] ?? 'compact'); // compact | full
 
 println('Strukturierter Curriculum Seeder gestartet');
 println('Model: ' . $model);
 println('Dry-run: ' . ($dryRun ? 'ja' : 'nein'));
 println('Jobs: ' . count($jobs));
 println('Limit: ' . $limit);
+println('Timeout: ' . $timeout . 's');
+println('Max output tokens: ' . $maxOutputTokens);
+println('Complexity: ' . $complexity);
 println(str_repeat('-', 90));
 
 $processed = 0;
@@ -108,7 +114,7 @@ foreach ($jobs as $job) {
     $runId = createImportRun($pdo, $job, $fingerprint, $model, $prompt, $dryRun ? 'dry_run' : 'pending');
 
     try {
-        $response = callOpenAi($apiKey, $model, $prompt);
+        $response = callOpenAi($apiKey, $model, $prompt, $timeout, $maxOutputTokens, $complexity);
         $data = parseOpenAiJson($response);
         validateResponse($data);
 
@@ -266,12 +272,19 @@ function buildPrompt(array $job): string
         . "- Domains sind Oberbereiche. Topics sind sichtbare Lehrplanthemen. Subtopics sind konkrete Skills/Unterthemen.\n"
         . "- Es geht nicht um vollstaendige amtliche Lehrplanabbildung, sondern um eine plausible, hochwertige Quiz-Navigation.\n"
         . "- Vermeide unpassende Inhalte fuer die Stufe.\n\n"
-        . "Erzeuge 4 bis 7 Domains. Pro Domain 4 bis 8 Topics. Pro Topic 3 bis 8 Subtopics.\n"
+        . "Erzeuge im Modus compact eine erste stabile Themenbasis: 3 bis 5 Domains, pro Domain 3 bis 5 Topics, pro Topic 2 bis 4 Subtopics.\n"
+        . "Erzeuge im Modus full: 4 bis 7 Domains, pro Domain 4 bis 8 Topics, pro Topic 3 bis 8 Subtopics.\n"
+        . "Lieber weniger, dafür sauber, eindeutig und ohne Dopplungen.\n"
         . "Die Ausgabe muss exakt dem JSON-Schema entsprechen.";
 }
 
-function callOpenAi(string $apiKey, string $model, string $prompt): array
+function callOpenAi(string $apiKey, string $model, string $prompt, int $timeout = 300, int $maxOutputTokens = 9000, string $complexity = 'compact'): array
 {
+    $isFull = $complexity === 'full';
+    $domainMax = $isFull ? 8 : 5;
+    $topicMax = $isFull ? 10 : 6;
+    $subtopicMax = $isFull ? 10 : 5;
+
     $schema = [
         'type' => 'object',
         'additionalProperties' => false,
@@ -279,7 +292,7 @@ function callOpenAi(string $apiKey, string $model, string $prompt): array
             'domains' => [
                 'type' => 'array',
                 'minItems' => 2,
-                'maxItems' => 8,
+                'maxItems' => $domainMax,
                 'items' => [
                     'type' => 'object',
                     'additionalProperties' => false,
@@ -291,7 +304,7 @@ function callOpenAi(string $apiKey, string $model, string $prompt): array
                         'topics' => [
                             'type' => 'array',
                             'minItems' => 3,
-                            'maxItems' => 10,
+                            'maxItems' => $topicMax,
                             'items' => [
                                 'type' => 'object',
                                 'additionalProperties' => false,
@@ -317,7 +330,7 @@ function callOpenAi(string $apiKey, string $model, string $prompt): array
                                     'subtopics' => [
                                         'type' => 'array',
                                         'minItems' => 2,
-                                        'maxItems' => 10,
+                                        'maxItems' => $subtopicMax,
                                         'items' => [
                                             'type' => 'object',
                                             'additionalProperties' => false,
@@ -371,7 +384,7 @@ function callOpenAi(string $apiKey, string $model, string $prompt): array
                 'content' => [
                     [
                         'type' => 'input_text',
-                        'text' => $prompt,
+                        'text' => $prompt . "\n\nAktueller Modus: " . $complexity,
                     ],
                 ],
             ],
@@ -384,7 +397,7 @@ function callOpenAi(string $apiKey, string $model, string $prompt): array
                 'schema' => $schema,
             ],
         ],
-        'max_output_tokens' => 16000,
+        'max_output_tokens' => $maxOutputTokens,
     ];
 
     $ch = curl_init('https://api.openai.com/v1/responses');
@@ -396,12 +409,14 @@ function callOpenAi(string $apiKey, string $model, string $prompt): array
             'Content-Type: application/json',
         ],
         CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
-        CURLOPT_TIMEOUT => 180,
+        CURLOPT_TIMEOUT => $timeout,
     ]);
 
     $raw = curl_exec($ch);
     if ($raw === false) {
-        throw new RuntimeException('OpenAI Request fehlgeschlagen: ' . curl_error($ch));
+        $errno = curl_errno($ch);
+        $error = curl_error($ch);
+        throw new RuntimeException('OpenAI Request fehlgeschlagen' . ($errno ? ' (cURL ' . $errno . ')' : '') . ': ' . $error . '. Tipp: mit --complexity=compact, --timeout=300 oder kleinerem Modell erneut versuchen.');
     }
 
     $status = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
