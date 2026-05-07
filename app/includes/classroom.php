@@ -268,7 +268,6 @@ function classroom_teacher_participant(int $classId): array
         return $participant;
     }
 
-    $avatar = classroom_avatar_payload('teacher_' . (int)$user['id'], $displayName);
     $stmt = classroom_db()->prepare("
         INSERT INTO classroom_participants
             (class_id, user_id, display_name, guest_token, avatar_emoji, avatar_type, avatar_gradient, status, last_seen_at)
@@ -282,7 +281,7 @@ function classroom_teacher_participant(int $classId): array
         'guest_token' => 'teacher_' . $classId . '_' . (int)$user['id'],
         'avatar_emoji' => '👩‍🏫',
         'avatar_type' => 'emoji',
-        'avatar_gradient' => $avatar['avatar_gradient'] ?? 'grad-1',
+        'avatar_gradient' => 'grad-5',
     ]);
 
     $id = (int)classroom_db()->lastInsertId();
