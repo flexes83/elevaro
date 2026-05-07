@@ -226,7 +226,9 @@ function elevaro_get_questions_for_quiz(int $quizId, bool $adaptiveOrder = true,
 
         $payload[] = [
             'id' => $qid,
-            'type' => $question['type'],
+            'type' => ((int)($quiz['listening_mode'] ?? 0) === 1 || ($question['source_context'] ?? '') === 'listening_segment' || !empty($question['audio_path']) || !empty($question['audio_text']))
+                ? 'listening_mc'
+                : $question['type'],
             'question' => $question['question_text'],
             'media' => [
                 'type' => $question['media_type'] ?? 'none',

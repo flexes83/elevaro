@@ -94,12 +94,12 @@
 
 
   function setupListeningComprehensionGate() {
-    // Listening-Comprehension wird jetzt pro Frage/Abschnitt abgespielt.
-    // Deshalb gibt es keinen langen Hörtext mehr, der vor dem Quiz komplett gehört werden muss.
+    // Listening-Quizzes nutzen kurze Hörabschnitte pro Frage.
+    // Es gibt keinen vorgeschalteten Gesamt-Hörtext mehr.
     return;
   }
 
-  function startQuiz(useWeak = false) {
+  function startQuiz  function startQuiz(useWeak = false) {
     questions = (useWeak && userIsPremium) ? [...weakQuestions] : [...originalQuestions];
     index = 0;
     score = 0;
@@ -272,34 +272,46 @@
     const existing = document.getElementById('questionListeningBox');
     if (existing) existing.remove();
 
-    if (question.type !== 'listening_mc') {
+    const isListeningQuestion =
+      question.type === 'listening_mc' ||
+      window.ELEVARO_QUIZ.listeningMode ||
+      question.source_context === 'listening_segment' ||
+      (question.audio && (question.audio.path || question.audio.text));
+
+    if (!isListeningQuestion) {
       return;
     }
 
-    const segmentTitle = question.listening_segment_title || question.source_excerpt || 'Hörabschnitt';
+    const segmentTitle = question.listening_segment_title || question.source_excerpt || `Hörabschnitt ${index + 1}`;
     const audioPath = question.audio && question.audio.path ? question.audio.path : '';
     const audioText = question.audio && question.audio.text ? question.audio.text : '';
-
-    if (!audioPath && !audioText) {
-      return;
-    }
 
     const box = document.createElement('div');
     box.id = 'questionListeningBox';
     box.className = 'question-listening-box';
+
+    let mediaHtml = '';
+    if (audioPath) {
+      mediaHtml = `<audio controls preload="metadata" src="${escapeAttribute(audioPath)}"></audio>`;
+    } else if (audioText) {
+      mediaHtml = `<div class="question-listening-text">${escapeHtml(audioText)}</div>`;
+    } else {
+      mediaHtml = `<div class="question-listening-missing">Für diesen Hörabschnitt wurde noch keine Audiodatei gefunden.</div>`;
+    }
+
     box.innerHTML = `
       <div class="question-listening-icon">🔊</div>
       <div>
         <strong>${escapeHtml(segmentTitle)}</strong>
         <p>Hör den kurzen Abschnitt und beantworte direkt diese Frage.</p>
-        ${audioPath ? `<audio controls preload="metadata" src="${escapeAttribute(audioPath)}"></audio>` : `<div class="question-listening-text">${escapeHtml(audioText)}</div>`}
+        ${mediaHtml}
       </div>
     `;
 
     questionEl.insertAdjacentElement('afterend', box);
   }
 
-  function renderQuestionMedia(question) {
+  function renderQuestionMedia  function renderQuestionMedia(question) {
     const existing = document.getElementById('questionMedia');
     if (existing) existing.remove();
 
