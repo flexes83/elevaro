@@ -41,7 +41,11 @@
         const name = input.name;
         $$(`${selector} input[name="${name}"]`).forEach(i => i.closest(selector)?.classList.remove('is-selected'));
         card.classList.add('is-selected');
+        const changed = !input.checked;
         input.checked = true;
+        if (changed) {
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
       });
     });
   }
@@ -59,9 +63,16 @@
   function updateSourceKind(kind) {
     const hidden = $('#aiWizardSourceKind');
     if (hidden) hidden.value = kind;
-    $('#aiMaterialSourceBox')?.classList.toggle('d-none', kind === 'curriculum');
-    $('#aiCurriculumSourceBox')?.classList.toggle('d-none', kind !== 'curriculum');
-    if (kind === 'curriculum' && !curriculumState.domains.length) loadCurriculumTopics();
+
+    const isCurriculum = kind === 'curriculum';
+    $('#aiMaterialSourceBox')?.classList.toggle('is-active', !isCurriculum);
+    $('#aiCurriculumSourceBox')?.classList.toggle('is-active', isCurriculum);
+    $('#aiMaterialGoalBox')?.classList.toggle('d-none', isCurriculum);
+    $('#aiCurriculumGoalBox')?.classList.toggle('d-none', !isCurriculum);
+
+    if (isCurriculum && !curriculumState.domains.length) {
+      loadCurriculumTopics();
+    }
   }
 
   async function loadCurriculumTopics() {
@@ -193,7 +204,10 @@
         throw new Error('Bitte ein Lehrplanthema auswählen.');
       }
       const res = await fetch('/teacher/api/ai_wizard_generate.php', { method: 'POST', body: new FormData(form) });
-      const json = await res.json().catch(() => ({}));
+      const text = await res.text();
+      let json = {};
+      try { json = text ? JSON.parse(text) : {}; }
+      catch (parseError) { throw new Error(text ? 'Serverantwort war kein JSON: ' + text.replace(/\s+/g, ' ').slice(0, 500) : 'Serverantwort war leer.'); }
       if (!res.ok || !json.ok) throw new Error(json.error || 'KI-Erstellung fehlgeschlagen.');
       state.draftId = json.draft_id;
 

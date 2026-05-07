@@ -43,65 +43,98 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
       <input type="hidden" name="class_id" value="<?= (int)$classId ?>">
       <input type="hidden" name="source_kind" id="aiWizardSourceKind" value="material">
 
-      <div class="row g-4">
-        <div class="col-lg-7">
-          <div class="card card-soft h-100"><div class="card-body p-4">
-            <h3 class="h4 fw-bold">1. Quelle auswählen</h3>
-            <p class="text-muted">Wähle aus, ob dein Quiz aus eigenem Material oder direkt aus einem Lehrplanthema entstehen soll.</p>
+      <div class="ai-step-one-layout">
+        <div class="ai-step-card">
+          <div class="ai-step-head">
+            <span>1</span>
+            <div>
+              <h3>Quelle wählen</h3>
+              <p>Woraus soll dein Quiz entstehen?</p>
+            </div>
+          </div>
 
-            <label class="form-label fw-bold mt-2">Quiz-Quelle</label>
-            <div class="ai-source-kind-grid">
-              <label class="ai-source-kind-card is-selected">
-                <input type="radio" name="source_kind_choice" value="material" checked>
-                <span class="ai-mode-icon">📄</span>
-                <strong>Material hochladen</strong>
-                <small>PDF, Arbeitsblatt, Foto oder eigener Text</small>
-              </label>
-              <label class="ai-source-kind-card">
-                <input type="radio" name="source_kind_choice" value="curriculum">
-                <span class="ai-mode-icon">🎯</span>
-                <strong>Lehrplanthema wählen</strong>
-                <small>Quiz ohne Upload aus deiner Klassenstufe erstellen</small>
-              </label>
+          <div class="ai-choice-stack">
+            <label class="ai-source-kind-card is-selected">
+              <input type="radio" name="source_kind_choice" value="material" checked>
+              <span class="ai-mode-icon">📄</span>
+              <strong>Material hochladen</strong>
+              <small>PDF, Foto, Arbeitsblatt, Buchseite oder eigener Text.</small>
+            </label>
+
+            <label class="ai-source-kind-card">
+              <input type="radio" name="source_kind_choice" value="curriculum">
+              <span class="ai-mode-icon">🎯</span>
+              <strong>Lehrplanthema wählen</strong>
+              <small>Quiz ohne Upload aus deiner Klassenstufe erstellen.</small>
+            </label>
+          </div>
+
+          <div class="ai-source-detail ai-material-source is-active" id="aiMaterialSourceBox">
+            <div class="ai-field-block">
+              <label class="form-label fw-bold">Material hochladen</label>
+              <input class="form-control form-control-lg" type="file" name="source_files[]" multiple accept="application/pdf,image/jpeg,image/png,image/webp">
+              <div class="form-text">PDF, JPG, PNG oder WebP. Fotos vom Arbeitsblatt oder Buchseite sind okay.</div>
             </div>
 
-            <div class="ai-curriculum-source d-none" id="aiCurriculumSourceBox">
-              <label class="form-label fw-bold mt-4">Lehrplanthema</label>
+            <div class="ai-field-block">
+              <label class="form-label fw-bold">Text / Notizen / Aufgabenstellung</label>
+              <textarea class="form-control" name="source_text" rows="6" placeholder="Optional: Text einkopieren oder kurz beschreiben, was aus dem Material entstehen soll."></textarea>
+            </div>
+          </div>
+
+          <div class="ai-source-detail ai-curriculum-source" id="aiCurriculumSourceBox">
+            <div class="ai-field-block">
+              <label class="form-label fw-bold">Lehrplanthema</label>
               <select class="form-select form-select-lg" id="aiCurriculumTopicSelect" name="curriculum_topic_content_id">
                 <option value="">Themen werden geladen…</option>
               </select>
-              <label class="form-label fw-bold mt-3">Unterthema / Skill <span class="text-muted fw-normal">optional</span></label>
+            </div>
+
+            <div class="ai-field-block">
+              <label class="form-label fw-bold">Unterthema / Skill <span class="text-muted fw-normal">optional</span></label>
               <select class="form-select" id="aiCurriculumSubtopicSelect" name="curriculum_topic_subtopic_id">
                 <option value="">Ganzes Thema verwenden</option>
               </select>
-              <div class="ai-curriculum-preview" id="aiCurriculumPreview">
-                Wähle ein Thema aus. Elevaro nutzt Kurz- und Langtitel, Lernziel, Keywords und Klassenkontext als Grundlage.
-              </div>
             </div>
 
-            <div class="ai-material-source" id="aiMaterialSourceBox">
-
-            <div class="ai-source-modes">
-              <label class="ai-mode-card is-selected">
-                <input type="radio" name="mode" value="quiz" checked>
-                <span class="ai-mode-icon">📝</span>
-                <strong>Normales Quiz</strong>
-                <small>Multiple Choice aus deinem Material</small>
-              </label>
-              <label class="ai-mode-card">
-                <input type="radio" name="mode" value="listening">
-                <span class="ai-mode-icon">🎧</span>
-                <strong>Listening + Comprehension</strong>
-                <small>Sprechertext + Fragen in der Zielsprache</small>
-              </label>
+            <div class="ai-curriculum-preview" id="aiCurriculumPreview">
+              Wähle ein Thema aus. Elevaro nutzt Kurz- und Langtitel, Lernziel, Keywords und Klassenkontext als Grundlage.
             </div>
+          </div>
+        </div>
 
-            <label class="form-label fw-bold mt-4">Was soll aus dem Material entstehen?</label>
+        <div class="ai-step-card">
+          <div class="ai-step-head">
+            <span>2</span>
+            <div>
+              <h3>Ziel wählen</h3>
+              <p>Was soll die KI daraus machen?</p>
+            </div>
+          </div>
+
+          <div class="ai-mode-targets">
+            <label class="ai-mode-card is-selected">
+              <input type="radio" name="mode" value="quiz" checked>
+              <span class="ai-mode-icon">📝</span>
+              <strong>Normales Quiz</strong>
+              <small>Multiple Choice für den Klassenraum.</small>
+            </label>
+
+            <label class="ai-mode-card">
+              <input type="radio" name="mode" value="listening">
+              <span class="ai-mode-icon">🎧</span>
+              <strong>Listening + Comprehension</strong>
+              <small>Sprechertext + Verständnisfragen.</small>
+            </label>
+          </div>
+
+          <div class="ai-material-goal-box" id="aiMaterialGoalBox">
+            <label class="form-label fw-bold mt-3">Was soll aus dem Material entstehen?</label>
             <div class="ai-intent-grid">
               <label class="ai-intent-card is-selected">
                 <input type="radio" name="material_goal" value="auto" checked>
                 <strong>KI entscheiden lassen</strong>
-                <small>Erkennt automatisch, ob es ein Lesetext, Arbeitsblatt, Vokabelliste oder Grammatikübung ist.</small>
+                <small>Erkennt Lesetext, Arbeitsblatt, Vokabelliste oder Grammatikübung.</small>
               </label>
               <label class="ai-intent-card">
                 <input type="radio" name="material_goal" value="content">
@@ -124,37 +157,30 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
                 <small>Für Pronomen, Zeiten, Satzbau und ähnliche Strukturen.</small>
               </label>
             </div>
+          </div>
 
-            <label class="form-label fw-bold mt-4">Material hochladen</label>
-            <input class="form-control form-control-lg" type="file" name="source_files[]" multiple accept="application/pdf,image/jpeg,image/png,image/webp">
-            <div class="form-text">PDF, JPG, PNG oder WebP. Fotos vom Arbeitsblatt oder Buchseite sind okay.</div>
-
-            <label class="form-label fw-bold mt-4">Text / Notizen / Aufgabenstellung</label>
-            <textarea class="form-control" name="source_text" rows="8" placeholder="Hier kannst du den relevanten Text einkopieren oder kurz beschreiben, was aus dem Material abgefragt werden soll."></textarea>
-
-            <label class="form-label fw-bold mt-4">Zusatzwunsch an die KI</label>
-            <textarea class="form-control" name="extra_prompt" rows="4" placeholder="z. B. bitte eher leichte Fragen, Fokus auf Vokabelverständnis, keine Jahreszahlen abfragen, Niveau A1..."></textarea>
+          <div class="ai-curriculum-goal-box d-none" id="aiCurriculumGoalBox">
+            <div class="ai-goal-hint">
+              <strong>Lehrplanbasiertes Quiz</strong>
+              <span>Die KI erstellt ein Quiz passend zu Klasse, Fach, Thema und optionalem Skill. Ohne Upload und ohne freie Prompt-Hürde.</span>
             </div>
+          </div>
 
-            <div class="d-flex gap-2 flex-wrap mt-4">
-              <button class="btn btn-primary btn-lg" type="submit">✨ Quiz mit KI erstellen</button>
-              <a class="btn btn-light btn-lg" href="quizzes.php?class_id=<?= (int)$classId ?>">Abbrechen</a>
-            </div>
-          </div></div>
-        </div>
-        <div class="col-lg-5">
-          <div class="ai-info-card">
-            <h3>Was die KI bekommt</h3>
-            <ul>
-              <li>Klasse, Schulart, Fach und Klassenstufe</li>
-              <li>dein hochgeladenes Material oder das ausgewählte Lehrplanthema</li>
-              <li>deine Zusatzanweisungen</li>
-              <li>ob Inhalte abgefragt, ähnliche Übungen oder ein lehrplanbasiertes Quiz erstellt werden soll</li>
-              <li>bei Listening: Ziel Sprache + Sprechertext</li>
-            </ul>
-            <div class="ai-warning">Wichtig: Die KI erstellt einen Entwurf. Vor Veröffentlichung bitte Fragen und Antworten prüfen.</div>
+          <div class="ai-field-block mt-4">
+            <label class="form-label fw-bold">Zusatzwunsch an die KI <span class="text-muted fw-normal">optional</span></label>
+            <textarea class="form-control" name="extra_prompt" rows="5" placeholder="z. B. eher leichte Fragen, Fokus auf Vokabelverständnis, keine Jahreszahlen abfragen, Niveau A1..."></textarea>
           </div>
         </div>
+      </div>
+
+      <div class="ai-step-info">
+        <strong>Hinweis:</strong>
+        Die KI erstellt einen Entwurf. Vor Veröffentlichung kannst du Titel, Beschreibung, Fragen, Antworten und Erklärungen prüfen und bearbeiten.
+      </div>
+
+      <div class="ai-step-actions">
+        <a class="btn btn-light btn-lg" href="quizzes.php?class_id=<?= (int)$classId ?>">Abbrechen</a>
+        <button class="btn btn-primary btn-lg" type="submit">✨ Quiz mit KI erstellen</button>
       </div>
     </form>
   </section>
