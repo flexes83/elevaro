@@ -764,6 +764,27 @@ $questions = [];
         $question = trim((string)($q['question'] ?? ''));
         $options = array_values(array_filter(array_map(static fn($o) => trim((string)$o), (array)($q['options'] ?? [])), static fn($o) => $o !== ''));
         $answer = trim((string)($q['answer'] ?? ''));
+
+        // Meta-/Arbeitsblattfragen entschärfen
+        if ($mode !== 'listening') {
+            $metaPatterns = [
+                '/^what english word completes/i',
+                '/^which ordinal number/i',
+                '/^what word completes/i',
+                '/^which sentence says/i',
+                '/^what is the word for/i',
+            ];
+
+            foreach ($metaPatterns as $pattern) {
+                if (preg_match($pattern, $question)) {
+                    $question = preg_replace('/^what english word completes this sentence:\s*/i', '', $question);
+                    $question = preg_replace('/^which ordinal number correctly completes the sentence:\s*/i', '', $question);
+                    $question = preg_replace('/^what word completes this sentence:\s*/i', '', $question);
+                    $question = trim($question, " '\":");
+                }
+            }
+        }
+
         if ($question === '' || $answer === '') continue;
         if (!in_array($answer, $options, true)) array_unshift($options, $answer);
         $options = array_values(array_unique($options));
@@ -1395,7 +1416,7 @@ if (!function_exists('elevaro_teacher_ai_create_split_draft')) {
 " . elevaro_teacher_ai_curriculum_prompt_block($ctx));
             $extraPrompt = trim($extraPrompt . "
 
-Quelle: Lerninhalt ohne zusätzliches Material. Erstelle ein Quiz auf Basis dieses Lerninhalts, der Langbeschreibung, Lernziele, Keywords und des Klassenkontexts. Keine Quellenverweise im Fragetext.");
+Quelle: Lerninhalt ohne zusätzliches Material. Erstelle ein Quiz auf Basis dieses Lerninhalts, der Langbeschreibung, Lernziele, Keywords und des Klassenkontexts. Keine Quellenverweise im Fragetext. Bei Sprach-/Übungsformaten: natürliche neue Beispielsätze und echte Anwendung statt Meta-Fragen über Aufgabenblätter.");
             $files = [];
         } elseif (!elevaro_teacher_ai_has_readable_material($sourceText, $files)) {
             throw new RuntimeException('Bitte Material hochladen, Text eingeben oder ein Lerninhalt auswählen.');
