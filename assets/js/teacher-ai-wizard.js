@@ -21,16 +21,31 @@
     $$('[data-step-indicator]').forEach(b => b.classList.toggle('is-active', b.dataset.stepIndicator === String(n)));
   }
 
-  function apiJson(url, payload) {
-    return fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload || {})
-    }).then(async res => {
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.ok) throw new Error(json.error || 'Anfrage fehlgeschlagen.');
-      return json;
-    });
+  async function apiJson(url, payload) {
+    let res;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload || {})
+      });
+    } catch (networkError) {
+      throw new Error('Verbindung unterbrochen oder Server nicht erreichbar. Bitte erneut versuchen. Details: ' + (networkError.message || networkError));
+    }
+
+    const text = await res.text();
+    let json = {};
+    try {
+      json = text ? JSON.parse(text) : {};
+    } catch (parseError) {
+      throw new Error(text ? 'Serverantwort war kein JSON: ' + text.replace(/\s+/g, ' ').slice(0, 500) : 'Serverantwort war leer.');
+    }
+
+    if (!res.ok || !json.ok) {
+      throw new Error(json.error || 'Anfrage fehlgeschlagen.');
+    }
+
+    return json;
   }
 
   function wireChoiceCards(selector) {
@@ -201,7 +216,7 @@
       const form = e.currentTarget;
       const sourceKind = $('#aiWizardSourceKind')?.value || 'material';
       if (sourceKind === 'curriculum' && !($('#aiCurriculumTopicSelect')?.value || '')) {
-        throw new Error('Bitte ein Lehrplanthema auswählen.');
+        throw new Error('Bitte ein Lerninhalt auswählen.');
       }
       const res = await fetch('/teacher/api/ai_wizard_generate.php', { method: 'POST', body: new FormData(form) });
       const text = await res.text();
@@ -222,7 +237,13 @@
       generateImage(false);
     } catch (err) {
       toast(err.message || String(err));
-      step(1);
+      const box = document.getElementById('aiWizardErrorBox');
+      if (box) {
+        box.classList.remove('d-none');
+        box.textContent = err.message || String(err);
+      }
+      // Nicht zurück auf den Startscreen springen: Lehrer soll Fehlermeldung sehen und Eingaben behalten.
+      step(2);
     } finally {
       stopLoadingCopy();
     }
@@ -234,11 +255,10 @@
     $('#aiQuizTitle').value = p.title || '';
     $('#aiQuizDescription').value = p.description || '';
     $('#aiImagePrompt').value = p.image_prompt || '';
+    const debugImagePrompt = document.querySelector('[data-debug-image-prompt]');
+    if (debugImagePrompt) debugImagePrompt.textContent = p.image_prompt || '';
     $('#aiListeningText').value = p.listening_text || '';
     $('#aiListeningBox').classList.toggle('d-none', p.mode !== 'listening');
-    if (p.mode === 'listening') {
-      const label = document.querySelector('label[for="aiListeningText"]');
-    }
     renderPlausibilityReview();
     renderQuestions();
     updatePublishSummary();
@@ -249,24 +269,12 @@
       const options = $$('.ai-option-text', card).map(i => i.value.trim()).filter(Boolean);
       const checked = $('.ai-option-correct:checked', card);
       const correctIndex = checked ? Number(checked.value) : 0;
-      const segmentInput = $('.ai-listening-segment-text', card);
-      const segmentTitleInput = $('.ai-listening-segment-title', card);
-      const audioPathInput = $('.ai-listening-audio-path', card);
-      const audioStatusInput = $('.ai-listening-audio-status', card);
       return {
         question: $('.ai-question-text', card).value.trim(),
         options,
         answer: options[correctIndex] || options[0] || '',
         explanation: $('.ai-question-explanation', card).value.trim(),
-        difficulty: Number($('.ai-question-difficulty', card).value || 0.35),
-        type: segmentInput ? 'listening_mc' : 'mc',
-        listening_segment_text: segmentInput ? segmentInput.value.trim() : '',
-        listening_segment_title: segmentTitleInput ? segmentTitleInput.value.trim() : '',
-        audio: segmentInput ? {
-          text: segmentInput.value.trim(),
-          path: audioPathInput ? audioPathInput.value.trim() : '',
-          status: audioStatusInput ? audioStatusInput.value.trim() : 'none'
-        } : undefined
+        difficulty: Number($('.ai-question-difficulty', card).value || 0.35)
       };
     }).filter(q => q.question && q.options.length);
 
@@ -335,33 +343,11 @@
     while (opts.length < 4) opts.push('');
     let correctIndex = Math.max(0, opts.findIndex(o => o === q.answer));
     if (correctIndex < 0) correctIndex = 0;
-    const isListening = (state.payload && state.payload.mode === 'listening') || q.type === 'listening_mc' || q.listening_segment_text;
-    const segmentText = q.listening_segment_text || (q.audio && q.audio.text) || '';
-    const segmentTitle = q.listening_segment_title || `Abschnitt ${idx + 1}`;
-    const audioPath = q.audio && q.audio.path ? q.audio.path : '';
-    const audioStatus = q.audio && q.audio.status ? q.audio.status : (audioPath ? 'generated' : 'none');
-    const listeningBlock = isListening ? `
-      <div class="ai-listening-review-box">
-        <div class="ai-listening-review-head">
-          <span>🎧 Hörtext zu dieser Frage</span>
-          ${audioPath ? '<strong>Audio bereit</strong>' : '<strong class="is-pending">Noch kein Audio</strong>'}
-        </div>
-        <label class="form-label fw-bold">Abschnittstitel</label>
-        <input class="form-control ai-listening-segment-title" value="${esc(segmentTitle)}" placeholder="z. B. Abschnitt ${idx + 1}">
-        <label class="form-label fw-bold mt-2">Hörabschnitt</label>
-        <textarea class="form-control ai-listening-segment-text" rows="4" placeholder="Kurzer Hörtext, der direkt vor dieser Frage abgespielt wird.">${esc(segmentText)}</textarea>
-        ${audioPath ? `<audio class="ai-listening-audio-preview" controls preload="metadata" src="${esc(audioPath)}"></audio>` : `<div class="ai-listening-audio-note">Die Vertonung wird automatisch erstellt. Falls sie fehlschlägt, bleibt der Text als Fallback erhalten.</div>`}
-        <input type="hidden" class="ai-listening-audio-path" value="${esc(audioPath)}">
-        <input type="hidden" class="ai-listening-audio-status" value="${esc(audioStatus)}">
-      </div>
-    ` : '';
-
     card.innerHTML = `
       <div class="ai-question-card-head">
         <span class="ai-question-number">Frage ${idx + 1}</span>
         <button class="btn btn-sm btn-outline-danger ai-delete-question" type="button">Löschen</button>
       </div>
-      ${listeningBlock}
       <label class="form-label fw-bold">Frage</label>
       <textarea class="form-control ai-question-text" rows="2">${esc(q.question || '')}</textarea>
       <div class="ai-question-options">

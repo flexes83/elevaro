@@ -446,7 +446,7 @@ Klassenkontext:
 - Sprache der Fragen: {$language}
 
 Vom Lehrer hochgeladene Dateien:
-" . ($fileList ? implode("\n", $fileList) : '[Keine Datei hochgeladen – ggf. Lehrplanthema als Quelle.]') . "
+" . ($fileList ? implode("\n", $fileList) : '[Keine Datei hochgeladen – ggf. Lerninhalt als Quelle.]') . "
 
 Zusätzlicher Lehrertext / Aufgabenstellung:
 " . ($sourceText !== '' ? $sourceText : '[Kein zusätzlicher Text eingetragen.]') . "
@@ -467,7 +467,7 @@ Aufgabe:
 - Formuliere altersgerecht.
 - Bei Fremdsprachen/Listening: Fragen und Antworten in der Zielsprache.
 - Bei Listening zusätzlich einen Sprechertext in der Zielsprache erstellen. Dieser Sprechertext muss inhaltlich auf dem Material basieren.
-- Erstelle außerdem eine kurze Quizbeschreibung und einen konkreten Bildprompt für ein freundliches, modernes Lernkarten-Bild.");
+- Erstelle außerdem eine kurze Quizbeschreibung und einen konkreten Bildprompt. Bildprompt-Regeln: ausschließlich Elevaro-CD-Stil, freundliche moderne 3D/Illustration, weiche Formen, klare lebendige Farben, altersgerecht zur Klassenstufe, ohne Text im Bild, ohne Logos/Marken, ohne fotorealistische Personen, ohne gruselige/gewalttätige Motive.");
 }
 
 function elevaro_teacher_ai_generate_from_material(array $class, string $mode, string $sourceText, string $extraPrompt, array $files): array
@@ -746,7 +746,13 @@ function elevaro_teacher_ai_normalize_payload(array $payload, string $mode): arr
     $payload['mode'] = $mode === 'listening' ? 'listening' : 'quiz';
     $payload['language'] = trim((string)($payload['language'] ?? 'Deutsch')) ?: 'Deutsch';
     $payload['listening_text'] = $mode === 'listening' ? trim((string)($payload['listening_text'] ?? '')) : '';
-    $payload['image_prompt'] = trim((string)($payload['image_prompt'] ?? 'Modernes Lernquiz Bild'));
+    $rawImagePrompt = trim((string)($payload['image_prompt'] ?? ''));
+    $payload['image_prompt'] = elevaro_teacher_ai_cd_image_prompt(
+        $rawImagePrompt,
+        (string)($payload['title'] ?? ''),
+        (string)($payload['description'] ?? ''),
+        (string)($payload['language'] ?? 'Deutsch')
+    );
 
     $questions = [];
     foreach (($payload['questions'] ?? []) as $q) {
@@ -759,28 +765,16 @@ function elevaro_teacher_ai_normalize_payload(array $payload, string $mode): arr
         while (count($options) < 4) $options[] = 'Antwort ' . (count($options) + 1);
         $options = array_slice($options, 0, 4);
         if (!in_array($answer, $options, true)) $options[0] = $answer;
-        $questionPayload = [
+        $questions[] = [
             'question' => $question,
             'options' => $options,
             'answer' => $answer,
             'explanation' => trim((string)($q['explanation'] ?? '')),
             'difficulty' => max(0.05, min(0.95, (float)($q['difficulty'] ?? 0.35))),
             'type' => $mode === 'listening' ? 'listening_mc' : 'mc',
-            'listening_segment_text' => $mode === 'listening' ? trim((string)($q['listening_segment_text'] ?? ($q['audio']['text'] ?? ''))) : '',
+            'listening_segment_text' => $mode === 'listening' ? trim((string)($q['listening_segment_text'] ?? '')) : '',
             'listening_segment_title' => $mode === 'listening' ? trim((string)($q['listening_segment_title'] ?? '')) : '',
         ];
-
-        if ($mode === 'listening') {
-            $questionPayload['audio'] = [
-                'text' => $questionPayload['listening_segment_text'],
-                'path' => $q['audio']['path'] ?? null,
-                'status' => $q['audio']['status'] ?? 'none',
-                'voice_id' => $q['audio']['voice_id'] ?? null,
-                'model_id' => $q['audio']['model_id'] ?? null,
-            ];
-        }
-
-        $questions[] = $questionPayload;
     }
     $payload['questions'] = $questions;
     return $payload;
@@ -851,11 +845,6 @@ function elevaro_teacher_ai_publish_draft(int $draftId, int $teacherId): int
     $payload = elevaro_teacher_ai_normalize_payload(elevaro_teacher_ai_draft_payload($draft), (string)$draft['mode']);
     if (count($payload['questions']) < 1) throw new RuntimeException('Der Entwurf enthält keine Fragen.');
 
-    // Wichtig: Schema-/DDL-Prüfungen VOR der Transaktion ausführen.
-    // MySQL committed ALTER/CREATE TABLE implizit; wenn das innerhalb einer PDO-Transaktion passiert,
-    // entsteht später "There is no active transaction".
-    elevaro_teacher_ai_split_ensure_schema();
-
     $pdo = elevaro_teacher_ai_wizard_db();
     $pdo->beginTransaction();
     try {
@@ -923,23 +912,15 @@ function elevaro_teacher_ai_publish_draft(int $draftId, int $teacherId): int
             $audioModelId = null;
 
             if ($isListening && $segmentText !== '') {
-                $existingAudio = is_array($q['audio'] ?? null) ? $q['audio'] : [];
-                $audioPath = trim((string)($existingAudio['path'] ?? '')) ?: null;
-                $audioVoiceId = $existingAudio['voice_id'] ?? null;
-                $audioModelId = $existingAudio['model_id'] ?? null;
-                $audioStatus = $audioPath ? 'generated' : 'text_generated';
-
-                if (!$audioPath) {
-                    try {
-                        $generatedAudio = elevaro_generate_audio_file($segmentText, 'listening_segment');
-                        $audioPath = $generatedAudio['path'] ?? null;
-                        $audioVoiceId = $generatedAudio['voice_id'] ?? null;
-                        $audioModelId = $generatedAudio['model_id'] ?? null;
-                        $audioStatus = $audioPath ? 'generated' : 'text_generated';
-                    } catch (Throwable $audioError) {
-                        error_log('[Elevaro AI Wizard Listening] Audio generation failed: ' . $audioError->getMessage());
-                        $audioStatus = 'text_generated';
-                    }
+                try {
+                    $generatedAudio = elevaro_generate_audio_file($segmentText, 'listening_segment');
+                    $audioPath = $generatedAudio['path'] ?? null;
+                    $audioVoiceId = $generatedAudio['voice_id'] ?? null;
+                    $audioModelId = $generatedAudio['model_id'] ?? null;
+                    $audioStatus = $audioPath ? 'generated' : 'text_generated';
+                } catch (Throwable $audioError) {
+                    error_log('[Elevaro AI Wizard Listening] Audio generation failed: ' . $audioError->getMessage());
+                    $audioStatus = 'text_generated';
                 }
             }
 
@@ -989,9 +970,9 @@ function elevaro_teacher_ai_publish_draft(int $draftId, int $teacherId): int
         $pdo->prepare("UPDATE teacher_ai_quiz_drafts SET status = 'published', published_quiz_id = :quiz_id WHERE id = :id")
             ->execute(['quiz_id' => $quizId, 'id' => $draftId]);
 
-        if ($pdo->inTransaction()) { $pdo->commit(); }
+        $pdo->commit();
     } catch (Throwable $e) {
-        if ($pdo->inTransaction()) if ($pdo->inTransaction()) { $pdo->rollBack(); }
+        if ($pdo->inTransaction()) $pdo->rollBack();
         throw $e;
     }
 
@@ -1297,10 +1278,10 @@ if (!function_exists('elevaro_teacher_ai_curriculum_context')) {
         $stmt=$pdo->prepare("SELECT * FROM curriculum_topics_content WHERE id=:id LIMIT 1");
         $stmt->execute(['id'=>$topicId]);
         $topic=$stmt->fetch();
-        if (!$topic) throw new RuntimeException('Das ausgewählte Lehrplanthema wurde nicht gefunden.');
+        if (!$topic) throw new RuntimeException('Das ausgewählte Lerninhalt wurde nicht gefunden.');
         $classGrade=(string)(($class['level_key'] ?? '') ?: ($class['grade'] ?? ''));
         if ((string)$topic['state_code'] !== (string)($class['state_code'] ?? '') || (string)$topic['school_type_key'] !== (string)($class['school_type_code'] ?? '') || (string)$topic['grade_key'] !== $classGrade || (string)$topic['subject_key'] !== (string)($class['subject_code'] ?? '')) {
-            throw new RuntimeException('Das ausgewählte Lehrplanthema passt nicht zur aktuellen Klasse.');
+            throw new RuntimeException('Das ausgewählte Lerninhalt passt nicht zur aktuellen Klasse.');
         }
         $subtopic=null;
         if ($subtopicId) {
@@ -1326,7 +1307,7 @@ if (!function_exists('elevaro_teacher_ai_curriculum_prompt_block')) {
         $keywords=array_filter(array_merge((array)$context['keywords'],(array)$context['subtopic_keywords']));
         $aliases=array_filter(array_merge((array)$context['aliases'],(array)$context['subtopic_aliases']));
         $lines=[
-            'Lehrplanthema als verbindliche Quelle:',
+            'Lerninhalt als verbindliche Quelle:',
             '- Bereich: '.(string)($t['domain_title'] ?? ''),
             '- Thema kurz: '.(string)(($t['title_short'] ?? '') ?: ($t['topic_title'] ?? '')),
             '- Thema lang: '.(string)($t['title_long'] ?? ''),
@@ -1394,17 +1375,17 @@ if (!function_exists('elevaro_teacher_ai_create_split_draft')) {
         $class = elevaro_teacher_ai_class_for_teacher($classId, $teacherId);
 
         if ($sourceKind === 'curriculum') {
-            if ($topicId <= 0) throw new RuntimeException('Bitte ein Lehrplanthema auswählen.');
+            if ($topicId <= 0) throw new RuntimeException('Bitte ein Lerninhalt auswählen.');
             $ctx = elevaro_teacher_ai_curriculum_context($topicId, $subtopicId ?: null, $class);
             $sourceText = trim($sourceText . "
 
 " . elevaro_teacher_ai_curriculum_prompt_block($ctx));
             $extraPrompt = trim($extraPrompt . "
 
-Quelle: Lehrplanthema ohne zusätzliches Material. Erstelle ein Quiz auf Basis dieses Lehrplanthemas, der Langbeschreibung, Lernziele, Keywords und des Klassenkontexts. Keine Quellenverweise im Fragetext.");
+Quelle: Lerninhalt ohne zusätzliches Material. Erstelle ein Quiz auf Basis dieses Lerninhalts, der Langbeschreibung, Lernziele, Keywords und des Klassenkontexts. Keine Quellenverweise im Fragetext.");
             $files = [];
         } elseif (!elevaro_teacher_ai_has_readable_material($sourceText, $files)) {
-            throw new RuntimeException('Bitte Material hochladen, Text eingeben oder ein Lehrplanthema auswählen.');
+            throw new RuntimeException('Bitte Material hochladen, Text eingeben oder ein Lerninhalt auswählen.');
         }
 
         $files = elevaro_teacher_ai_prepare_openai_material_files($files);
@@ -1475,7 +1456,7 @@ if (!function_exists('elevaro_teacher_ai_split_build_analysis_prompt')) {
         $language = elevaro_teacher_ai_language_for_class($class, $mode);
         $fileList = array_map(static fn($file) => '- ' . (string)($file['original_name'] ?? 'Material') . ' (' . (string)($file['mime'] ?? 'Datei') . ')', $files);
 
-        return trim("Analysiere die Quelle für einen Elevaro-KI-Quiz-Wizard. Die Quelle kann hochgeladenes Unterrichtsmaterial oder ein ausgewähltes Lehrplanthema sein.\n\n" .
+        return trim("Analysiere die Quelle für einen Elevaro-KI-Quiz-Wizard. Die Quelle kann hochgeladenes Unterrichtsmaterial oder ein ausgewähltes Lerninhalt sein.\n\n" .
             "Klassenkontext:\n- Klasse: {$grade}\n- Schulart/Level: {$school} / {$level}\n- Fach: {$subject}\n- Modus: " . ($mode === 'listening' ? 'Listening + Comprehension' : 'normales Multiple-Choice-Quiz') . "\n- Erwartete Sprache der Fragen: {$language}\n\n" .
             "Dateien:\n" . ($fileList ? implode("\n", $fileList) : '[Keine Datei hochgeladen.]') . "\n\n" .
             "Lehrertext / Aufgabenstellung:\n" . ($sourceText !== '' ? $sourceText : '[Kein zusätzlicher Text eingetragen.]') . "\n\n" .
@@ -1483,7 +1464,7 @@ if (!function_exists('elevaro_teacher_ai_split_build_analysis_prompt')) {
             "Aufgabe für diesen Schritt: Erstelle KEINE fertigen Fragen. Analysiere nur die Quelle und entscheide zuerst, welche Art von Material vorliegt.\n" .
             "Zielumfang: " . elevaro_teacher_ai_target_question_count($mode) . " Fragen insgesamt. Bei normalen Quizzen 15 Fragen. Bei Listening 5 Fragen mit je einem kurzen Hörabschnitt.\n" .
             "Klassifiziere material_type und task_intent besonders sorgfältig:\n" .
-            "- Wenn die Quelle ein Lehrplanthema ohne Material ist: material_type = mixed, task_intent = quiz_about_content. Erstelle eine vollständige, lehrplanorientierte Themenabdeckung, keine Materialbeschreibung.\n" .
+            "- Wenn die Quelle ein Lerninhalt ohne Material ist: material_type = mixed, task_intent = quiz_about_content. Erstelle eine vollständige, lehrplanorientierte Themenabdeckung, keine Materialbeschreibung.\n" .
             "- reading_text + quiz_about_content: Der Inhalt selbst soll verstanden und abgefragt werden.\n" .
             "- worksheet, grammar_exercise oder vocabulary_list: Das Blatt ist meist Übungsmaterial. Dann darf NICHT zufälliger Beispielsatz-Inhalt abgefragt werden. Stattdessen sollen die geübten Lernziele, Vokabeln, Satzmuster, Grammatikstrukturen oder Kompetenzen trainiert werden.\n" .
             "- Bei Fremdsprachen-Arbeitsblättern: Übersetze die späteren Fragen nicht automatisch ins Deutsche. Bewahre die Sprache und den Aufgabentyp des Materials, sofern der Lehrer nichts anderes verlangt.\n" .
@@ -1722,62 +1703,6 @@ if (!function_exists('elevaro_teacher_ai_split_base_payload')) {
     }
 }
 
-
-if (!function_exists('elevaro_teacher_ai_generate_listening_preview_audio')) {
-    function elevaro_teacher_ai_generate_listening_preview_audio(array $payload): array
-    {
-        if (($payload['mode'] ?? '') !== 'listening') {
-            return $payload;
-        }
-
-        foreach (($payload['questions'] ?? []) as $index => $question) {
-            $segmentText = trim((string)($question['listening_segment_text'] ?? ($question['audio']['text'] ?? '')));
-            if ($segmentText === '') {
-                continue;
-            }
-
-            $payload['questions'][$index]['type'] = 'listening_mc';
-            $payload['questions'][$index]['listening_segment_text'] = $segmentText;
-            $payload['questions'][$index]['listening_segment_title'] = trim((string)($question['listening_segment_title'] ?? ('Abschnitt ' . ($index + 1))));
-
-            $existingPath = trim((string)($question['audio']['path'] ?? ''));
-            if ($existingPath !== '') {
-                $payload['questions'][$index]['audio'] = [
-                    'text' => $segmentText,
-                    'path' => $existingPath,
-                    'status' => (string)($question['audio']['status'] ?? 'generated'),
-                    'voice_id' => $question['audio']['voice_id'] ?? null,
-                    'model_id' => $question['audio']['model_id'] ?? null,
-                ];
-                continue;
-            }
-
-            try {
-                $generated = elevaro_generate_audio_file($segmentText, 'listening_preview_' . ($index + 1));
-                $payload['questions'][$index]['audio'] = [
-                    'text' => $segmentText,
-                    'path' => $generated['path'] ?? null,
-                    'status' => !empty($generated['path']) ? 'generated' : 'text_generated',
-                    'voice_id' => $generated['voice_id'] ?? null,
-                    'model_id' => $generated['model_id'] ?? null,
-                ];
-            } catch (Throwable $e) {
-                error_log('[Elevaro AI Wizard Listening Preview] Audio generation failed: ' . $e->getMessage());
-                $payload['questions'][$index]['audio'] = [
-                    'text' => $segmentText,
-                    'path' => null,
-                    'status' => 'text_generated',
-                    'voice_id' => null,
-                    'model_id' => null,
-                ];
-            }
-        }
-
-        return $payload;
-    }
-}
-
-
 if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
     function elevaro_teacher_ai_poll_split_draft(int $draftId, int $teacherId): array
     {
@@ -1861,7 +1786,6 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
             $plausibility = elevaro_teacher_ai_apply_plausibility_review($analysis, $allQuestions, $mode, $files);
             $checkedQuestions = $plausibility['questions'];
             $payload = elevaro_teacher_ai_split_base_payload($analysis, $mode, $checkedQuestions);
-            $payload = elevaro_teacher_ai_generate_listening_preview_audio($payload);
             $payload['plausibility_review'] = $plausibility['review'];
             $stmt = elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts
                 SET status = 'draft', generation_step = 'done', generated_payload_json = :payload, source_title = :title, image_prompt = :image_prompt, image_status = 'pending'

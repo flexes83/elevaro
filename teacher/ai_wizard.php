@@ -64,8 +64,8 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
             <label class="ai-source-kind-card">
               <input type="radio" name="source_kind_choice" value="curriculum">
               <span class="ai-mode-icon">🎯</span>
-              <strong>Lehrplanthema wählen</strong>
-              <small>Quiz ohne Upload aus deiner Klassenstufe erstellen.</small>
+              <strong>Lerninhalt wählen</strong>
+              <small>Quiz ohne Upload aus den hinterlegten Themen dieser Klasse erstellen.</small>
             </label>
           </div>
 
@@ -84,7 +84,7 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
 
           <div class="ai-source-detail ai-curriculum-source" id="aiCurriculumSourceBox">
             <div class="ai-field-block">
-              <label class="form-label fw-bold">Lehrplanthema</label>
+              <label class="form-label fw-bold">Lerninhalt</label>
               <select class="form-select form-select-lg" id="aiCurriculumTopicSelect" name="curriculum_topic_content_id">
                 <option value="">Themen werden geladen…</option>
               </select>
@@ -98,7 +98,7 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
             </div>
 
             <div class="ai-curriculum-preview" id="aiCurriculumPreview">
-              Wähle ein Thema aus. Elevaro nutzt Kurz- und Langtitel, Lernziel, Keywords und Klassenkontext als Grundlage.
+              Wähle einen Lerninhalt aus. Elevaro nutzt Thema, Skill, Lernziel, Keywords und Klassenkontext als Grundlage.
             </div>
           </div>
         </div>
@@ -161,8 +161,8 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
 
           <div class="ai-curriculum-goal-box d-none" id="aiCurriculumGoalBox">
             <div class="ai-goal-hint">
-              <strong>Lehrplanbasiertes Quiz</strong>
-              <span>Die KI erstellt ein Quiz passend zu Klasse, Fach, Thema und optionalem Skill. Ohne Upload und ohne freie Prompt-Hürde.</span>
+              <strong>Quiz aus Lerninhalt</strong>
+              <span>Die KI erstellt ein Quiz passend zu Klasse, Fach, Lerninhalt und optionalem Skill. Ohne Upload und ohne freie Prompt-Hürde.</span>
             </div>
           </div>
 
@@ -195,10 +195,11 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
       <div class="ai-progress"><i></i></div>
       <div class="ai-progress-list">
         <span data-loading-copy>📄 Quelle verstehen</span>
-        <span data-loading-copy>🧠 Fragen entwickeln</span>
+        <span data-loading-copy>🧠 Lerninhalte auswerten</span>
         <span data-loading-copy>✅ Antworten prüfen</span>
         <span data-loading-copy>🎨 Quizbild vorbereiten</span>
       </div>
+      <div id="aiWizardErrorBox" class="alert alert-danger d-none mt-4 text-start"></div>
     </div>
   </section>
 
@@ -216,13 +217,13 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
           <textarea class="form-control" id="aiQuizDescription" rows="5"></textarea>
 
           <div id="aiListeningBox" class="mt-3 d-none">
-            <label class="form-label fw-bold">Listening-Sprechertext</label>
-            <textarea class="form-control" id="aiListeningText" rows="8"></textarea>
-            <div class="form-text">Die Vertonung passiert erst beim Veröffentlichen.</div>
+            <label class="form-label fw-bold">Listening-Zusammenfassung</label>
+            <textarea class="form-control" id="aiListeningText" rows="5"></textarea>
+            <div class="form-text">Die eigentlichen Hörabschnitte stehen direkt bei den Fragen.</div>
           </div>
 
-          <label class="form-label fw-bold mt-3">Bildprompt</label>
-          <textarea class="form-control" id="aiImagePrompt" rows="4"></textarea>
+          <textarea class="d-none" id="aiImagePrompt" rows="1" aria-hidden="true"></textarea>
+          <small class="d-none" data-debug-image-prompt></small>
 
           <div class="ai-image-preview mt-3" id="aiImagePreview">
             <span>🎨</span>
