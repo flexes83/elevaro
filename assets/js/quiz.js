@@ -311,7 +311,7 @@
     questionEl.insertAdjacentElement('afterend', box);
   }
 
-  function renderQuestionMedia  function renderQuestionMedia(question) {
+  function renderQuestionMedia(question) {
     const existing = document.getElementById('questionMedia');
     if (existing) existing.remove();
 
