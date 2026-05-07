@@ -268,6 +268,9 @@ function classroom_teacher_participant(int $classId): array
     $participant = $stmt->fetch();
 
     if ($participant) {
+        auth_start_session();
+        $_SESSION[ELEVARO_CLASSROOM_SESSION_KEY] = (int)$participant['id'];
+        classroom_touch((int)$participant['id']);
         return $participant;
     }
 
@@ -288,6 +291,8 @@ function classroom_teacher_participant(int $classId): array
     ]);
 
     $id = (int)classroom_db()->lastInsertId();
+    auth_start_session();
+    $_SESSION[ELEVARO_CLASSROOM_SESSION_KEY] = $id;
     $stmt = classroom_db()->prepare("SELECT * FROM classroom_participants WHERE id = :id LIMIT 1");
     $stmt->execute(['id' => $id]);
 
