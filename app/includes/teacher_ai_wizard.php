@@ -765,6 +765,9 @@ function elevaro_teacher_ai_normalize_payload(array $payload, string $mode): arr
             'answer' => $answer,
             'explanation' => trim((string)($q['explanation'] ?? '')),
             'difficulty' => max(0.05, min(0.95, (float)($q['difficulty'] ?? 0.35))),
+            'type' => $mode === 'listening' ? 'listening_mc' : 'mc',
+            'listening_segment_text' => $mode === 'listening' ? trim((string)($q['listening_segment_text'] ?? '')) : '',
+            'listening_segment_title' => $mode === 'listening' ? trim((string)($q['listening_segment_title'] ?? '')) : '',
         ];
     }
     $payload['questions'] = $questions;
@@ -871,7 +874,7 @@ function elevaro_teacher_ai_publish_draft(int $draftId, int $teacherId): int
             'image_status' => $draft['image_path'] ? 'draft' : 'none',
             'listening_mode' => $isListening ? 1 : 0,
             'listening_text' => $isListening ? ($payload['listening_text'] ?? '') : null,
-            'listening_status' => $isListening ? 'text_generated' : 'none',
+            'listening_status' => $isListening ? 'segment_audio' : 'none',
             'source_text' => $draft['source_text'] ?: null,
             'context_notes' => 'Erstellt über Lehrer-KI-Wizard aus eigenem Unterrichtsmaterial.',
             'theme_color_1' => '#5a4ff3',
@@ -894,21 +897,51 @@ function elevaro_teacher_ai_publish_draft(int $draftId, int $teacherId): int
         $sort = 0;
         foreach ($payload['questions'] as $q) {
             $sort += 10;
+            $questionType = $isListening ? 'listening_mc' : 'mc';
+            $segmentText = $isListening ? trim((string)($q['listening_segment_text'] ?? '')) : '';
+            $segmentTitle = $isListening ? trim((string)($q['listening_segment_title'] ?? '')) : '';
+            $audioPath = null;
+            $audioStatus = 'none';
+            $audioVoiceId = null;
+            $audioModelId = null;
+
+            if ($isListening && $segmentText !== '') {
+                try {
+                    $generatedAudio = elevaro_generate_audio_file($segmentText, 'listening_segment');
+                    $audioPath = $generatedAudio['path'] ?? null;
+                    $audioVoiceId = $generatedAudio['voice_id'] ?? null;
+                    $audioModelId = $generatedAudio['model_id'] ?? null;
+                    $audioStatus = $audioPath ? 'generated' : 'text_generated';
+                } catch (Throwable $audioError) {
+                    error_log('[Elevaro AI Wizard Listening] Audio generation failed: ' . $audioError->getMessage());
+                    $audioStatus = 'text_generated';
+                }
+            }
+
             $stmt = $pdo->prepare("INSERT INTO questions
                 (quiz_id, question_key, type, question_text, correct_answer, explanation, difficulty_manual,
-                 difficulty_calculated, status, ai_generated, source_context, sort_order)
+                 difficulty_calculated, status, ai_generated, source_context, source_excerpt,
+                 audio_text, audio_path, audio_status, audio_voice_id, audio_model_id, sort_order)
                 VALUES
-                (:quiz_id, :question_key, 'mc', :question_text, :correct_answer, :explanation, :difficulty_manual,
-                 :difficulty_calculated, 'draft', 1, :source_context, :sort_order)");
+                (:quiz_id, :question_key, :type, :question_text, :correct_answer, :explanation, :difficulty_manual,
+                 :difficulty_calculated, 'draft', 1, :source_context, :source_excerpt,
+                 :audio_text, :audio_path, :audio_status, :audio_voice_id, :audio_model_id, :sort_order)");
             $stmt->execute([
                 'quiz_id' => $quizId,
                 'question_key' => elevaro_teacher_ai_slug($q['question']) . '-' . substr(sha1($quizId . '-' . $sort), 0, 6),
+                'type' => $questionType,
                 'question_text' => $q['question'],
                 'correct_answer' => $q['answer'],
                 'explanation' => $q['explanation'],
                 'difficulty_manual' => $q['difficulty'],
                 'difficulty_calculated' => $q['difficulty'],
-                'source_context' => $isListening ? 'listening_text' : 'general',
+                'source_context' => $isListening ? 'listening_segment' : 'general',
+                'source_excerpt' => $isListening ? ($segmentTitle ?: ('Abschnitt ' . (int)($sort / 10))) : null,
+                'audio_text' => $segmentText ?: null,
+                'audio_path' => $audioPath,
+                'audio_status' => $audioStatus,
+                'audio_voice_id' => $audioVoiceId,
+                'audio_model_id' => $audioModelId,
                 'sort_order' => $sort,
             ]);
             $questionId = (int)$pdo->lastInsertId();
@@ -1105,6 +1138,19 @@ if (!function_exists('elevaro_teacher_ai_analysis_schema')) {
                 'difficulty_progression' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'image_prompt' => ['type' => 'string'],
                 'listening_text' => ['type' => 'string'],
+                'listening_segments' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'additionalProperties' => false,
+                        'properties' => [
+                            'segment_number' => ['type' => 'integer'],
+                            'segment_summary' => ['type' => 'string'],
+                            'question_goal' => ['type' => 'string'],
+                        ],
+                        'required' => ['segment_number', 'segment_summary', 'question_goal'],
+                    ],
+                ],
                 'question_plan' => [
                     'type' => 'array',
                     'items' => [
@@ -1120,7 +1166,7 @@ if (!function_exists('elevaro_teacher_ai_analysis_schema')) {
                     ],
                 ],
             ],
-            'required' => ['title', 'description', 'mode', 'language', 'source_summary', 'usable_material_note', 'material_type', 'task_intent', 'target_language', 'content_map', 'topics', 'difficulty_progression', 'image_prompt', 'listening_text', 'question_plan'],
+            'required' => ['title', 'description', 'mode', 'language', 'source_summary', 'usable_material_note', 'material_type', 'task_intent', 'target_language', 'content_map', 'topics', 'difficulty_progression', 'image_prompt', 'listening_text', 'listening_segments', 'question_plan'],
         ];
     }
 }
@@ -1146,8 +1192,10 @@ if (!function_exists('elevaro_teacher_ai_questions_block_schema')) {
                             'explanation' => ['type' => 'string'],
                             'difficulty' => ['type' => 'number'],
                             'source_reference' => ['type' => 'string'],
+                            'listening_segment_text' => ['type' => 'string'],
+                            'listening_segment_title' => ['type' => 'string'],
                         ],
-                        'required' => ['question', 'options', 'answer', 'explanation', 'difficulty', 'source_reference'],
+                        'required' => ['question', 'options', 'answer', 'explanation', 'difficulty', 'source_reference', 'listening_segment_text', 'listening_segment_title'],
                     ],
                 ],
             ],
@@ -1356,6 +1404,42 @@ Quelle: Lehrplanthema ohne zusätzliches Material. Erstelle ein Quiz auf Basis d
     }
 }
 
+
+if (!function_exists('elevaro_teacher_ai_target_question_count')) {
+    function elevaro_teacher_ai_target_question_count(string $mode): int
+    {
+        return $mode === 'listening' ? 5 : 15;
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_generation_block_size')) {
+    function elevaro_teacher_ai_generation_block_size(string $mode): int
+    {
+        return $mode === 'listening' ? 1 : 5;
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_generation_block_count')) {
+    function elevaro_teacher_ai_generation_block_count(string $mode): int
+    {
+        return (int)ceil(elevaro_teacher_ai_target_question_count($mode) / elevaro_teacher_ai_generation_block_size($mode));
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_listening_story_instruction')) {
+    function elevaro_teacher_ai_listening_story_instruction(int $targetQuestions): string
+    {
+        return "Listening-Speziallogik:\n"
+            . "- Erstelle keine lange Audiodatei für das ganze Quiz.\n"
+            . "- Plane eine zusammenhängende kleine Story oder Situation in exakt {$targetQuestions} kurzen Hörabschnitten.\n"
+            . "- Jeder Abschnitt bekommt später genau eine Verständnisfrage.\n"
+            . "- Die Abschnitte müssen in fester Reihenfolge funktionieren und dürfen nicht zufällig gemischt werden.\n"
+            . "- Jeder Abschnitt soll kurz genug sein, um direkt vor der jeweiligen Frage abgespielt zu werden.\n"
+            . "- Die Fragen, Antwortoptionen und Erklärungen bleiben in der Ziel-/Fremdsprache, sofern der Lehrer nichts anderes verlangt.\n";
+    }
+}
+
+
 if (!function_exists('elevaro_teacher_ai_split_build_analysis_prompt')) {
     function elevaro_teacher_ai_split_build_analysis_prompt(array $class, string $mode, string $sourceText, string $extraPrompt, array $files): string
     {
@@ -1372,18 +1456,21 @@ if (!function_exists('elevaro_teacher_ai_split_build_analysis_prompt')) {
             "Lehrertext / Aufgabenstellung:\n" . ($sourceText !== '' ? $sourceText : '[Kein zusätzlicher Text eingetragen.]') . "\n\n" .
             "Zusatzwunsch des Lehrers:\n" . ($extraPrompt !== '' ? $extraPrompt : '[Keine Zusatzanweisung.]') . "\n\n" .
             "Aufgabe für diesen Schritt: Erstelle KEINE fertigen Fragen. Analysiere nur die Quelle und entscheide zuerst, welche Art von Material vorliegt.\n" .
+            "Zielumfang: " . elevaro_teacher_ai_target_question_count($mode) . " Fragen insgesamt. Bei normalen Quizzen 15 Fragen. Bei Listening 5 Fragen mit je einem kurzen Hörabschnitt.\n" .
             "Klassifiziere material_type und task_intent besonders sorgfältig:\n" .
             "- Wenn die Quelle ein Lehrplanthema ohne Material ist: material_type = mixed, task_intent = quiz_about_content. Erstelle eine vollständige, lehrplanorientierte Themenabdeckung, keine Materialbeschreibung.\n" .
             "- reading_text + quiz_about_content: Der Inhalt selbst soll verstanden und abgefragt werden.\n" .
             "- worksheet, grammar_exercise oder vocabulary_list: Das Blatt ist meist Übungsmaterial. Dann darf NICHT zufälliger Beispielsatz-Inhalt abgefragt werden. Stattdessen sollen die geübten Lernziele, Vokabeln, Satzmuster, Grammatikstrukturen oder Kompetenzen trainiert werden.\n" .
             "- Bei Fremdsprachen-Arbeitsblättern: Übersetze die späteren Fragen nicht automatisch ins Deutsche. Bewahre die Sprache und den Aufgabentyp des Materials, sofern der Lehrer nichts anderes verlangt.\n" .
             "- Bei Lückentexten: Erkenne, ob es um Vokabeln, Grammatik, Wortpaare, Monate, Ordnungszahlen, Datum, Pronomen o. ä. geht. Frage nicht nach irrelevanten Inhalten aus Beispielsätzen.\n\n" .
-            "Erstelle eine content_map mit den wichtigsten Lernzielen und Frage-Strategien. Diese content_map ist die verbindliche Grundlage für die späteren 30 Fragen und soll die relevanten Inhalte bzw. Kompetenzen möglichst vollständig abdecken.\n" .
-            "Erstelle eine belastbare Fragenplanung für 30 spätere Multiple-Choice-Fragen in 6 Blöcken à 5 Fragen. Verteile die Blöcke über die content_map, damit nichts Wesentliches verloren geht.\n" .
+            "Erstelle eine content_map mit den wichtigsten Lernzielen und Frage-Strategien. Diese content_map ist die verbindliche Grundlage für die späteren Fragen und soll die relevanten Inhalte bzw. Kompetenzen möglichst vollständig abdecken.\n" .
+            ($mode === 'listening'
+                ? elevaro_teacher_ai_listening_story_instruction(elevaro_teacher_ai_target_question_count($mode)) . "Erstelle eine Fragenplanung für 5 Abschnitte in fester Reihenfolge. listening_text ist nur eine kurze Gesamtzusammenfassung; die eigentlichen Hörtexte kommen später pro Frage als listening_segment_text.\n"
+                : "Erstelle eine belastbare Fragenplanung für 15 spätere Multiple-Choice-Fragen in 3 Blöcken à 5 Fragen. Verteile die Blöcke über die content_map, damit nichts Wesentliches verloren geht.\n") .
             "description ist eine kurze, motivierende Quizbeschreibung für Schülerinnen und Schüler, keine Beschreibung der hochgeladenen Quelle.\n" .
             "image_prompt beschreibt ein passendes Elevaro-Quizbild im bestehenden modernen, freundlichen, spielerisch-edukativen Stil für die Zielgruppe; beschreibe NICHT das PDF, Arbeitsblatt oder Handschriften.\n" .
             "Der Klassenkontext darf Niveau und Sprache steuern, aber keine Fakten ergänzen. Wenn Inhalte unleserlich sind, benenne das offen.\n" .
-            "Bei Listening: Erstelle zusätzlich einen Sprechertext in der Zielsprache, ausschließlich aus dem Material bzw. den erkannten Lernzielen abgeleitet.");
+            "Bei Listening: Erstelle keinen langen Sprechertext für das ganze Quiz, sondern nutze listening_segments als Story-/Abschnittsplan. listening_text darf nur eine kurze Zusammenfassung der Story sein.");
     }
 }
 
@@ -1404,8 +1491,32 @@ if (!function_exists('elevaro_teacher_ai_split_build_questions_prompt')) {
         }
         if ($focus === '') $focus = '- Nutze content_map, Analyse und Originalmaterial für diesen Block.\n';
 
+        $listeningRules = '';
+        if ($mode === 'listening') {
+            $segmentNumber = $blockIndex + 1;
+            $segmentPlan = '';
+            foreach (($analysis['listening_segments'] ?? []) as $segment) {
+                if ((int)($segment['segment_number'] ?? 0) === $segmentNumber) {
+                    $segmentPlan = '- Abschnitt ' . $segmentNumber . ': ' . (string)($segment['segment_summary'] ?? '') . ' | Frageziel: ' . (string)($segment['question_goal'] ?? '');
+                    break;
+                }
+            }
+            if ($segmentPlan === '') {
+                $segmentPlan = '- Abschnitt ' . $segmentNumber . ': Nutze die Story- und Fragenplanung aus der Analyse.';
+            }
+
+            $listeningRules = "\nListening-Regeln für diesen Block:\n"
+                . "- Erzeuge exakt eine Frage für Abschnitt {$segmentNumber}.\n"
+                . "- Erzeuge dazu ein Feld listening_segment_text: ein kurzer Hörabschnitt in der Zielsprache.\n"
+                . "- Der Hörabschnitt muss vor der Frage verständlich sein und darf nicht länger als ca. 35–55 Wörter sein.\n"
+                . "- Die Story muss in Reihenfolge funktionieren. Dieser Abschnitt darf sich sinnvoll an vorherige Abschnitte anschließen.\n"
+                . "- Frage, Optionen und Erklärung beziehen sich nur auf diesen Hörabschnitt und bleiben in der Zielsprache.\n"
+                . "- Setze listening_segment_title kurz, z. B. 'Abschnitt {$segmentNumber}'.\n"
+                . $segmentPlan . "\n";
+        }
+
         $worksheetRules = '';
-        if (in_array($taskIntent, ['practice_same_skill', 'vocabulary_training', 'grammar_training'], true) || in_array($materialType, ['worksheet', 'grammar_exercise', 'vocabulary_list'], true)) {
+        if ($mode !== 'listening' && (in_array($taskIntent, ['practice_same_skill', 'vocabulary_training', 'grammar_training'], true) || in_array($materialType, ['worksheet', 'grammar_exercise', 'vocabulary_list'], true))) {
             $worksheetRules = "\nSpezialregeln für Arbeitsblätter / Sprachübungen:\n" .
                 "- Erzeuge Übungsfragen zum gleichen Lernziel, nicht Verständnisfragen über zufällige Beispielsatz-Inhalte.\n" .
                 "- Wenn das Material englische Übungen enthält, bleiben Frage, Antwortoptionen und Erklärung grundsätzlich auf Englisch, sofern der Lehrer nichts anderes verlangt.\n" .
@@ -1423,10 +1534,12 @@ if (!function_exists('elevaro_teacher_ai_split_build_questions_prompt')) {
             "Block-Fokus:\n{$focus}\n" .
             "Bereits erzeugte Fragen, die NICHT wiederholt werden dürfen:\n" . ($existing ? implode("\n", array_slice($existing, -24)) : '[Noch keine]') . "\n\n" .
             "Lehrertext / Zusatzwunsch als Zusatzkontext:\n" . ($sourceText !== '' ? $sourceText : '[leer]') . "\n" . ($extraPrompt !== '' ? $extraPrompt : '') . "\n" .
-            $worksheetRules . "\n" .
+            $worksheetRules . $listeningRules . "\n" .
             "Erzeuge exakt {$blockSize} neue Multiple-Choice-Fragen. Jede Frage hat exakt 4 Optionen und genau eine richtige Antwort. " .
             "Alle Fragen müssen aus Originalmaterial, content_map oder Analyse ableitbar sein. Prüfe im Zweifel wieder das direkt angehängte PDF/Bildmaterial. " .
-            "Die Schwierigkeit soll über alle 6 Blöcke sanft ansteigen: Block 1 sehr leicht, Blöcke 2–3 leicht bis mittel, Blöcke 4–5 mittel, Block 6 anspruchsvoller. " .
+            ($mode === 'listening'
+                ? "Die Listening-Fragen sollen in Story-Reihenfolge bleiben und nicht zufällig gemischt werden. "
+                : "Die Schwierigkeit soll über alle 3 Blöcke sanft ansteigen: Block 1 eher leicht, Block 2 mittel, Block 3 etwas anspruchsvoller. ") .
             "Decke in diesem Block den angegebenen Fokus ab und vermeide Wiederholungen. " .
             "Wichtig: In Frage, Antwortoptionen und Erklärung dürfen keine Materialverweise stehen wie 'laut Mindmap', 'im Arbeitsblatt', 'auf der Seite', 'in der Quelle', 'im Material' oder ähnliche Formulierungen, weil Schülerinnen und Schüler das Material später nicht sehen. source_reference darf intern knapp bleiben.");
     }
@@ -1573,7 +1686,9 @@ if (!function_exists('elevaro_teacher_ai_split_base_payload')) {
             'description' => (string)($analysis['description'] ?? ''),
             'mode' => $mode,
             'language' => (string)($analysis['language'] ?? 'Deutsch'),
-            'listening_text' => $mode === 'listening' ? (string)($analysis['listening_text'] ?? '') : '',
+            'listening_text' => $mode === 'listening'
+                ? trim((string)($analysis['listening_text'] ?? ''))
+                : '',
             'image_prompt' => (string)($analysis['image_prompt'] ?? ''),
             'questions' => $questions,
             'material_type' => (string)($analysis['material_type'] ?? ''),
@@ -1631,8 +1746,8 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
                 return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'analysis_done', 'status_label' => 'Inhalte wurden strukturiert. Die Fragen werden jetzt erstellt…'];
             }
 
-            $blockSize = 5;
-            $targetBlocks = 6;
+            $blockSize = elevaro_teacher_ai_generation_block_size($mode);
+            $targetBlocks = elevaro_teacher_ai_generation_block_count($mode);
             if (count($blocks) < $targetBlocks) {
                 $blockIndex = count($blocks);
                 $prompt = elevaro_teacher_ai_split_build_questions_prompt($class, $analysis, $blockIndex, $blockSize, $mode, $sourceText, $extraPrompt, $allQuestions);
@@ -1652,7 +1767,8 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
                         'id' => $draftId,
                         'teacher_id' => $teacherId,
                     ]);
-                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'questions_' . count($blocks), 'status_label' => 'Fragenblock ' . count($blocks) . '/' . $targetBlocks . ' ist fertig…'];
+                $progress = 25 + (int)round((count($blocks) / max(1, $targetBlocks)) * 62);
+                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'questions_' . count($blocks), 'progress' => $progress, 'status_label' => ($mode === 'listening' ? 'Hörabschnitt ' : 'Fragenblock ') . count($blocks) . '/' . $targetBlocks . ' ist fertig…'];
             }
 
             if (($draft['generation_step'] ?? '') !== 'plausibility') {

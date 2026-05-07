@@ -165,7 +165,7 @@
     if (!status) return 12;
     if (status === 'analysis_done') return 25;
     const match = String(status).match(/^questions_(\d+)/);
-    if (match) return 25 + Math.round((Number(match[1]) / 6) * 62);
+    if (match) return 25 + Math.round((Number(match[1]) / 3) * 62);
     if (status === 'plausibility') return 93;
     if (status === 'done') return 100;
     return 14;

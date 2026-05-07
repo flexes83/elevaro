@@ -117,14 +117,14 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
               <input type="radio" name="mode" value="quiz" checked>
               <span class="ai-mode-icon">📝</span>
               <strong>Normales Quiz</strong>
-              <small>Multiple Choice für den Klassenraum.</small>
+              <small>15 Multiple-Choice-Fragen für den Klassenraum.</small>
             </label>
 
             <label class="ai-mode-card">
               <input type="radio" name="mode" value="listening">
               <span class="ai-mode-icon">🎧</span>
               <strong>Listening + Comprehension</strong>
-              <small>Sprechertext + Verständnisfragen.</small>
+              <small>5 Hörabschnitte mit je einer Verständnisfrage.</small>
             </label>
           </div>
 

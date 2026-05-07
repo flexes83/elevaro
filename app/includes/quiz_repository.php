@@ -126,7 +126,11 @@ function elevaro_question_pool_target_count(): int
 function elevaro_get_questions_for_quiz(int $quizId, bool $adaptiveOrder = true, ?int $limit = null, ?int $userId = null, ?bool $isPremium = null): array
 {
     $pdo = elevaro_db();
-    $limit = $limit ?: elevaro_quiz_round_length();
+    $isListeningQuizStmt = $pdo->prepare("SELECT listening_mode FROM quizzes WHERE id = :quiz_id LIMIT 1");
+    $isListeningQuizStmt->execute(['quiz_id' => $quizId]);
+    $isListeningQuiz = (int)$isListeningQuizStmt->fetchColumn() === 1;
+
+    $limit = $isListeningQuiz ? 5 : ($limit ?: elevaro_quiz_round_length());
     $userId = $userId ?: (function_exists('elevaro_current_user_id') ? elevaro_current_user_id() : null);
 
     if ($isPremium === null) {
@@ -169,7 +173,11 @@ function elevaro_get_questions_for_quiz(int $quizId, bool $adaptiveOrder = true,
         return [];
     }
 
-    if ($isPremium) {
+    if ($isListeningQuiz) {
+        // Listening-Quizzes sind bewusst sequenziell: jeder Frage ist ein Hörabschnitt zugeordnet.
+        // Deshalb keine adaptive Auswahl, kein Nachziehen falscher Fragen und keine andere Reihenfolge.
+        $questions = array_slice($questions, 0, $limit);
+    } elseif ($isPremium) {
         $questions = elevaro_select_premium_question_round($questions, $limit);
     } else {
         $questions = array_slice($questions, 0, $limit);
@@ -249,6 +257,7 @@ function elevaro_get_questions_for_quiz(int $quizId, bool $adaptiveOrder = true,
             'difficulty' => (float)$question['difficulty'],
             'source_context' => $question['source_context'] ?? 'general',
             'source_excerpt' => $question['source_excerpt'] ?? null,
+            'listening_segment_title' => $question['source_excerpt'] ?? null,
             'reports_count' => (int)($question['reports_count'] ?? 0),
             'progress_state' => [
                 'answered_count' => (int)($question['answered_count'] ?? 0),

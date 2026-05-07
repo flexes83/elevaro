@@ -212,25 +212,20 @@ $hasListeningAudio = $listeningMode && $listeningAudioPath !== '';
           <?php endif; ?>
 
           <?php if ($listeningMode): ?>
-            <div id="listeningComprehensionBox" class="listening-comprehension-box <?= $hasListeningAudio ? '' : 'is-missing' ?>">
+            <div id="listeningComprehensionBox" class="listening-comprehension-box">
               <div class="listening-comprehension-icon">🎧</div>
               <div>
                 <strong>Listening-Comprehension</strong>
                 <p>
-                  Hör dir den vollständigen Infotext aufmerksam an. Die Fragen beziehen sich danach auf genau diesen Text.
-                  <?php if (!$hasListeningAudio): ?>
-                    <br><span>Audio wurde noch nicht generiert.</span>
-                  <?php endif; ?>
+                  In diesem Quiz hörst du vor jeder Frage einen kurzen Abschnitt.
+                  Die Reihenfolge bleibt fest, damit die Story verständlich bleibt.
                 </p>
-                <?php if ($hasListeningAudio): ?>
-                  <audio id="listeningComprehensionAudio" controls preload="metadata" src="<?= qh($listeningAudioPath) ?>"></audio>
-                <?php endif; ?>
               </div>
             </div>
           <?php endif; ?>
 
           <div class="quiz-intro-actions">
-            <button id="startBtn" class="btn btn-primary btn-lg" <?= ($hasIntroAudio || $hasListeningAudio) ? 'disabled' : '' ?>><?= ($hasIntroAudio || $hasListeningAudio) ? 'Audio zuerst anhören' : 'Quiz starten' ?></button>
+            <button id="startBtn" class="btn btn-primary btn-lg" <?= $hasIntroAudio ? 'disabled' : '' ?>><?= $hasIntroAudio ? 'Audio zuerst anhören' : 'Quiz starten' ?></button>
             <span class="quiz-progress-text">
               <?= $played ? qh($passed . ' von ' . $total . ' im Pool bestanden') : qh(count($quiz['questions']) . ' Fragen pro Runde · ' . $total . ' im Pool') ?>
             </span>

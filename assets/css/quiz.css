@@ -1216,3 +1216,15 @@ body.quiz-is-playing .quiz-highscore-placeholder {
   gap: .65rem;
   margin-top: .9rem;
 }
+
+
+/* Listening-Fragen: pro Frage kurzer Hörabschnitt */
+.question-listening-text {
+  margin-top: .65rem;
+  padding: .9rem 1rem;
+  border-radius: 1rem;
+  background: rgba(90,79,243,.08);
+  color: #172033;
+  font-weight: 700;
+  line-height: 1.55;
+}

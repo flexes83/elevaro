@@ -94,30 +94,9 @@
 
 
   function setupListeningComprehensionGate() {
-    if (!window.ELEVARO_QUIZ.listeningMode || !listeningComprehensionAudio || !startBtn) {
-      return;
-    }
-
-    startBtn.disabled = true;
-    startBtn.textContent = 'Hörtext zuerst anhören';
-    startBtn.classList.add('is-audio-locked');
-
-    const unlock = () => {
-      startBtn.disabled = false;
-      startBtn.textContent = 'Quiz starten';
-      startBtn.classList.remove('is-audio-locked');
-      if (listeningComprehensionBox) {
-        listeningComprehensionBox.classList.add('is-complete');
-      }
-    };
-
-    listeningComprehensionAudio.addEventListener('ended', unlock);
-    listeningComprehensionAudio.addEventListener('play', () => {
-      if (listeningComprehensionBox) listeningComprehensionBox.classList.add('is-playing');
-    });
-    listeningComprehensionAudio.addEventListener('pause', () => {
-      if (listeningComprehensionBox) listeningComprehensionBox.classList.remove('is-playing');
-    });
+    // Listening-Comprehension wird jetzt pro Frage/Abschnitt abgespielt.
+    // Deshalb gibt es keinen langen Hörtext mehr, der vor dem Quiz komplett gehört werden muss.
+    return;
   }
 
   function startQuiz(useWeak = false) {
@@ -293,7 +272,15 @@
     const existing = document.getElementById('questionListeningBox');
     if (existing) existing.remove();
 
-    if (question.type !== 'listening_mc' || !question.audio || !question.audio.path) {
+    if (question.type !== 'listening_mc') {
+      return;
+    }
+
+    const segmentTitle = question.listening_segment_title || question.source_excerpt || 'Hörabschnitt';
+    const audioPath = question.audio && question.audio.path ? question.audio.path : '';
+    const audioText = question.audio && question.audio.text ? question.audio.text : '';
+
+    if (!audioPath && !audioText) {
       return;
     }
 
@@ -303,9 +290,9 @@
     box.innerHTML = `
       <div class="question-listening-icon">🔊</div>
       <div>
-        <strong>Hör genau hin</strong>
-        <p>Spiele den Hörtext ab und wähle dann die passende Antwort.</p>
-        <audio controls preload="metadata" src="${escapeAttribute(question.audio.path)}"></audio>
+        <strong>${escapeHtml(segmentTitle)}</strong>
+        <p>Hör den kurzen Abschnitt und beantworte direkt diese Frage.</p>
+        ${audioPath ? `<audio controls preload="metadata" src="${escapeAttribute(audioPath)}"></audio>` : `<div class="question-listening-text">${escapeHtml(audioText)}</div>`}
       </div>
     `;
 
