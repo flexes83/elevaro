@@ -759,16 +759,28 @@ function elevaro_teacher_ai_normalize_payload(array $payload, string $mode): arr
         while (count($options) < 4) $options[] = 'Antwort ' . (count($options) + 1);
         $options = array_slice($options, 0, 4);
         if (!in_array($answer, $options, true)) $options[0] = $answer;
-        $questions[] = [
+        $questionPayload = [
             'question' => $question,
             'options' => $options,
             'answer' => $answer,
             'explanation' => trim((string)($q['explanation'] ?? '')),
             'difficulty' => max(0.05, min(0.95, (float)($q['difficulty'] ?? 0.35))),
             'type' => $mode === 'listening' ? 'listening_mc' : 'mc',
-            'listening_segment_text' => $mode === 'listening' ? trim((string)($q['listening_segment_text'] ?? '')) : '',
+            'listening_segment_text' => $mode === 'listening' ? trim((string)($q['listening_segment_text'] ?? ($q['audio']['text'] ?? ''))) : '',
             'listening_segment_title' => $mode === 'listening' ? trim((string)($q['listening_segment_title'] ?? '')) : '',
         ];
+
+        if ($mode === 'listening') {
+            $questionPayload['audio'] = [
+                'text' => $questionPayload['listening_segment_text'],
+                'path' => $q['audio']['path'] ?? null,
+                'status' => $q['audio']['status'] ?? 'none',
+                'voice_id' => $q['audio']['voice_id'] ?? null,
+                'model_id' => $q['audio']['model_id'] ?? null,
+            ];
+        }
+
+        $questions[] = $questionPayload;
     }
     $payload['questions'] = $questions;
     return $payload;
@@ -906,15 +918,23 @@ function elevaro_teacher_ai_publish_draft(int $draftId, int $teacherId): int
             $audioModelId = null;
 
             if ($isListening && $segmentText !== '') {
-                try {
-                    $generatedAudio = elevaro_generate_audio_file($segmentText, 'listening_segment');
-                    $audioPath = $generatedAudio['path'] ?? null;
-                    $audioVoiceId = $generatedAudio['voice_id'] ?? null;
-                    $audioModelId = $generatedAudio['model_id'] ?? null;
-                    $audioStatus = $audioPath ? 'generated' : 'text_generated';
-                } catch (Throwable $audioError) {
-                    error_log('[Elevaro AI Wizard Listening] Audio generation failed: ' . $audioError->getMessage());
-                    $audioStatus = 'text_generated';
+                $existingAudio = is_array($q['audio'] ?? null) ? $q['audio'] : [];
+                $audioPath = trim((string)($existingAudio['path'] ?? '')) ?: null;
+                $audioVoiceId = $existingAudio['voice_id'] ?? null;
+                $audioModelId = $existingAudio['model_id'] ?? null;
+                $audioStatus = $audioPath ? 'generated' : 'text_generated';
+
+                if (!$audioPath) {
+                    try {
+                        $generatedAudio = elevaro_generate_audio_file($segmentText, 'listening_segment');
+                        $audioPath = $generatedAudio['path'] ?? null;
+                        $audioVoiceId = $generatedAudio['voice_id'] ?? null;
+                        $audioModelId = $generatedAudio['model_id'] ?? null;
+                        $audioStatus = $audioPath ? 'generated' : 'text_generated';
+                    } catch (Throwable $audioError) {
+                        error_log('[Elevaro AI Wizard Listening] Audio generation failed: ' . $audioError->getMessage());
+                        $audioStatus = 'text_generated';
+                    }
                 }
             }
 
@@ -1697,6 +1717,62 @@ if (!function_exists('elevaro_teacher_ai_split_base_payload')) {
     }
 }
 
+
+if (!function_exists('elevaro_teacher_ai_generate_listening_preview_audio')) {
+    function elevaro_teacher_ai_generate_listening_preview_audio(array $payload): array
+    {
+        if (($payload['mode'] ?? '') !== 'listening') {
+            return $payload;
+        }
+
+        foreach (($payload['questions'] ?? []) as $index => $question) {
+            $segmentText = trim((string)($question['listening_segment_text'] ?? ($question['audio']['text'] ?? '')));
+            if ($segmentText === '') {
+                continue;
+            }
+
+            $payload['questions'][$index]['type'] = 'listening_mc';
+            $payload['questions'][$index]['listening_segment_text'] = $segmentText;
+            $payload['questions'][$index]['listening_segment_title'] = trim((string)($question['listening_segment_title'] ?? ('Abschnitt ' . ($index + 1))));
+
+            $existingPath = trim((string)($question['audio']['path'] ?? ''));
+            if ($existingPath !== '') {
+                $payload['questions'][$index]['audio'] = [
+                    'text' => $segmentText,
+                    'path' => $existingPath,
+                    'status' => (string)($question['audio']['status'] ?? 'generated'),
+                    'voice_id' => $question['audio']['voice_id'] ?? null,
+                    'model_id' => $question['audio']['model_id'] ?? null,
+                ];
+                continue;
+            }
+
+            try {
+                $generated = elevaro_generate_audio_file($segmentText, 'listening_preview_' . ($index + 1));
+                $payload['questions'][$index]['audio'] = [
+                    'text' => $segmentText,
+                    'path' => $generated['path'] ?? null,
+                    'status' => !empty($generated['path']) ? 'generated' : 'text_generated',
+                    'voice_id' => $generated['voice_id'] ?? null,
+                    'model_id' => $generated['model_id'] ?? null,
+                ];
+            } catch (Throwable $e) {
+                error_log('[Elevaro AI Wizard Listening Preview] Audio generation failed: ' . $e->getMessage());
+                $payload['questions'][$index]['audio'] = [
+                    'text' => $segmentText,
+                    'path' => null,
+                    'status' => 'text_generated',
+                    'voice_id' => null,
+                    'model_id' => null,
+                ];
+            }
+        }
+
+        return $payload;
+    }
+}
+
+
 if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
     function elevaro_teacher_ai_poll_split_draft(int $draftId, int $teacherId): array
     {
@@ -1780,6 +1856,7 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
             $plausibility = elevaro_teacher_ai_apply_plausibility_review($analysis, $allQuestions, $mode, $files);
             $checkedQuestions = $plausibility['questions'];
             $payload = elevaro_teacher_ai_split_base_payload($analysis, $mode, $checkedQuestions);
+            $payload = elevaro_teacher_ai_generate_listening_preview_audio($payload);
             $payload['plausibility_review'] = $plausibility['review'];
             $stmt = elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts
                 SET status = 'draft', generation_step = 'done', generated_payload_json = :payload, source_title = :title, image_prompt = :image_prompt, image_status = 'pending'

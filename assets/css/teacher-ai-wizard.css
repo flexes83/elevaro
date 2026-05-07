@@ -327,3 +327,56 @@
     width: 100%;
   }
 }
+
+
+/* AI Wizard Listening Review */
+.ai-listening-review-box {
+  margin: 0 0 16px;
+  padding: 16px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(90,79,243,.08), rgba(0,194,255,.07));
+  border: 1px solid rgba(90,79,243,.18);
+}
+
+.ai-listening-review-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.ai-listening-review-head span {
+  font-weight: 950;
+  color: #172033;
+}
+
+.ai-listening-review-head strong {
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(22,163,74,.12);
+  color: #15803d;
+  font-size: .82rem;
+  font-weight: 950;
+}
+
+.ai-listening-review-head strong.is-pending {
+  background: rgba(245,158,11,.13);
+  color: #92400e;
+}
+
+.ai-listening-audio-preview {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+}
+
+.ai-listening-audio-note {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.72);
+  color: #64748b;
+  font-weight: 750;
+  font-size: .92rem;
+}
