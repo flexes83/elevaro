@@ -216,6 +216,17 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
           <label class="form-label fw-bold mt-3">Beschreibung</label>
           <textarea class="form-control" id="aiQuizDescription" rows="5"></textarea>
 
+          <div class="ai-review-mapping-box mt-3">
+            <label class="form-label fw-bold">Lerninhalt-Zuordnung</label>
+            <select class="form-select" id="aiReviewCurriculumTopic">
+              <option value="">Automatisch zuordnen</option>
+            </select>
+            <select class="form-select mt-2" id="aiReviewCurriculumSubtopic">
+              <option value="">Ganzes Thema</option>
+            </select>
+            <div class="form-text">Falls die automatische Zuordnung scheitert, wähle hier den passenden Lerninhalt manuell.</div>
+          </div>
+
           <div id="aiListeningBox" class="mt-3 d-none">
             <label class="form-label fw-bold">Listening-Zusammenfassung</label>
             <textarea class="form-control" id="aiListeningText" rows="5"></textarea>

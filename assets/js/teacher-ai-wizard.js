@@ -249,6 +249,53 @@
     }
   });
 
+
+  function populateReviewCurriculumSelect() {
+    const topicSelect = $('#aiReviewCurriculumTopic');
+    const subtopicSelect = $('#aiReviewCurriculumSubtopic');
+    if (!topicSelect || !subtopicSelect) return;
+
+    if (!curriculumState.domains.length) {
+      loadCurriculumTopics().then(populateReviewCurriculumSelect).catch(() => {});
+      return;
+    }
+
+    const currentTopic = String((state.payload && state.payload.curriculum_topic_content_id) || $('#aiCurriculumTopicSelect')?.value || '');
+    const currentSubtopic = String((state.payload && state.payload.curriculum_topic_subtopic_id) || $('#aiCurriculumSubtopicSelect')?.value || '');
+
+    topicSelect.innerHTML = '<option value="">Automatisch zuordnen</option>';
+    curriculumState.domains.forEach(domain => {
+      const group = document.createElement('optgroup');
+      group.label = domain.domain_title || 'Lerninhalte';
+      (domain.topics || []).forEach(topic => {
+        const option = document.createElement('option');
+        option.value = topic.id;
+        option.textContent = topic.title_short || topic.topic_title || ('Thema #' + topic.id);
+        group.appendChild(option);
+      });
+      topicSelect.appendChild(group);
+    });
+
+    topicSelect.value = currentTopic;
+    populateReviewSubtopicSelect(currentTopic, currentSubtopic);
+  }
+
+  function populateReviewSubtopicSelect(topicId, selectedSubtopic) {
+    const subtopicSelect = $('#aiReviewCurriculumSubtopic');
+    if (!subtopicSelect) return;
+    subtopicSelect.innerHTML = '<option value="">Ganzes Thema</option>';
+    const topic = findCurriculumTopic(topicId);
+    if (!topic) return;
+    (topic.subtopics || []).forEach(sub => {
+      const option = document.createElement('option');
+      option.value = sub.id;
+      option.textContent = sub.title_short || sub.subtopic_title || ('Skill #' + sub.id);
+      subtopicSelect.appendChild(option);
+    });
+    if (selectedSubtopic) subtopicSelect.value = String(selectedSubtopic);
+  }
+
+
   function fillEditor() {
     const p = state.payload || {};
     $('#aiDraftId').value = state.draftId || '';
@@ -261,6 +308,7 @@
     $('#aiListeningBox').classList.toggle('d-none', p.mode !== 'listening');
     renderPlausibilityReview();
     renderQuestions();
+    populateReviewCurriculumSelect();
     updatePublishSummary();
   }
 
@@ -280,6 +328,8 @@
 
     state.payload = {
       ...(state.payload || {}),
+      curriculum_topic_content_id: $('#aiReviewCurriculumTopic') ? Number($('#aiReviewCurriculumTopic').value || 0) : Number((state.payload || {}).curriculum_topic_content_id || 0),
+      curriculum_topic_subtopic_id: $('#aiReviewCurriculumSubtopic') ? Number($('#aiReviewCurriculumSubtopic').value || 0) : Number((state.payload || {}).curriculum_topic_subtopic_id || 0),
       title: $('#aiQuizTitle').value.trim(),
       description: $('#aiQuizDescription').value.trim(),
       listening_text: $('#aiListeningText').value.trim(),
@@ -462,4 +512,9 @@
       $('#aiPublishQuiz').textContent = '🚀 Für Klasse veröffentlichen';
     }
   });
+
+  $('#aiReviewCurriculumTopic')?.addEventListener('change', e => {
+    populateReviewSubtopicSelect(e.target.value, '');
+  });
+
 })();
