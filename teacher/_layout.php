@@ -19,7 +19,9 @@ function teacher_header(string $title, string $subtitle = ''): void {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="/admin/assets/admin.css" rel="stylesheet">
   <style>
-    .teacher-class-switch{margin:0 0 18px;padding:14px;border-radius:18px;background:var(--soft)}
+    .teacher-class-switch{margin:0 0 18px;padding:16px;border-radius:22px;background:linear-gradient(135deg,rgba(90,79,243,.12),rgba(139,124,255,.08));border:1px solid rgba(90,79,243,.18)}
+    .teacher-current-class-label{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:.78rem;font-weight:900;color:#5a4ff3;text-transform:uppercase;letter-spacing:.04em}
+    .teacher-current-class-name{display:block;font-weight:950;color:#172033;line-height:1.15;margin-bottom:12px}
     .teacher-class-switch label{font-size:.78rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
     .invite-code{font-size:1.35rem;letter-spacing:.12em;font-weight:900;background:#172033;color:#fff;border-radius:16px;padding:12px 16px;display:inline-block}
     .qr-placeholder{width:180px;height:180px;border-radius:24px;background:repeating-linear-gradient(45deg,#172033 0 8px,#fff 8px 16px);box-shadow:inset 0 0 0 16px #fff;border:1px solid rgba(23,32,51,.12)}
@@ -31,7 +33,11 @@ function teacher_header(string $title, string $subtitle = ''): void {
     <a class="admin-brand" href="/teacher/index.php">Elevaro</a>
 
     <div class="teacher-class-switch">
-      <label class="form-label mb-1">Klasse</label>
+      <span class="teacher-current-class-label">🏫 Aktuelle Klasse</span>
+      <?php if ($selected): ?>
+        <span class="teacher-current-class-name"><?= teacher_h(teacher_class_label($selected)) ?></span>
+      <?php endif; ?>
+      <label class="form-label mb-1">Klasse wechseln</label>
       <?php if ($classes): ?>
         <form method="get" action="<?= teacher_h($current) ?>">
           <select name="class_id" class="form-select form-select-sm" onchange="this.form.submit()">
@@ -47,9 +53,9 @@ function teacher_header(string $title, string $subtitle = ''): void {
 
     <nav class="admin-nav">
       <a class="<?= teacher_active('index.php') ?>" href="<?= teacher_h($withClass('index.php')) ?>">🏠 Dashboard</a>
-      <?php if ($classId): ?><a href="/classroom.php?class_id=<?= (int)$classId ?>">🚪 Klassenraum betreten</a><?php endif; ?>
       <a class="<?= teacher_active('students.php') ?>" href="<?= teacher_h($withClass('students.php')) ?>">👧 Schüler</a>
       <a class="<?= teacher_active('quizzes.php') ?>" href="<?= teacher_h($withClass('quizzes.php')) ?>">📝 Quizzes</a>
+      <a class="<?= teacher_active('ai_wizard.php') ?>" href="<?= teacher_h($withClass('ai_wizard.php')) ?>">✨ KI-Wizard</a>
       <a class="<?= teacher_active('live.php') ?>" href="<?= teacher_h($withClass('live.php')) ?>">⚡ Live Quizz</a>
       <a class="<?= teacher_active('settings.php') ?>" href="<?= teacher_h($withClass('settings.php')) ?>">⚙️ Einstellungen</a>
       <a class="<?= teacher_active('classes.php') ?>" href="classes.php">🏫 Klassen</a>
@@ -63,7 +69,7 @@ function teacher_header(string $title, string $subtitle = ''): void {
       <a class="admin-logout" href="/logout.php">Logout</a>
     </div>
 
-    <div class="admin-sidebar-footer">Klassen niedrigschwellig einladen.</div>
+
   </aside>
 
   <main class="admin-main">
@@ -74,7 +80,7 @@ function teacher_header(string $title, string $subtitle = ''): void {
       </div>
       <div class="d-flex gap-2 flex-wrap">
         <?php if ($classId): ?><a class="btn btn-outline-primary" href="/classroom.php?class_id=<?= (int)$classId ?>">🚪 Klassenraum betreten</a><?php endif; ?>
-        <a class="btn btn-primary" href="classes.php">🏫 Klasse anlegen</a>
+        <a class="btn btn-primary" href="classes.php">🏫 Klassen verwalten</a>
       </div>
     </header>
 <?php }
