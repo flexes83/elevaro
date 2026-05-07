@@ -40,7 +40,12 @@ function curriculum_school_types(string $stateCode): array
     $categorySelect = $hasCategory ? "st.school_category" : "'general' AS school_category";
 
     $stmt = elevaro_db()->prepare("
-        SELECT st.code, st.name, {$categorySelect}, sst.min_grade, sst.max_grade
+        SELECT
+            st.code,
+            st.name,
+            {$categorySelect},
+            sst.min_grade,
+            sst.max_grade
         FROM state_school_types sst
         JOIN states s ON s.id = sst.state_id
         JOIN school_types st ON st.id = sst.school_type_id
@@ -130,12 +135,6 @@ function curriculum_education_track_levels(string $stateCode, string $schoolType
 
 function curriculum_grades(string $stateCode, string $schoolTypeCode): array
 {
-    // Berufliche Schulen nutzen künftig Bildungsgang + Stufe statt normaler Klassen.
-    // Der bestehende allgemeinbildende Flow bleibt unverändert.
-    if (curriculum_is_vocational_school_type($stateCode, $schoolTypeCode)) {
-        return [];
-    }
-
     $stmt = elevaro_db()->prepare("
         SELECT sst.min_grade, sst.max_grade
         FROM state_school_types sst
@@ -152,47 +151,20 @@ function curriculum_grades(string $stateCode, string $schoolTypeCode): array
     ]);
 
     $row = $stmt->fetch();
-
-    if (!$row) {
-        return [];
-    }
+    if (!$row) return [];
 
     $grades = [];
-
     for ($i = (int)$row['min_grade']; $i <= (int)$row['max_grade']; $i++) {
-        $grades[] = [
-            'code' => (string)$i,
-            'name' => $i . '. Klasse'
-        ];
+        $grades[] = ['code' => (string)$i, 'name' => $i . '. Klasse'];
     }
-
     return $grades;
 }
 
 
 function curriculum_resolve_level(string $stateCode, string $schoolTypeCode, $levelOrGrade): ?array
 {
-    if (!curriculum_table_exists('school_type_levels')) {
-        return null;
-    }
-
     $raw = trim((string)$levelOrGrade);
-    if ($raw === '') {
-        return null;
-    }
-
-    $params = [
-        'state' => $stateCode,
-        'school_type' => $schoolTypeCode,
-        'level_code' => $raw,
-        'level_code_order' => $raw,
-    ];
-
-    $numericWhere = '';
-    if (ctype_digit($raw)) {
-        $numericWhere = ' OR l.numeric_grade = :numeric_grade';
-        $params['numeric_grade'] = (int)$raw;
-    }
+    if ($raw === '') return null;
 
     $stmt = elevaro_db()->prepare("
         SELECT
@@ -204,17 +176,24 @@ function curriculum_resolve_level(string $stateCode, string $schoolTypeCode, $le
         FROM school_type_levels l
         JOIN states s ON s.id = l.state_id
         JOIN school_types st ON st.id = l.school_type_id
+        JOIN state_school_types sst
+          ON sst.state_id = s.id
+         AND sst.school_type_id = st.id
         WHERE s.code = :state
           AND st.code = :school_type
-          AND (l.code = :level_code{$numericWhere})
-        ORDER BY CASE WHEN l.code = :level_code_order THEN 0 ELSE 1 END, l.sort_order ASC
+          AND (l.code = :level_code OR l.numeric_grade = :numeric_grade)
+        ORDER BY l.sort_order ASC
         LIMIT 1
     ");
 
-    $stmt->execute($params);
-    $level = $stmt->fetch();
+    $stmt->execute([
+        'state' => $stateCode,
+        'school_type' => $schoolTypeCode,
+        'level_code' => $raw,
+        'numeric_grade' => ctype_digit($raw) ? (int)$raw : -1,
+    ]);
 
-    return $level ?: null;
+    return $stmt->fetch() ?: null;
 }
 
 function curriculum_context_from_level(string $stateCode, string $schoolTypeCode, $levelOrGrade): array
@@ -234,141 +213,64 @@ function curriculum_context_from_level(string $stateCode, string $schoolTypeCode
 
 function curriculum_levels(string $stateCode, string $schoolTypeCode): array
 {
-    try {
-        $stmt = elevaro_db()->prepare("
-            SELECT l.id, l.code, l.name, l.numeric_grade
-            FROM school_type_levels l
-            JOIN states s ON s.id = l.state_id
-            JOIN school_types st ON st.id = l.school_type_id
-            WHERE s.code = :state
-              AND st.code = :school_type
-            ORDER BY l.sort_order ASC, l.name ASC
-        ");
+    $stmt = elevaro_db()->prepare("
+        SELECT l.id, l.code, l.name, l.numeric_grade
+        FROM school_type_levels l
+        JOIN states s ON s.id = l.state_id
+        JOIN school_types st ON st.id = l.school_type_id
+        JOIN state_school_types sst
+          ON sst.state_id = s.id
+         AND sst.school_type_id = st.id
+        WHERE s.code = :state
+          AND st.code = :school_type
+        ORDER BY l.sort_order ASC, l.name ASC
+    ");
 
-        $stmt->execute([
-            'state' => $stateCode,
-            'school_type' => $schoolTypeCode,
-        ]);
+    $stmt->execute([
+        'state' => $stateCode,
+        'school_type' => $schoolTypeCode,
+    ]);
 
-        $levels = $stmt->fetchAll();
-
-        if (!empty($levels)) {
-            return array_map(static function (array $level): array {
-                return [
-                    'id' => $level['id'],
-                    'code' => $level['code'],
-                    'name' => $level['name'],
-                    'numeric_grade' => $level['numeric_grade'],
-                    'grade' => $level['numeric_grade'],
-                ];
-            }, $levels);
-        }
-    } catch (Throwable $e) {
-        // Fall back below for older DBs.
-    }
-
-    return curriculum_grades($stateCode, $schoolTypeCode);
+    return array_map(static function (array $level): array {
+        return [
+            'id' => $level['id'],
+            'code' => $level['code'],
+            'name' => $level['name'],
+            'numeric_grade' => $level['numeric_grade'],
+            'grade' => $level['numeric_grade'],
+        ];
+    }, $stmt->fetchAll());
 }
 
 
 function curriculum_subjects(string $stateCode, string $schoolTypeCode, $levelOrGrade): array
 {
     $ctx = curriculum_context_from_level($stateCode, $schoolTypeCode, $levelOrGrade);
-    $grade = (int)$ctx['numeric_grade'];
     $levelId = $ctx['level_id'];
 
-    if ($levelId && curriculum_table_exists('school_type_level_subjects')) {
-        $stmt = elevaro_db()->prepare("
-            SELECT DISTINCT sub.code, sub.name, sub.icon
-            FROM school_type_level_subjects map
-            JOIN states s ON s.id = map.state_id
-            JOIN subjects sub ON sub.id = map.subject_id
-            WHERE s.code = :state
-              AND map.school_type_level_id = :level_id
-            ORDER BY map.sort_order ASC, sub.sort_order ASC, sub.name ASC
-        ");
-
-        $stmt->execute([
-            'state' => $stateCode,
-            'level_id' => $levelId,
-        ]);
-
-        $subjects = $stmt->fetchAll();
-
-        if (!empty($subjects)) {
-            return $subjects;
-        }
-    }
-
-    if ($levelId && curriculum_column_exists('curriculum_topics', 'school_type_level_id')) {
-        $stmt = elevaro_db()->prepare("
-            SELECT DISTINCT sub.code, sub.name, sub.icon
-            FROM curriculum_topics t
-            JOIN states s ON s.id = t.state_id
-            JOIN school_types st ON st.id = t.school_type_id
-            JOIN subjects sub ON sub.id = t.subject_id
-            WHERE s.code = :state
-              AND st.code = :school_type
-              AND t.school_type_level_id = :level_id
-            ORDER BY sub.sort_order ASC, sub.name ASC
-        ");
-        $stmt->execute([
-            'state' => $stateCode,
-            'school_type' => $schoolTypeCode,
-            'level_id' => $levelId,
-        ]);
-        $subjects = $stmt->fetchAll();
-        if (!empty($subjects)) {
-            return $subjects;
-        }
-    }
-
-    if ($grade > 0) {
-        $stmt = elevaro_db()->prepare("
-            SELECT DISTINCT sub.code, sub.name, sub.icon
-            FROM curriculum_topics t
-            JOIN states s ON s.id = t.state_id
-            JOIN school_types st ON st.id = t.school_type_id
-            JOIN subjects sub ON sub.id = t.subject_id
-            WHERE s.code = :state
-              AND st.code = :school_type
-              AND t.grade = :grade
-            ORDER BY sub.sort_order ASC, sub.name ASC
-        ");
-
-        $stmt->execute([
-            'state' => $stateCode,
-            'school_type' => $schoolTypeCode,
-            'grade' => $grade
-        ]);
-
-        $subjects = $stmt->fetchAll();
-
-        if (!empty($subjects)) {
-            return $subjects;
-        }
-    }
-
-    if ($ctx['is_vocational']) {
-        $codes = ['deutsch', 'mathe', 'englisch', 'bwl', 'wirtschaft', 'rechnungswesen'];
-    } elseif ($grade > 0 && $grade <= 4) {
-        $codes = ['deutsch', 'mathe', 'sachunterricht'];
-    } elseif ($grade > 0 && $grade <= 6) {
-        $codes = ['deutsch', 'mathe', 'englisch'];
-    } else {
-        $codes = ['deutsch', 'mathe', 'englisch', 'biologie', 'physik', 'chemie', 'geschichte', 'geographie'];
-    }
-
-    $placeholders = implode(',', array_fill(0, count($codes), '?'));
+    if (!$levelId) return [];
 
     $stmt = elevaro_db()->prepare("
-        SELECT code, name, icon
-        FROM subjects
-        WHERE code IN ($placeholders)
-        ORDER BY sort_order ASC, name ASC
+        SELECT DISTINCT sub.code, sub.name, sub.icon
+        FROM school_type_level_subjects map
+        JOIN states s ON s.id = map.state_id
+        JOIN school_type_levels lvl ON lvl.id = map.school_type_level_id
+        JOIN school_types st ON st.id = lvl.school_type_id
+        JOIN state_school_types sst
+          ON sst.state_id = s.id
+         AND sst.school_type_id = st.id
+        JOIN subjects sub ON sub.id = map.subject_id
+        WHERE s.code = :state
+          AND st.code = :school_type
+          AND map.school_type_level_id = :level_id
+        ORDER BY map.sort_order ASC, sub.sort_order ASC, sub.name ASC
     ");
 
-    $stmt->execute($codes);
+    $stmt->execute([
+        'state' => $stateCode,
+        'school_type' => $schoolTypeCode,
+        'level_id' => $levelId,
+    ]);
 
     return $stmt->fetchAll();
 }
