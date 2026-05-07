@@ -871,6 +871,10 @@ function elevaro_teacher_ai_publish_draft(int $draftId, int $teacherId): int
     $payload = elevaro_teacher_ai_normalize_payload(elevaro_teacher_ai_draft_payload($draft), (string)$draft['mode']);
     if (count($payload['questions']) < 1) throw new RuntimeException('Der Entwurf enthält keine Fragen.');
 
+    // Wichtig: Schema-/DDL-Prüfungen VOR der Transaktion ausführen.
+    // MySQL committed ALTER/CREATE TABLE implizit und beendet dadurch PDO-Transaktionen.
+    elevaro_teacher_ai_split_ensure_schema();
+
     $pdo = elevaro_teacher_ai_wizard_db();
     $pdo->beginTransaction();
     try {
@@ -1004,9 +1008,9 @@ function elevaro_teacher_ai_publish_draft(int $draftId, int $teacherId): int
         $pdo->prepare("UPDATE teacher_ai_quiz_drafts SET status = 'published', published_quiz_id = :quiz_id WHERE id = :id")
             ->execute(['quiz_id' => $quizId, 'id' => $draftId]);
 
-        $pdo->commit();
+        if ($pdo->inTransaction()) { $pdo->commit(); }
     } catch (Throwable $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
+        if ($pdo->inTransaction()) if ($pdo->inTransaction()) { $pdo->rollBack(); }
         throw $e;
     }
 
