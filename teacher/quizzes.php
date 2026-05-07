@@ -222,7 +222,10 @@ teacher_header('Quizzes', 'Bis zu 10 Quizzes für ' . $classLabel . ' freischalt
               <small class="text-muted"><?= teacher_h($quiz['quiz_key']) ?> · <?= count($quizQuestions) ?> Fragen · <span class="toggle-label"></span></small>
             </button>
             <div class="teacher-class-column"><?= teacher_h($classLabel) ?></div>
-            <button class="btn btn-sm btn-light" type="submit" form="removeQuizForm<?= $quizId ?>">Entfernen</button>
+            <div class="d-flex gap-2 flex-wrap justify-content-lg-end">
+              <a class="btn btn-sm btn-primary" href="/quiz.php?key=<?= urlencode((string)$quiz['quiz_key']) ?>&class_id=<?= (int)$classId ?>" target="_blank" rel="noopener">▶ Starten</a>
+              <button class="btn btn-sm btn-light" type="submit" form="removeQuizForm<?= $quizId ?>">Entfernen</button>
+            </div>
           </div>
           <div class="collapse" id="<?= teacher_h($detailsId) ?>">
             <div class="teacher-quiz-details">
@@ -236,6 +239,7 @@ teacher_header('Quizzes', 'Bis zu 10 Quizzes für ' . $classLabel . ' freischalt
               <?php if ($quizQuestions): ?>
                 <div class="teacher-question-actions">
                   <div class="teacher-question-toolbar">
+                    <a class="btn btn-sm btn-primary" href="/quiz.php?key=<?= urlencode((string)$quiz['quiz_key']) ?>&class_id=<?= (int)$classId ?>" target="_blank" rel="noopener">▶ Quiz testen</a>
                     <button class="btn btn-sm btn-outline-secondary" type="button" data-select-all>Dieses Quiz auswählen</button>
                     <button class="btn btn-sm btn-outline-secondary" type="button" data-select-none>Dieses Quiz leeren</button>
                   </div>

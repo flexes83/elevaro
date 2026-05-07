@@ -47,9 +47,9 @@ function teacher_header(string $title, string $subtitle = ''): void {
 
     <nav class="admin-nav">
       <a class="<?= teacher_active('index.php') ?>" href="<?= teacher_h($withClass('index.php')) ?>">🏠 Dashboard</a>
+      <?php if ($classId): ?><a href="/classroom.php?class_id=<?= (int)$classId ?>">🚪 Klassenraum betreten</a><?php endif; ?>
       <a class="<?= teacher_active('students.php') ?>" href="<?= teacher_h($withClass('students.php')) ?>">👧 Schüler</a>
       <a class="<?= teacher_active('quizzes.php') ?>" href="<?= teacher_h($withClass('quizzes.php')) ?>">📝 Quizzes</a>
-      <a class="<?= teacher_active('ai_wizard.php') ?>" href="<?= teacher_h($withClass('ai_wizard.php')) ?>">✨ KI-Wizard</a>
       <a class="<?= teacher_active('live.php') ?>" href="<?= teacher_h($withClass('live.php')) ?>">⚡ Live Quizz</a>
       <a class="<?= teacher_active('settings.php') ?>" href="<?= teacher_h($withClass('settings.php')) ?>">⚙️ Einstellungen</a>
       <a class="<?= teacher_active('classes.php') ?>" href="classes.php">🏫 Klassen</a>
@@ -72,7 +72,10 @@ function teacher_header(string $title, string $subtitle = ''): void {
         <h1><?= teacher_h($title) ?></h1>
         <?php if ($subtitle): ?><p><?= teacher_h($subtitle) ?></p><?php endif; ?>
       </div>
-      <a class="btn btn-primary" href="classes.php">🏫 Klasse anlegen</a>
+      <div class="d-flex gap-2 flex-wrap">
+        <?php if ($classId): ?><a class="btn btn-outline-primary" href="/classroom.php?class_id=<?= (int)$classId ?>">🚪 Klassenraum betreten</a><?php endif; ?>
+        <a class="btn btn-primary" href="classes.php">🏫 Klasse anlegen</a>
+      </div>
     </header>
 <?php }
 

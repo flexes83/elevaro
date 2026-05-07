@@ -7,7 +7,6 @@ require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/access.php';
 
 const ELEVARO_CLASSROOM_SESSION_KEY = 'elevaro_classroom_participant_id';
-const ELEVARO_CLASSROOM_PIN_FLASH_KEY = 'elevaro_classroom_new_guest_pin';
 
 function classroom_db(): PDO { return elevaro_db(); }
 function classroom_h($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
@@ -25,7 +24,6 @@ function classroom_ensure_schema(): void
         user_id INT UNSIGNED NULL,
         display_name VARCHAR(160) NOT NULL,
         guest_token VARCHAR(96) NULL,
-        guest_pin CHAR(4) NULL,
         avatar_emoji VARCHAR(16) NOT NULL DEFAULT '🙂',
         avatar_type VARCHAR(20) NOT NULL DEFAULT 'emoji',
         avatar_gradient VARCHAR(32) NOT NULL DEFAULT 'grad-1',
@@ -33,14 +31,12 @@ function classroom_ensure_schema(): void
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         last_seen_at DATETIME NULL,
         UNIQUE KEY uniq_classroom_guest_token (guest_token),
-        UNIQUE KEY uniq_classroom_guest_pin (class_id, guest_pin),
         KEY idx_classroom_participants_class (class_id),
         KEY idx_classroom_participants_user (user_id),
         KEY idx_classroom_participants_seen (last_seen_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
     foreach ([
-        'guest_pin' => "ALTER TABLE classroom_participants ADD COLUMN guest_pin CHAR(4) NULL AFTER guest_token",
         'avatar_type' => "ALTER TABLE classroom_participants ADD COLUMN avatar_type VARCHAR(20) NOT NULL DEFAULT 'emoji' AFTER avatar_emoji",
         'avatar_gradient' => "ALTER TABLE classroom_participants ADD COLUMN avatar_gradient VARCHAR(32) NOT NULL DEFAULT 'grad-1' AFTER avatar_type",
     ] as $column => $sql) {
@@ -224,6 +220,87 @@ function classroom_by_id(int $classId): ?array
     return $stmt->fetch() ?: null;
 }
 
+function classroom_current_teacher_can_enter(array $class): bool
+{
+    $user = auth_user();
+    if (!$user) return false;
+
+    $role = function_exists('auth_effective_role') ? auth_effective_role() : ($user['role'] ?? null);
+    if (!in_array((string)$role, ['lehrer', 'admin'], true)) {
+        return false;
+    }
+
+    if ((string)$role === 'admin') {
+        return true;
+    }
+
+    return (int)($class['teacher_id'] ?? 0) === (int)($user['id'] ?? 0);
+}
+
+function classroom_teacher_participant(int $classId): array
+{
+    classroom_ensure_schema();
+
+    $user = auth_user();
+    if (!$user) {
+        throw new RuntimeException('Nicht eingeloggt.');
+    }
+
+    $displayName = trim((string)($user['display_name'] ?: $user['username'] ?: $user['email']));
+    if ($displayName === '') {
+        $displayName = 'Lehrkraft';
+    }
+
+    $stmt = classroom_db()->prepare("
+        SELECT *
+        FROM classroom_participants
+        WHERE class_id = :class_id
+          AND user_id = :user_id
+        LIMIT 1
+    ");
+    $stmt->execute([
+        'class_id' => $classId,
+        'user_id' => (int)$user['id'],
+    ]);
+    $participant = $stmt->fetch();
+
+    if ($participant) {
+        return $participant;
+    }
+
+    $avatar = classroom_avatar_payload('teacher_' . (int)$user['id'], $displayName);
+    $stmt = classroom_db()->prepare("
+        INSERT INTO classroom_participants
+            (class_id, user_id, display_name, guest_token, avatar_emoji, avatar_type, avatar_gradient, status, last_seen_at)
+        VALUES
+            (:class_id, :user_id, :display_name, :guest_token, :avatar_emoji, :avatar_type, :avatar_gradient, 'online', NOW())
+    ");
+    $stmt->execute([
+        'class_id' => $classId,
+        'user_id' => (int)$user['id'],
+        'display_name' => $displayName,
+        'guest_token' => 'teacher_' . $classId . '_' . (int)$user['id'],
+        'avatar_emoji' => '👩‍🏫',
+        'avatar_type' => 'emoji',
+        'avatar_gradient' => $avatar['avatar_gradient'] ?? 'grad-1',
+    ]);
+
+    $id = (int)classroom_db()->lastInsertId();
+    $stmt = classroom_db()->prepare("SELECT * FROM classroom_participants WHERE id = :id LIMIT 1");
+    $stmt->execute(['id' => $id]);
+
+    return $stmt->fetch() ?: [
+        'id' => $id,
+        'class_id' => $classId,
+        'user_id' => (int)$user['id'],
+        'display_name' => $displayName,
+        'avatar_emoji' => '👩‍🏫',
+        'avatar_type' => 'emoji',
+        'avatar_gradient' => 'grad-1',
+    ];
+}
+
+
 function classroom_label(array $class): string
 {
     return (string)($class['name'] ?? ('Klasse ' . ($class['invite_code'] ?? '')));
@@ -320,74 +397,6 @@ function classroom_update_avatar(int $participantId, int $classId, string $type,
     return classroom_current_participant($classId) ?: [];
 }
 
-
-function classroom_generate_guest_pin(int $classId): string
-{
-    classroom_ensure_schema();
-    $pdo = classroom_db();
-
-    for ($i = 0; $i < 80; $i++) {
-        $pin = str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT);
-        $stmt = $pdo->prepare("SELECT id FROM classroom_participants WHERE class_id = :class_id AND guest_pin = :pin LIMIT 1");
-        $stmt->execute(['class_id' => $classId, 'pin' => $pin]);
-        if (!$stmt->fetch()) {
-            return $pin;
-        }
-    }
-
-    throw new RuntimeException('Für diese Klasse konnte gerade kein freier PIN erzeugt werden. Bitte versuche es erneut.');
-}
-
-function classroom_normalize_guest_pin(string $pin): string
-{
-    $pin = preg_replace('/\D+/', '', $pin) ?: '';
-    if (strlen($pin) !== 4) {
-        throw new RuntimeException('Bitte gib deinen 4-stelligen Klassen-PIN ein.');
-    }
-    return $pin;
-}
-
-function classroom_login_guest_pin(array $class, string $pin): array
-{
-    classroom_ensure_schema();
-    auth_start_session();
-    $pin = classroom_normalize_guest_pin($pin);
-
-    $stmt = classroom_db()->prepare("SELECT * FROM classroom_participants WHERE class_id = :class_id AND guest_pin = :pin LIMIT 1");
-    $stmt->execute(['class_id' => (int)$class['id'], 'pin' => $pin]);
-    $participant = $stmt->fetch();
-
-    if (!$participant) {
-        throw new RuntimeException('Diesen PIN finde ich in diesem Klassenraum nicht. Frag am besten kurz deine Lehrkraft.');
-    }
-
-    $_SESSION[ELEVARO_CLASSROOM_SESSION_KEY] = (int)$participant['id'];
-    classroom_touch((int)$participant['id']);
-    classroom_log_activity((int)$class['id'], (int)$participant['id'], 'return', $participant['display_name'] . ' ist wieder im Klassenraum.', '');
-
-    return classroom_current_participant((int)$class['id']) ?: $participant;
-}
-
-function classroom_pending_new_guest_pin(): ?string
-{
-    auth_start_session();
-    $pin = isset($_SESSION[ELEVARO_CLASSROOM_PIN_FLASH_KEY]) ? (string)$_SESSION[ELEVARO_CLASSROOM_PIN_FLASH_KEY] : '';
-    return $pin !== '' ? $pin : null;
-}
-
-function classroom_clear_new_guest_pin(): void
-{
-    auth_start_session();
-    unset($_SESSION[ELEVARO_CLASSROOM_PIN_FLASH_KEY]);
-}
-
-function classroom_consume_new_guest_pin(): ?string
-{
-    $pin = classroom_pending_new_guest_pin();
-    classroom_clear_new_guest_pin();
-    return $pin;
-}
-
 function classroom_join_guest(array $class, string $displayName): array
 {
     classroom_ensure_schema();
@@ -398,7 +407,6 @@ function classroom_join_guest(array $class, string $displayName): array
 
     $user = auth_user();
     $token = $user ? null : bin2hex(random_bytes(24));
-    $guestPin = $user ? null : classroom_generate_guest_pin((int)$class['id']);
     $avatar = classroom_pick_avatar($displayName);
     $gradient = classroom_pick_gradient($displayName);
     $type = 'emoji';
@@ -410,21 +418,19 @@ function classroom_join_guest(array $class, string $displayName): array
         $avatar = classroom_initials($displayName);
     }
 
-    $stmt = classroom_db()->prepare("INSERT INTO classroom_participants (class_id, user_id, display_name, guest_token, guest_pin, avatar_emoji, avatar_type, avatar_gradient, last_seen_at)
-        VALUES (:class_id, :user_id, :display_name, :guest_token, :guest_pin, :avatar_emoji, :avatar_type, :avatar_gradient, NOW())");
+    $stmt = classroom_db()->prepare("INSERT INTO classroom_participants (class_id, user_id, display_name, guest_token, avatar_emoji, avatar_type, avatar_gradient, last_seen_at)
+        VALUES (:class_id, :user_id, :display_name, :guest_token, :avatar_emoji, :avatar_type, :avatar_gradient, NOW())");
     $stmt->execute([
         'class_id' => (int)$class['id'],
         'user_id' => $user ? (int)$user['id'] : null,
         'display_name' => $displayName,
         'guest_token' => $token,
-        'guest_pin' => $guestPin,
         'avatar_emoji' => $avatar,
         'avatar_type' => $type,
         'avatar_gradient' => $gradient,
     ]);
     $id = (int)classroom_db()->lastInsertId();
     $_SESSION[ELEVARO_CLASSROOM_SESSION_KEY] = $id;
-    if ($guestPin) { $_SESSION[ELEVARO_CLASSROOM_PIN_FLASH_KEY] = $guestPin; }
     classroom_log_activity((int)$class['id'], $id, 'join', $displayName . ' ist dem Klassenraum beigetreten.', '');
     return classroom_current_participant((int)$class['id']);
 }

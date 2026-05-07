@@ -5,13 +5,21 @@ $code = strtoupper(trim((string)($_GET['code'] ?? '')));
 $classId = (int)($_GET['class_id'] ?? 0);
 $class = $code !== '' ? classroom_by_code($code) : ($classId ? classroom_by_id($classId) : null);
 if (!$class) { http_response_code(404); echo 'Klassenraum nicht gefunden.'; exit; }
+$teacherPreview = false;
 $participant = classroom_current_participant((int)$class['id']);
+
+if (!$participant && classroom_current_teacher_can_enter($class)) {
+    $participant = classroom_teacher_participant((int)$class['id']);
+    $teacherPreview = true;
+}
+
 if (!$participant) {
     // QR-Code und geteilter Link dürfen direkt auf classroom.php zeigen.
     // Wer noch keine Klassenraum-Session hat, landet im niedrigschwelligen Namens-Join.
     header('Location: /join.php?code=' . urlencode((string)$class['invite_code']));
     exit;
 }
+
 classroom_touch((int)$participant['id']);
 $quizzes = classroom_assigned_quizzes((int)$class['id'], (int)$participant['id']);
 $online = classroom_online_participants((int)$class['id']);
@@ -31,25 +39,25 @@ $gradientOptions = classroom_gradient_options();
   <link rel="stylesheet" href="/assets/css/quiz-card.css?v=<?= filemtime(__DIR__ . '/assets/css/quiz-card.css') ?>">
   <link rel="stylesheet" href="/assets/css/classroom.css?v=<?= filemtime(__DIR__ . '/assets/css/classroom.css') ?>">
 </head>
-<body class="classroom-page" data-class-id="<?= (int)$class['id'] ?>">
+<body class="classroom-page <?= !empty($teacherPreview) ? 'classroom-teacher-preview' : '' ?>" data-class-id="<?= (int)$class['id'] ?>">
 <nav class="classroom-topbar">
   <a class="brand" href="/classroom.php?class_id=<?= (int)$class['id'] ?>">Elevaro</a>
   <div class="class-pill">🏫 <?= classroom_h(classroom_label($class)) ?></div>
-  <button class="me-pill avatar-settings-toggle" type="button" aria-haspopup="dialog"><span class="avatar-bubble <?= classroom_h($participant['avatar_type'] ?? 'emoji') ?> <?= classroom_h($participant['avatar_gradient'] ?? 'grad-1') ?>"><?= classroom_h($participant['avatar_emoji']) ?></span><?= classroom_h($participant['display_name']) ?><small>ändern</small></button>
+  <button class="me-pill avatar-settings-toggle" type="button" aria-haspopup="dialog"><span class="avatar-bubble <?= classroom_h($participant['avatar_type'] ?? 'emoji') ?> <?= classroom_h($participant['avatar_gradient'] ?? 'grad-1') ?>"><?= classroom_h($participant['avatar_emoji']) ?></span><?= classroom_h($participant['display_name']) ?><small><?= !empty($teacherPreview) ? 'Lehrkraft' : 'ändern' ?></small></button>
+  <?php if (!empty($teacherPreview)): ?><a class="classroom-back" href="/teacher/index.php?class_id=<?= (int)$class['id'] ?>">← Lehrerbereich</a><?php endif; ?>
 </nav>
 <main class="classroom-layout">
   <section class="classroom-hero">
     <div>
-      <span class="eyebrow">Klassenraum ist geöffnet</span>
-      <h1>Hallo <?= classroom_h(explode(' ', trim((string)$participant['display_name']))[0] ?: $participant['display_name']) ?> 👋</h1>
-      <p>Hier findest du die Quizzes, Livequizzes und Materialien deiner Lehrkraft. Rechts siehst du, was gerade im Raum passiert.</p>
+      <span class="eyebrow"><?= !empty($teacherPreview) ? 'Lehrer-Vorschau' : 'Klassenraum ist geöffnet' ?></span>
+      <h1><?= !empty($teacherPreview) ? 'Klassenraum betreten' : 'Hallo ' . classroom_h(explode(' ', trim((string)$participant['display_name']))[0] ?: $participant['display_name']) . ' 👋' ?></h1>
+      <p><?= !empty($teacherPreview) ? 'Du siehst den Klassenraum aus Schülerperspektive und kannst freigeschaltete Quizzes direkt testen.' : 'Hier findest du die Quizzes, Livequizzes und Materialien deiner Lehrkraft. Rechts siehst du, was gerade im Raum passiert.' ?></p>
     </div>
     <div class="room-pulse-card">
       <div class="pulse-dot"></div>
       <strong id="onlineCount"><?= count($online) ?></strong>
       <span>gerade aktiv</span>
     </div>
-
   </section>
 
   <div class="classroom-grid">
