@@ -446,7 +446,7 @@ Klassenkontext:
 - Sprache der Fragen: {$language}
 
 Vom Lehrer hochgeladene Dateien:
-" . ($fileList ? implode("\n", $fileList) : '[Keine Datei hochgeladen.]') . "
+" . ($fileList ? implode("\n", $fileList) : '[Keine Datei hochgeladen – ggf. Lehrplanthema als Quelle.]') . "
 
 Zusätzlicher Lehrertext / Aufgabenstellung:
 " . ($sourceText !== '' ? $sourceText : '[Kein zusätzlicher Text eingetragen.]') . "
@@ -883,6 +883,14 @@ function elevaro_teacher_ai_publish_draft(int $draftId, int $teacherId): int
         ]);
         $quizId = (int)$pdo->lastInsertId();
 
+        $selectedTopicId = !empty($draft['curriculum_topic_content_id']) ? (int)$draft['curriculum_topic_content_id'] : 0;
+        $selectedSubtopicId = !empty($draft['curriculum_topic_subtopic_id']) ? (int)$draft['curriculum_topic_subtopic_id'] : 0;
+        if ($selectedTopicId > 0) {
+            elevaro_teacher_ai_store_curriculum_mapping($quizId, $selectedTopicId, $selectedSubtopicId ?: null, 'selected', 100.0);
+        } else {
+            elevaro_teacher_ai_auto_match_curriculum($quizId, $class, $payload);
+        }
+
         $sort = 0;
         foreach ($payload['questions'] as $q) {
             $sort += 10;
@@ -1156,29 +1164,190 @@ if (!function_exists('elevaro_teacher_ai_split_ensure_schema')) {
         elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'analysis_json', "analysis_json LONGTEXT NULL AFTER generated_payload_json");
         elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'question_blocks_json', "question_blocks_json LONGTEXT NULL AFTER analysis_json");
         elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'generation_error', "generation_error TEXT NULL AFTER question_blocks_json");
+        elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'source_kind', "source_kind VARCHAR(40) NOT NULL DEFAULT 'material' AFTER mode");
+        elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'curriculum_topic_content_id', "curriculum_topic_content_id INT UNSIGNED NULL AFTER source_kind");
+        elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'curriculum_topic_subtopic_id', "curriculum_topic_subtopic_id INT UNSIGNED NULL AFTER curriculum_topic_content_id");
+        elevaro_teacher_ai_wizard_db()->exec("CREATE TABLE IF NOT EXISTS quiz_curriculum_topics (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            quiz_id INT UNSIGNED NOT NULL,
+            curriculum_topic_content_id INT UNSIGNED NOT NULL,
+            curriculum_topic_subtopic_id INT UNSIGNED NULL,
+            match_type ENUM('selected','auto','manual') NOT NULL DEFAULT 'selected',
+            confidence DECIMAL(5,2) NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_quiz_curriculum_topic (quiz_id, curriculum_topic_content_id, curriculum_topic_subtopic_id),
+            KEY idx_quiz_curriculum_quiz (quiz_id),
+            KEY idx_quiz_curriculum_topic (curriculum_topic_content_id),
+            KEY idx_quiz_curriculum_subtopic (curriculum_topic_subtopic_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    }
+}
+
+
+if (!function_exists('elevaro_teacher_ai_curriculum_topics_for_class')) {
+    function elevaro_teacher_ai_curriculum_topics_for_class(array $class): array
+    {
+        $state = (string)($class['state_code'] ?? '');
+        $school = (string)($class['school_type_code'] ?? '');
+        $gradeKey = (string)(($class['level_key'] ?? '') ?: ($class['grade'] ?? ''));
+        $subject = (string)($class['subject_code'] ?? '');
+        if ($state === '' || $school === '' || $gradeKey === '' || $subject === '') return [];
+
+        $pdo = elevaro_teacher_ai_wizard_db();
+        $stmt = $pdo->prepare("SELECT * FROM curriculum_topics_content
+            WHERE state_code = :state AND school_type_key = :school AND grade_key = :grade AND subject_key = :subject
+              AND COALESCE(is_active, 1) = 1
+            ORDER BY domain_title ASC, sort_order ASC, topic_title ASC");
+        $stmt->execute(['state'=>$state,'school'=>$school,'grade'=>$gradeKey,'subject'=>$subject]);
+        $topics = $stmt->fetchAll() ?: [];
+        if (!$topics) return [];
+        $ids = array_map(static fn($row)=>(int)$row['id'],$topics);
+        $subtopicsByTopic=[];
+        if ($ids) {
+            $ph = implode(',', array_fill(0,count($ids),'?'));
+            $sub = $pdo->prepare("SELECT * FROM curriculum_topic_subtopics
+                WHERE curriculum_topic_content_id IN ({$ph}) AND COALESCE(is_active, 1) = 1
+                ORDER BY curriculum_topic_content_id ASC, sort_order ASC, subtopic_title ASC");
+            $sub->execute($ids);
+            foreach ($sub->fetchAll() ?: [] as $row) $subtopicsByTopic[(int)$row['curriculum_topic_content_id']][]=$row;
+        }
+        foreach ($topics as &$topic) $topic['subtopics']=$subtopicsByTopic[(int)$topic['id']] ?? [];
+        unset($topic);
+        return $topics;
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_curriculum_context')) {
+    function elevaro_teacher_ai_curriculum_context(int $topicId, ?int $subtopicId, array $class): array
+    {
+        $pdo = elevaro_teacher_ai_wizard_db();
+        $stmt=$pdo->prepare("SELECT * FROM curriculum_topics_content WHERE id=:id LIMIT 1");
+        $stmt->execute(['id'=>$topicId]);
+        $topic=$stmt->fetch();
+        if (!$topic) throw new RuntimeException('Das ausgewählte Lehrplanthema wurde nicht gefunden.');
+        $classGrade=(string)(($class['level_key'] ?? '') ?: ($class['grade'] ?? ''));
+        if ((string)$topic['state_code'] !== (string)($class['state_code'] ?? '') || (string)$topic['school_type_key'] !== (string)($class['school_type_code'] ?? '') || (string)$topic['grade_key'] !== $classGrade || (string)$topic['subject_key'] !== (string)($class['subject_code'] ?? '')) {
+            throw new RuntimeException('Das ausgewählte Lehrplanthema passt nicht zur aktuellen Klasse.');
+        }
+        $subtopic=null;
+        if ($subtopicId) {
+            $sub=$pdo->prepare("SELECT * FROM curriculum_topic_subtopics WHERE id=:id AND curriculum_topic_content_id=:topic_id LIMIT 1");
+            $sub->execute(['id'=>$subtopicId,'topic_id'=>$topicId]);
+            $subtopic=$sub->fetch() ?: null;
+        }
+        return [
+            'topic'=>$topic,
+            'subtopic'=>$subtopic,
+            'aliases'=>json_decode((string)($topic['aliases_json'] ?? '[]'), true) ?: [],
+            'keywords'=>json_decode((string)($topic['keywords_json'] ?? '[]'), true) ?: [],
+            'subtopic_aliases'=>$subtopic ? (json_decode((string)($subtopic['aliases_json'] ?? '[]'), true) ?: []) : [],
+            'subtopic_keywords'=>$subtopic ? (json_decode((string)($subtopic['keywords_json'] ?? '[]'), true) ?: []) : [],
+        ];
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_curriculum_prompt_block')) {
+    function elevaro_teacher_ai_curriculum_prompt_block(array $context): string
+    {
+        $t=$context['topic']; $s=$context['subtopic'];
+        $keywords=array_filter(array_merge((array)$context['keywords'],(array)$context['subtopic_keywords']));
+        $aliases=array_filter(array_merge((array)$context['aliases'],(array)$context['subtopic_aliases']));
+        $lines=[
+            'Lehrplanthema als verbindliche Quelle:',
+            '- Bereich: '.(string)($t['domain_title'] ?? ''),
+            '- Thema kurz: '.(string)(($t['title_short'] ?? '') ?: ($t['topic_title'] ?? '')),
+            '- Thema lang: '.(string)($t['title_long'] ?? ''),
+            '- Beschreibung: '.(string)($t['topic_description'] ?? ''),
+            '- Lernziel: '.(string)($t['learning_goal'] ?? ''),
+        ];
+        if ($s) {
+            $lines[]='- Ausgewähltes Unterthema kurz: '.(string)(($s['title_short'] ?? '') ?: ($s['subtopic_title'] ?? ''));
+            $lines[]='- Ausgewähltes Unterthema lang: '.(string)($s['title_long'] ?? '');
+            $lines[]='- Unterthema-Lernziel: '.(string)($s['learning_goal'] ?? '');
+        }
+        if ($keywords) $lines[]='- Keywords: '.implode(', ', array_slice($keywords,0,18));
+        if ($aliases) $lines[]='- Aliasbegriffe: '.implode(', ', array_slice($aliases,0,12));
+        return implode("\n",$lines);
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_store_curriculum_mapping')) {
+    function elevaro_teacher_ai_store_curriculum_mapping(int $quizId, ?int $topicId, ?int $subtopicId, string $matchType='selected', ?float $confidence=null): void
+    {
+        if (!$topicId) return;
+        elevaro_teacher_ai_split_ensure_schema();
+        $stmt=elevaro_teacher_ai_wizard_db()->prepare("INSERT INTO quiz_curriculum_topics (quiz_id,curriculum_topic_content_id,curriculum_topic_subtopic_id,match_type,confidence)
+            VALUES (:quiz_id,:topic_id,:subtopic_id,:match_type,:confidence)
+            ON DUPLICATE KEY UPDATE match_type=VALUES(match_type), confidence=VALUES(confidence)");
+        $stmt->execute(['quiz_id'=>$quizId,'topic_id'=>$topicId,'subtopic_id'=>$subtopicId ?: null,'match_type'=>$matchType,'confidence'=>$confidence]);
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_auto_match_curriculum')) {
+    function elevaro_teacher_ai_auto_match_curriculum(int $quizId, array $class, array $payload): void
+    {
+        $topics=elevaro_teacher_ai_curriculum_topics_for_class($class);
+        if (!$topics) return;
+        $haystack=mb_strtolower(implode(' ',array_filter([
+            $payload['title'] ?? '', $payload['description'] ?? '', implode(' ',(array)($payload['topics'] ?? [])),
+            implode(' ',array_map(static fn($q)=>(string)($q['question'] ?? ''),array_slice((array)($payload['questions'] ?? []),0,10))),
+        ])),'UTF-8');
+        $bestTopic=null; $bestSubtopic=null; $bestScore=0;
+        foreach ($topics as $topic) {
+            $score=0;
+            foreach ([($topic['title_short'] ?? ''),($topic['title_long'] ?? ''),($topic['topic_title'] ?? ''),($topic['domain_title'] ?? '')] as $term) {
+                $term=mb_strtolower(trim((string)$term),'UTF-8'); if ($term !== '' && str_contains($haystack,$term)) $score+=4;
+            }
+            foreach ((json_decode((string)($topic['keywords_json'] ?? '[]'),true) ?: []) as $kw) { $kw=mb_strtolower(trim((string)$kw),'UTF-8'); if ($kw !== '' && str_contains($haystack,$kw)) $score+=2; }
+            foreach (($topic['subtopics'] ?? []) as $sub) {
+                $subScore=$score;
+                foreach ([($sub['title_short'] ?? ''),($sub['title_long'] ?? ''),($sub['subtopic_title'] ?? '')] as $term) { $term=mb_strtolower(trim((string)$term),'UTF-8'); if ($term !== '' && str_contains($haystack,$term)) $subScore+=3; }
+                foreach ((json_decode((string)($sub['keywords_json'] ?? '[]'),true) ?: []) as $kw) { $kw=mb_strtolower(trim((string)$kw),'UTF-8'); if ($kw !== '' && str_contains($haystack,$kw)) $subScore+=2; }
+                if ($subScore > $bestScore) { $bestScore=$subScore; $bestTopic=$topic; $bestSubtopic=$sub; }
+            }
+            if ($score > $bestScore) { $bestScore=$score; $bestTopic=$topic; $bestSubtopic=null; }
+        }
+        if ($bestTopic && $bestScore >= 4) elevaro_teacher_ai_store_curriculum_mapping($quizId,(int)$bestTopic['id'],$bestSubtopic ? (int)$bestSubtopic['id'] : null,'auto',min(99,$bestScore*10));
     }
 }
 
 if (!function_exists('elevaro_teacher_ai_create_split_draft')) {
-    function elevaro_teacher_ai_create_split_draft(int $teacherId, int $classId, string $mode, string $sourceText, string $extraPrompt, array $files): int
+    function elevaro_teacher_ai_create_split_draft(int $teacherId, int $classId, string $mode, string $sourceText, string $extraPrompt, array $files, array $options = []): int
     {
         elevaro_teacher_ai_split_ensure_schema();
-        if (!elevaro_teacher_ai_has_readable_material($sourceText, $files)) {
-            throw new RuntimeException('Bitte lade ein PDF/Bild hoch oder gib Material als Text ein. Ohne Unterrichtsmaterial wird kein Quiz generiert, damit keine Fantasiefragen entstehen.');
+        $sourceKind = (string)($options['source_kind'] ?? 'material');
+        $topicId = isset($options['curriculum_topic_content_id']) ? (int)$options['curriculum_topic_content_id'] : 0;
+        $subtopicId = isset($options['curriculum_topic_subtopic_id']) ? (int)$options['curriculum_topic_subtopic_id'] : 0;
+        $class = elevaro_teacher_ai_class_for_teacher($classId, $teacherId);
+
+        if ($sourceKind === 'curriculum') {
+            if ($topicId <= 0) throw new RuntimeException('Bitte ein Lehrplanthema auswählen.');
+            $ctx = elevaro_teacher_ai_curriculum_context($topicId, $subtopicId ?: null, $class);
+            $sourceText = trim($sourceText . "
+
+" . elevaro_teacher_ai_curriculum_prompt_block($ctx));
+            $extraPrompt = trim($extraPrompt . "
+
+Quelle: Lehrplanthema ohne zusätzliches Material. Erstelle ein Quiz auf Basis dieses Lehrplanthemas, der Langbeschreibung, Lernziele, Keywords und des Klassenkontexts. Keine Quellenverweise im Fragetext.");
+            $files = [];
+        } elseif (!elevaro_teacher_ai_has_readable_material($sourceText, $files)) {
+            throw new RuntimeException('Bitte Material hochladen, Text eingeben oder ein Lehrplanthema auswählen.');
         }
 
         $files = elevaro_teacher_ai_prepare_openai_material_files($files);
-        $class = elevaro_teacher_ai_class_for_teacher($classId, $teacherId);
         $promptLog = elevaro_teacher_ai_build_generation_prompt($class, $mode, $sourceText, $extraPrompt, $files);
 
         $pdo = elevaro_teacher_ai_wizard_db();
         $stmt = $pdo->prepare("INSERT INTO teacher_ai_quiz_drafts
-            (teacher_id, class_id, mode, status, generation_step, source_title, source_text, source_files_json, prompt, generated_payload_json, image_prompt, image_status)
-            VALUES (:teacher_id, :class_id, :mode, 'generating', 'analysis', NULL, :source_text, :source_files_json, :prompt, NULL, NULL, 'none')");
+            (teacher_id, class_id, mode, source_kind, curriculum_topic_content_id, curriculum_topic_subtopic_id, status, generation_step, source_title, source_text, source_files_json, prompt, generated_payload_json, image_prompt, image_status)
+            VALUES (:teacher_id, :class_id, :mode, :source_kind, :curriculum_topic_content_id, :curriculum_topic_subtopic_id, 'generating', 'analysis', NULL, :source_text, :source_files_json, :prompt, NULL, NULL, 'none')");
         $stmt->execute([
             'teacher_id' => $teacherId,
             'class_id' => $classId,
             'mode' => $mode,
+            'source_kind' => $sourceKind,
+            'curriculum_topic_content_id' => $topicId ?: null,
+            'curriculum_topic_subtopic_id' => $subtopicId ?: null,
             'source_text' => $sourceText,
             'source_files_json' => json_encode($files, JSON_UNESCAPED_UNICODE),
             'prompt' => $promptLog,
@@ -1197,13 +1366,14 @@ if (!function_exists('elevaro_teacher_ai_split_build_analysis_prompt')) {
         $language = elevaro_teacher_ai_language_for_class($class, $mode);
         $fileList = array_map(static fn($file) => '- ' . (string)($file['original_name'] ?? 'Material') . ' (' . (string)($file['mime'] ?? 'Datei') . ')', $files);
 
-        return trim("Analysiere das Unterrichtsmaterial für einen Elevaro-KI-Quiz-Wizard.\n\n" .
+        return trim("Analysiere die Quelle für einen Elevaro-KI-Quiz-Wizard. Die Quelle kann hochgeladenes Unterrichtsmaterial oder ein ausgewähltes Lehrplanthema sein.\n\n" .
             "Klassenkontext:\n- Klasse: {$grade}\n- Schulart/Level: {$school} / {$level}\n- Fach: {$subject}\n- Modus: " . ($mode === 'listening' ? 'Listening + Comprehension' : 'normales Multiple-Choice-Quiz') . "\n- Erwartete Sprache der Fragen: {$language}\n\n" .
             "Dateien:\n" . ($fileList ? implode("\n", $fileList) : '[Keine Datei hochgeladen.]') . "\n\n" .
             "Lehrertext / Aufgabenstellung:\n" . ($sourceText !== '' ? $sourceText : '[Kein zusätzlicher Text eingetragen.]') . "\n\n" .
             "Zusatzwunsch des Lehrers:\n" . ($extraPrompt !== '' ? $extraPrompt : '[Keine Zusatzanweisung.]') . "\n\n" .
             "Aufgabe für diesen Schritt: Erstelle KEINE fertigen Fragen. Analysiere nur die Quelle und entscheide zuerst, welche Art von Material vorliegt.\n" .
             "Klassifiziere material_type und task_intent besonders sorgfältig:\n" .
+            "- Wenn die Quelle ein Lehrplanthema ohne Material ist: material_type = mixed, task_intent = quiz_about_content. Erstelle eine vollständige, lehrplanorientierte Themenabdeckung, keine Materialbeschreibung.\n" .
             "- reading_text + quiz_about_content: Der Inhalt selbst soll verstanden und abgefragt werden.\n" .
             "- worksheet, grammar_exercise oder vocabulary_list: Das Blatt ist meist Übungsmaterial. Dann darf NICHT zufälliger Beispielsatz-Inhalt abgefragt werden. Stattdessen sollen die geübten Lernziele, Vokabeln, Satzmuster, Grammatikstrukturen oder Kompetenzen trainiert werden.\n" .
             "- Bei Fremdsprachen-Arbeitsblättern: Übersetze die späteren Fragen nicht automatisch ins Deutsche. Bewahre die Sprache und den Aufgabentyp des Materials, sofern der Lehrer nichts anderes verlangt.\n" .

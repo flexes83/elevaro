@@ -6,6 +6,8 @@
   const $ = (sel, ctx = document) => ctx.querySelector(sel);
   const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
 
+  function showError(message) { alert(message); }
+
   function toast(message) {
     const el = document.createElement('div');
     el.className = 'ai-toast';
@@ -25,19 +27,8 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload || {})
     }).then(async res => {
-      const text = await res.text();
-      let json = {};
-      try {
-        json = text ? JSON.parse(text) : {};
-      } catch (e) {
-        const preview = text.replace(/\s+/g, ' ').slice(0, 500);
-        throw new Error(preview ? 'Serverantwort war kein JSON: ' + preview : 'Serverantwort war leer.');
-      }
-
-      if (!res.ok || !json.ok) {
-        throw new Error(json.error || 'Anfrage fehlgeschlagen.');
-      }
-
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) throw new Error(json.error || 'Anfrage fehlgeschlagen.');
       return json;
     });
   }
@@ -56,6 +47,68 @@
   }
   wireChoiceCards('.ai-mode-card');
   wireChoiceCards('.ai-intent-card');
+
+  wireChoiceCards('.ai-source-kind-card');
+
+  const curriculumState = { domains: [], topicMap: new Map() };
+
+  function escapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[ch]));
+  }
+
+  function updateSourceKind(kind) {
+    const hidden = $('#aiWizardSourceKind');
+    if (hidden) hidden.value = kind;
+    $('#aiMaterialSourceBox')?.classList.toggle('d-none', kind === 'curriculum');
+    $('#aiCurriculumSourceBox')?.classList.toggle('d-none', kind !== 'curriculum');
+    if (kind === 'curriculum' && !curriculumState.domains.length) loadCurriculumTopics();
+  }
+
+  async function loadCurriculumTopics() {
+    const select = $('#aiCurriculumTopicSelect');
+    if (!select) return;
+    select.innerHTML = '<option value="">Themen werden geladen…</option>';
+    try {
+      const res = await fetch('/teacher/api/curriculum_topics.php?class_id=' + encodeURIComponent(root.dataset.classId || '0'));
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || 'Themen konnten nicht geladen werden.');
+      curriculumState.domains = json.domains || [];
+      curriculumState.topicMap = new Map();
+      let html = '<option value="">Bitte Thema auswählen…</option>';
+      curriculumState.domains.forEach(domain => {
+        html += `<optgroup label="${escapeHtml(domain.title || 'Allgemein')}">`;
+        (domain.topics || []).forEach(topic => {
+          curriculumState.topicMap.set(String(topic.id), topic);
+          html += `<option value="${topic.id}">${escapeHtml(topic.title)}</option>`;
+        });
+        html += '</optgroup>';
+      });
+      if (!json.count) html = '<option value="">Noch keine Lehrplanthemen für diese Klasse importiert</option>';
+      select.innerHTML = html;
+    } catch (err) {
+      select.innerHTML = '<option value="">Fehler beim Laden der Themen</option>';
+      showError(err.message || 'Themen konnten nicht geladen werden.');
+    }
+  }
+
+  function updateSubtopics() {
+    const topicId = $('#aiCurriculumTopicSelect')?.value || '';
+    const sub = $('#aiCurriculumSubtopicSelect');
+    const preview = $('#aiCurriculumPreview');
+    const topic = curriculumState.topicMap.get(String(topicId));
+    if (!sub) return;
+    sub.innerHTML = '<option value="">Ganzes Thema verwenden</option>';
+    if (topic) {
+      (topic.subtopics || []).forEach(s => { sub.innerHTML += `<option value="${s.id}">${escapeHtml(s.title)}</option>`; });
+      if (preview) preview.innerHTML = `<strong>${escapeHtml(topic.title)}</strong><br>${escapeHtml(topic.title_long || topic.description || 'Dieses Thema wird als Grundlage für das Quiz verwendet.')}`;
+    } else if (preview) {
+      preview.textContent = 'Wähle ein Thema aus. Elevaro nutzt Kurz- und Langtitel, Lernziel, Keywords und Klassenkontext als Grundlage.';
+    }
+  }
+
+  $$('.ai-source-kind-card input').forEach(input => input.addEventListener('change', () => updateSourceKind(input.value)));
+  $('#aiCurriculumTopicSelect')?.addEventListener('change', updateSubtopics);
+
 
   const loadingTexts = [
     'Material wird gelesen und strukturiert...',
@@ -135,6 +188,10 @@
     startLoadingCopy();
     try {
       const form = e.currentTarget;
+      const sourceKind = $('#aiWizardSourceKind')?.value || 'material';
+      if (sourceKind === 'curriculum' && !($('#aiCurriculumTopicSelect')?.value || '')) {
+        throw new Error('Bitte ein Lehrplanthema auswählen.');
+      }
       const res = await fetch('/teacher/api/ai_wizard_generate.php', { method: 'POST', body: new FormData(form) });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.ok) throw new Error(json.error || 'KI-Erstellung fehlgeschlagen.');
@@ -352,15 +409,15 @@
   $('#aiPublishQuiz')?.addEventListener('click', async () => {
     try {
       const btn = $('#aiPublishQuiz');
-      btn.disabled = true; btn.textContent = 'Veröffentliche Quiz...';
+      btn.disabled = true; btn.textContent = 'Veröffentliche...';
       const payload = readPayload();
       if (!state.imagePath) {
         btn.textContent = 'Erstelle Quizbild...';
         try { await generateImage(false); } catch (e) {}
-        btn.textContent = 'Veröffentliche Quiz...';
+        btn.textContent = 'Veröffentliche...';
       }
       const res = await apiJson('/teacher/api/ai_wizard_publish.php', { draft_id: state.draftId, payload });
-      toast(res.image_pending ? 'Quiz wurde veröffentlicht. Das Bild wird später ergänzt.' : 'Quiz wurde veröffentlicht.');
+      toast('Quiz wurde veröffentlicht.');
       window.location.href = res.class_quizzes_url || '/teacher/quizzes.php';
     } catch (err) {
       toast(err.message || String(err));

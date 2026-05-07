@@ -41,12 +41,45 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
   <section class="ai-wizard-panel is-active" data-step="1">
     <form id="aiWizardSourceForm" enctype="multipart/form-data">
       <input type="hidden" name="class_id" value="<?= (int)$classId ?>">
+      <input type="hidden" name="source_kind" id="aiWizardSourceKind" value="material">
 
       <div class="row g-4">
         <div class="col-lg-7">
           <div class="card card-soft h-100"><div class="card-body p-4">
             <h3 class="h4 fw-bold">1. Quelle auswählen</h3>
-            <p class="text-muted">Lade Arbeitsblätter, PDFs oder fotografierte Buchseiten hoch. Ergänzender Text hilft der KI, genauer zu arbeiten.</p>
+            <p class="text-muted">Wähle aus, ob dein Quiz aus eigenem Material oder direkt aus einem Lehrplanthema entstehen soll.</p>
+
+            <label class="form-label fw-bold mt-2">Quiz-Quelle</label>
+            <div class="ai-source-kind-grid">
+              <label class="ai-source-kind-card is-selected">
+                <input type="radio" name="source_kind_choice" value="material" checked>
+                <span class="ai-mode-icon">📄</span>
+                <strong>Material hochladen</strong>
+                <small>PDF, Arbeitsblatt, Foto oder eigener Text</small>
+              </label>
+              <label class="ai-source-kind-card">
+                <input type="radio" name="source_kind_choice" value="curriculum">
+                <span class="ai-mode-icon">🎯</span>
+                <strong>Lehrplanthema wählen</strong>
+                <small>Quiz ohne Upload aus deiner Klassenstufe erstellen</small>
+              </label>
+            </div>
+
+            <div class="ai-curriculum-source d-none" id="aiCurriculumSourceBox">
+              <label class="form-label fw-bold mt-4">Lehrplanthema</label>
+              <select class="form-select form-select-lg" id="aiCurriculumTopicSelect" name="curriculum_topic_content_id">
+                <option value="">Themen werden geladen…</option>
+              </select>
+              <label class="form-label fw-bold mt-3">Unterthema / Skill <span class="text-muted fw-normal">optional</span></label>
+              <select class="form-select" id="aiCurriculumSubtopicSelect" name="curriculum_topic_subtopic_id">
+                <option value="">Ganzes Thema verwenden</option>
+              </select>
+              <div class="ai-curriculum-preview" id="aiCurriculumPreview">
+                Wähle ein Thema aus. Elevaro nutzt Kurz- und Langtitel, Lernziel, Keywords und Klassenkontext als Grundlage.
+              </div>
+            </div>
+
+            <div class="ai-material-source" id="aiMaterialSourceBox">
 
             <div class="ai-source-modes">
               <label class="ai-mode-card is-selected">
@@ -101,6 +134,7 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
 
             <label class="form-label fw-bold mt-4">Zusatzwunsch an die KI</label>
             <textarea class="form-control" name="extra_prompt" rows="4" placeholder="z. B. bitte eher leichte Fragen, Fokus auf Vokabelverständnis, keine Jahreszahlen abfragen, Niveau A1..."></textarea>
+            </div>
 
             <div class="d-flex gap-2 flex-wrap mt-4">
               <button class="btn btn-primary btn-lg" type="submit">✨ Quiz mit KI erstellen</button>
@@ -113,9 +147,9 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
             <h3>Was die KI bekommt</h3>
             <ul>
               <li>Klasse, Schulart, Fach und Klassenstufe</li>
-              <li>dein hochgeladenes Material</li>
+              <li>dein hochgeladenes Material oder das ausgewählte Lehrplanthema</li>
               <li>deine Zusatzanweisungen</li>
-              <li>ob Inhalte abgefragt oder ähnliche Übungen erstellt werden sollen</li>
+              <li>ob Inhalte abgefragt, ähnliche Übungen oder ein lehrplanbasiertes Quiz erstellt werden soll</li>
               <li>bei Listening: Ziel Sprache + Sprechertext</li>
             </ul>
             <div class="ai-warning">Wichtig: Die KI erstellt einen Entwurf. Vor Veröffentlichung bitte Fragen und Antworten prüfen.</div>

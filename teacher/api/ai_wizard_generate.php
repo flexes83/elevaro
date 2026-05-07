@@ -13,6 +13,9 @@ try {
     $sourceText = trim((string)($_POST['source_text'] ?? ''));
     $extraPrompt = trim((string)($_POST['extra_prompt'] ?? ''));
     $materialGoal = (string)($_POST['material_goal'] ?? 'auto');
+    $sourceKind = (string)($_POST['source_kind'] ?? 'material');
+    $curriculumTopicId = (int)($_POST['curriculum_topic_content_id'] ?? 0);
+    $curriculumSubtopicId = (int)($_POST['curriculum_topic_subtopic_id'] ?? 0);
     $goalHints = [
         'auto' => 'Materialziel: KI entscheidet anhand des Materials, ob Inhalte abgefragt oder ähnliche Übungen erstellt werden sollen.',
         'content' => 'Materialziel: Inhalte verstehen und abfragen. Erstelle Fragen zum fachlichen Inhalt, nicht nur zum Aufgabenformat.',
@@ -27,11 +30,15 @@ try {
     }
     $files = elevaro_teacher_ai_collect_files('source_files');
 
-    if ($sourceText === '' && !$files) {
-        throw new RuntimeException('Bitte Material hochladen oder einen Text/eine Aufgabenstellung eingeben.');
+    if ($sourceKind !== 'curriculum' && $sourceText === '' && !$files) {
+        throw new RuntimeException('Bitte Material hochladen, Text eingeben oder ein Lehrplanthema auswählen.');
     }
 
-    $draftId = elevaro_teacher_ai_create_split_draft($teacherId, $classId, $mode, $sourceText, $extraPrompt, $files);
+    $draftId = elevaro_teacher_ai_create_split_draft($teacherId, $classId, $mode, $sourceText, $extraPrompt, $files, [
+        'source_kind' => $sourceKind === 'curriculum' ? 'curriculum' : 'material',
+        'curriculum_topic_content_id' => $curriculumTopicId,
+        'curriculum_topic_subtopic_id' => $curriculumSubtopicId,
+    ]);
 
     elevaro_teacher_ai_json_response([
         'ok' => true,
