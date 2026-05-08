@@ -48,6 +48,56 @@
     return json;
   }
 
+
+  const promptPlaceholderSets = {
+    default: [
+      'z. B. eher leichte Fragen, Fokus auf Vokabelverständnis, keine Jahreszahlen abfragen...',
+      'z. B. kurze Fragen für Klasse 5, keine Fangfragen, einfache Sprache...',
+      'z. B. verwende Alltagssituationen aus Schule, Familie und Freizeit...'
+    ],
+    curriculum: [
+      'Verwende die Vokabeln „mother“, „father“, „sister“ und „brother“...',
+      'Erstelle einfache Aufgaben auf Niveau A1 mit kurzen Sätzen...',
+      'Fokus auf Monate, Jahreszeiten und Datumsangaben...',
+      'Nutze Beispiele aus dem Schulalltag und der Familie...',
+      'Baue 3 Wiederholungsfragen zu schwierigen Begriffen ein...'
+    ],
+    listening: [
+      'Erstelle einen kurzen Dialog zwischen zwei Schülern...',
+      'Nutze einfache Alltagssprache und langsames Niveau...',
+      'Der Hörtext soll eine kleine Geschichte mit 5 Abschnitten sein...',
+      'Verwende die Wörter „mother“, „father“, „sister“ und „school“...'
+    ]
+  };
+
+  let promptPlaceholderIndex = 0;
+  let promptPlaceholderTimer = null;
+
+  function updateExtraPromptPlaceholder() {
+    const field = $('#aiExtraPrompt');
+    if (!field || field.value.trim() !== '') return;
+
+    const sourceKind = $('#aiWizardSourceKind')?.value || 'material';
+    const mode = document.querySelector('input[name="mode"]:checked')?.value || 'quiz';
+    const key = mode === 'listening' ? 'listening' : (sourceKind === 'curriculum' ? 'curriculum' : 'default');
+    const items = promptPlaceholderSets[key] || promptPlaceholderSets.default;
+
+    field.classList.add('is-placeholder-changing');
+    setTimeout(() => {
+      field.placeholder = items[promptPlaceholderIndex % items.length];
+      field.dataset.placeholderMode = key;
+      promptPlaceholderIndex++;
+      field.classList.remove('is-placeholder-changing');
+    }, 120);
+  }
+
+  function startPromptPlaceholderRotation() {
+    if (promptPlaceholderTimer) clearInterval(promptPlaceholderTimer);
+    updateExtraPromptPlaceholder();
+    promptPlaceholderTimer = setInterval(updateExtraPromptPlaceholder, 2600);
+  }
+
+
   function wireChoiceCards(selector) {
     $$(selector).forEach(card => {
       card.addEventListener('click', () => {
@@ -88,6 +138,7 @@
     if (isCurriculum && !curriculumState.domains.length) {
       loadCurriculumTopics();
     }
+    updateExtraPromptPlaceholder();
   }
 
   async function loadCurriculumTopics() {
@@ -548,6 +599,21 @@
 
   $('#aiReviewCurriculumTopic')?.addEventListener('change', e => {
     populateReviewSubtopicSelect(e.target.value, '');
+  });
+
+
+  $$('input[name="mode"]').forEach(input => {
+    input.addEventListener('change', () => updateExtraPromptPlaceholder());
+  });
+
+  $$('[data-prompt-example]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const field = $('#aiExtraPrompt');
+      if (!field) return;
+      const text = btn.dataset.promptExample || '';
+      field.value = field.value.trim() ? (field.value.trim() + "\n" + text) : text;
+      field.focus();
+    });
   });
 
 })();

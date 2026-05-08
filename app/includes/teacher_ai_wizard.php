@@ -469,7 +469,7 @@ Aufgabe:
 - Wenn zu wenig Material lesbar ist: Erstelle nur Fragen zu sicher lesbaren Inhalten und erwähne die Einschränkung in der Beschreibung. Erfinde keine Inhalte.
 - Formuliere altersgerecht.
 - Bei Fremdsprachen/Listening: Fragen und Antworten in der Zielsprache.
-- Bei Listening zusätzlich einen Sprechertext in der Zielsprache erstellen. Dieser Sprechertext muss inhaltlich auf dem Material basieren.
+- Bei Listening gilt: Erstelle einen neuen kurzen Hörtext bzw. mehrere kurze Hörabschnitte, die thematisch und sprachlich zum Material/Lerninhalt passen. Das Material dient als Vorlage für Thema, Wortschatz, Niveau und Kontext, nicht als Satz-für-Satz-Quelle. Die Fragen prüfen Hörverstehen zum neu erzeugten Hörtext.
 - Erstelle außerdem eine kurze Quizbeschreibung und einen konkreten Bildprompt. Bildprompt-Regeln: ausschließlich Elevaro-CD-Stil, flache freundliche Vektor-Illustration, weiche Formen, klare lebendige Farben, dezente Schatten, keine 3D-Optik, altersgerecht zur Klassenstufe, ohne Text im Bild, ohne Logos/Marken, ohne fotorealistische Personen, ohne gruselige/gewalttätige Motive.");
 }
 
@@ -1452,6 +1452,7 @@ if (!function_exists('elevaro_teacher_ai_listening_story_instruction')) {
             . "- Erstelle keine lange Audiodatei für das ganze Quiz.\n"
             . "- Plane eine zusammenhängende kleine Story oder Situation in exakt {$targetQuestions} kurzen Hörabschnitten.\n"
             . "- Jeder Abschnitt bekommt später genau eine Verständnisfrage.\n"
+            . "- Der Hörtext soll neu formuliert sein, aber Thema, Wortschatz, Niveau und Kontext des Materials/Lerninhalts aufnehmen.\n"
             . "- Die Abschnitte müssen in fester Reihenfolge funktionieren und dürfen nicht zufällig gemischt werden.\n"
             . "- Jeder Abschnitt soll kurz genug sein, um direkt vor der jeweiligen Frage abgespielt zu werden.\n"
             . "- Die Fragen, Antwortoptionen und Erklärungen bleiben in der Ziel-/Fremdsprache, sofern der Lehrer nichts anderes verlangt.\n";
@@ -1489,7 +1490,7 @@ if (!function_exists('elevaro_teacher_ai_split_build_analysis_prompt')) {
             "description ist eine kurze, motivierende Quizbeschreibung für Schülerinnen und Schüler, keine Beschreibung der hochgeladenen Quelle.\n" .
             "image_prompt beschreibt ein passendes Elevaro-Quizbild im bestehenden modernen, freundlichen, spielerisch-edukativen Stil für die Zielgruppe; beschreibe NICHT das PDF, Arbeitsblatt oder Handschriften.\n" .
             "Der Klassenkontext darf Niveau und Sprache steuern, aber keine Fakten ergänzen. Wenn Inhalte unleserlich sind, benenne das offen.\n" .
-            "Bei Listening: Erstelle keinen langen Sprechertext für das ganze Quiz, sondern nutze listening_segments als Story-/Abschnittsplan. listening_text darf nur eine kurze Zusammenfassung der Story sein.");
+            "Bei Listening: Erstelle keinen langen Sprechertext für das ganze Quiz, sondern nutze listening_segments als Story-/Abschnittsplan. Erzeuge einen neuen, passenden Hörtext ähnlich zum Thema/Wortschatz des Materials oder Lerninhalts; die Fragen beziehen sich auf diesen neuen Hörtext. listening_text darf nur eine kurze Zusammenfassung der Story sein.");
     }
 }
 

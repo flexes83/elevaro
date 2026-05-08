@@ -162,13 +162,19 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
           <div class="ai-curriculum-goal-box d-none" id="aiCurriculumGoalBox">
             <div class="ai-goal-hint">
               <strong>Quiz aus Lerninhalt</strong>
-              <span>Die KI erstellt ein Quiz passend zu Klasse, Fach, Lerninhalt und optionalem Skill. Ohne Upload und ohne freie Prompt-Hürde.</span>
+              <span>Die KI erstellt ein Quiz passend zu Klasse, Fach, Lerninhalt und optionalem Skill. Im Zusatzfeld kannst du optional Wortschatz, Schwerpunkt oder Niveau steuern.</span>
             </div>
           </div>
 
           <div class="ai-field-block mt-4">
             <label class="form-label fw-bold">Zusatzwunsch an die KI <span class="text-muted fw-normal">optional</span></label>
-            <textarea class="form-control" name="extra_prompt" rows="5" placeholder="z. B. eher leichte Fragen, Fokus auf Vokabelverständnis, keine Jahreszahlen abfragen, Niveau A1..."></textarea>
+            <textarea class="form-control ai-animated-placeholder" id="aiExtraPrompt" name="extra_prompt" rows="5" data-placeholder-mode="default" placeholder="z. B. eher leichte Fragen, Fokus auf Vokabelverständnis, keine Jahreszahlen abfragen, Niveau A1..."></textarea>
+            <div class="ai-prompt-examples" id="aiPromptExamples">
+              <span>Beispiele:</span>
+              <button type="button" data-prompt-example="Verwende die Vokabeln „mother“, „father“, „sister“ und „brother“.">Familienvokabeln</button>
+              <button type="button" data-prompt-example="Erstelle einfache Fragen auf Niveau A1 mit kurzen Sätzen.">Niveau A1</button>
+              <button type="button" data-prompt-example="Nutze Alltagssituationen aus Schule, Familie und Freizeit.">Alltagssituationen</button>
+            </div>
           </div>
         </div>
       </div>

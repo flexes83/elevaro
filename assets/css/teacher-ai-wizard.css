@@ -413,3 +413,40 @@
 @keyframes aiRouteStepIn {
   to { opacity: 1; transform: translateY(0); }
 }
+
+
+.ai-animated-placeholder {
+  transition: box-shadow .2s ease, border-color .2s ease, opacity .16s ease;
+}
+
+.ai-animated-placeholder.is-placeholder-changing {
+  opacity: .62;
+}
+
+.ai-prompt-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.ai-prompt-examples span {
+  font-size: .82rem;
+  font-weight: 850;
+  color: #64748b;
+}
+
+.ai-prompt-examples button {
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: rgba(90,79,243,.09);
+  color: #4f46e5;
+  font-weight: 850;
+  font-size: .82rem;
+}
+
+.ai-prompt-examples button:hover {
+  background: rgba(90,79,243,.15);
+}
