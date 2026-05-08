@@ -714,6 +714,60 @@
     }
     box.classList.remove('d-none');
     code.textContent = prompt;
+    logPromptDebugToConsole('review-rendered');
+  }
+
+  function elevaroSelectedText(selector) {
+    const el = $(selector);
+    if (!el) return '';
+    if (el.tagName === 'SELECT') {
+      return el.options[el.selectedIndex]?.textContent || '';
+    }
+    return el.textContent || el.value || '';
+  }
+
+  function logPromptDebugToConsole(reason) {
+    const prompt = String(state.debugPrompt || (state.payload && state.payload._debug_prompt) || '').trim();
+    if (!prompt) return;
+
+    const sourceKind = $('#aiWizardSourceKind')?.value || '';
+    const topicText = elevaroSelectedText('#aiCurriculumTopicSelect') || elevaroSelectedText('#aiReviewCurriculumTopic');
+    const subtopicText = elevaroSelectedText('#aiCurriculumSubtopicSelect') || elevaroSelectedText('#aiReviewCurriculumSubtopic');
+    const teacherPrompt = ($('#aiExtraPrompt')?.value || '').trim();
+
+    const debugObject = {
+      reason: reason || 'updated',
+      draftId: state.draftId || null,
+      mode: document.querySelector('input[name="mode"]:checked')?.value || (state.payload && state.payload.mode) || null,
+      sourceKind: sourceKind || null,
+      curriculumTopic: topicText || null,
+      curriculumSubtopic: subtopicText || null,
+      teacherPrompt: teacherPrompt || null,
+      analysis: state.analysis || null,
+      payloadPreview: state.payload ? {
+        title: state.payload.title || null,
+        description: state.payload.description || null,
+        questionCount: Array.isArray(state.payload.questions) ? state.payload.questions.length : null,
+        imagePrompt: state.payload.image_prompt || null
+      } : null,
+      finalPrompt: prompt
+    };
+
+    window.ELEVARO_DEBUG = debugObject;
+
+    const hash = [state.draftId || '', prompt.length, prompt.slice(0, 160)].join('|');
+    if (state._lastPromptDebugHash === hash) return;
+    state._lastPromptDebugHash = hash;
+
+    if (window.console && typeof console.groupCollapsed === 'function') {
+      console.groupCollapsed('%cELEVARO DEBUG%c verwendeter KI-Prompt', 'background:#5a4ff3;color:#fff;border-radius:4px;padding:2px 6px;font-weight:700;', 'color:#5a4ff3;font-weight:700;');
+      console.log('Debug-Objekt: window.ELEVARO_DEBUG', debugObject);
+      console.log('Finaler Prompt:\n' + prompt);
+      console.groupEnd();
+    } else if (window.console) {
+      console.log('ELEVARO DEBUG', debugObject);
+      console.log('ELEVARO FINAL PROMPT\n' + prompt);
+    }
   }
 
   function renderPlausibilityReview() {
