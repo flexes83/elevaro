@@ -34,8 +34,10 @@ function elevaro_render_quiz_card(array $item): void
     $description = $item['quiz_description'] ?? $item['description'] ?? $item['topic_description'] ?? 'Starte ein kurzes Quiz mit direktem Feedback.';
     $quizKey = $item['quiz_key'] ?? '';
     $imagePath = $item['image_path'] ?? '';
-    $imageStatus = $item['image_status'] ?? '';
-    $hasImage = $imagePath && (!$imageStatus || in_array($imageStatus, ['approved','generated','selected'], true));
+    $imageStatus = strtolower(trim((string)($item['image_status'] ?? '')));
+    // Zeige vorhandene Bilder auch dann, wenn sie aus dem Wizard noch als "draft" markiert sind.
+    // Versteckt werden nur eindeutig nicht nutzbare/abgelehnte Statuswerte.
+    $hasImage = $imagePath && !in_array($imageStatus, ['none','failed','error','rejected'], true);
     $tags = [];
 
     if (!empty($item['tag_names'])) {

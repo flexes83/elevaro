@@ -70,8 +70,12 @@ $gradientOptions = classroom_gradient_options();
           <?php
             $emoji = $quiz['theme_emoji'] ?: '🎯';
             $imagePath = (string)($quiz['image_path'] ?? '');
-            $imageStatus = (string)($quiz['image_status'] ?? '');
-            $hasImage = $imagePath !== '' && (!$imageStatus || in_array($imageStatus, ['approved','generated','selected'], true));
+            $imageStatus = strtolower(trim((string)($quiz['image_status'] ?? '')));
+            // Im Klassenraum sollen bereitgestellte Quizbilder sichtbar sein.
+            // Früher wurden Bilder mit Status "draft" ausgeblendet; KI-Wizard-Bilder
+            // können aber genau diesen Status haben, obwohl sie bereits zum Quiz gehören.
+            // Ausblenden nur bei eindeutig nicht nutzbaren/abgelehnten Statuswerten.
+            $hasImage = $imagePath !== '' && !in_array($imageStatus, ['none','failed','error','rejected'], true);
             $bestPercent = isset($quiz['best_percent']) ? (float)$quiz['best_percent'] : 0.0;
             $bestCorrect = isset($quiz['best_correct']) ? (int)$quiz['best_correct'] : 0;
             $bestTotal = isset($quiz['best_total']) ? (int)$quiz['best_total'] : 0;

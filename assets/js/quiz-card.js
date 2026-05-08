@@ -39,8 +39,9 @@
     const quizKey = item.quiz_key || item.key || '';
     const quizId = item.quiz_id || item.id || '';
     const imagePath = item.image_path || item.card_image_path || '';
-    const imageStatus = item.image_status || '';
-    const hasImage = imagePath && (!imageStatus || imageStatus === 'approved' || imageStatus === 'generated' || imageStatus === 'selected');
+    const imageStatus = String(item.image_status || '').trim().toLowerCase();
+    // Show existing images from the wizard as well; only hide clearly unusable/rejected states.
+    const hasImage = imagePath && !['none', 'failed', 'error', 'rejected'].includes(imageStatus);
     const tags = normalizeTags(item);
     const progress = normalizeProgress(item);
 
