@@ -10,7 +10,10 @@ try {
     if ($question === '') throw new RuntimeException('Bitte zuerst eine Frage eingeben.');
     $draft = elevaro_teacher_ai_load_draft($draftId, $teacherId);
     $payload = elevaro_teacher_ai_draft_payload($draft);
-    $language = (string)($payload['language'] ?? 'Deutsch');
+    $class = elevaro_teacher_ai_class_for_teacher((int)($draft['class_id'] ?? 0), $teacherId);
+    $subject = elevaro_teacher_ai_subject_label($class['subject_code'] ?? '');
+    $analysis = (array)($payload['analysis'] ?? $payload['source_analysis'] ?? []);
+    $language = (string)($payload['language'] ?? $analysis['target_language'] ?? 'Deutsch');
 
     $schema = [
         'type' => 'object',
@@ -22,42 +25,44 @@ try {
         ],
         'required' => ['options', 'answer', 'explanation'],
     ];
-    $prompt = "Erstelle vier Multiple-Choice-Antworten für diese Frage. Genau eine Antwort ist richtig. Sprache: {$language}. Frage: {$question}";
-    $result = elevaro_openai_chat_json([
-        ['role' => 'system', 'content' => 'Du bist Lehrer und erstellst plausible Multiple-Choice-Optionen. Antworte nur als JSON.'],
-        ['role' => 'user', 'content' => $prompt],
-    ], $schema, 0.4);
-    $json = $result['json'];
-
-    // Nutzt denselben Qualitätscheck wie die Vor-Review-Bereinigung:
-    // Falls mehrere Antwortkombinationen möglich wären, werden die Distraktoren eindeutig falsch gemacht.
-    $candidate = [
+    $promptLibrary = function_exists('elevaro_prompt_library_build') ? elevaro_prompt_library_build([
+        'stage' => 'suggest_options',
+        'mode' => (string)($payload['mode'] ?? $draft['mode'] ?? 'quiz'),
+        'subject_code' => (string)($class['subject_code'] ?? ''),
+        'subject_label' => $subject,
+        'material_type' => (string)($analysis['material_type'] ?? ''),
+        'task_intent' => (string)($analysis['task_intent'] ?? ''),
+        'content_mode' => (string)($analysis['content_mode'] ?? ''),
+        'generation_strategy' => (string)($analysis['generation_strategy'] ?? ''),
+        'detected_skills' => $analysis['detected_skills'] ?? [],
+        'topics' => $analysis['topics'] ?? [],
         'question' => $question,
-        'options' => array_values((array)($json['options'] ?? [])),
-        'answer' => (string)($json['answer'] ?? ''),
-        'explanation' => (string)($json['explanation'] ?? ''),
-        'difficulty' => 0.5,
-        'source_reference' => '',
-        'listening_segment_text' => '',
-        'listening_segment_title' => '',
-    ];
-    $analysis = [
-        'title' => (string)($payload['title'] ?? ''),
-        'description' => (string)($payload['description'] ?? ''),
-        'language' => $language,
-        'material_type' => (string)($payload['material_type'] ?? ''),
-        'task_intent' => (string)($payload['task_intent'] ?? ''),
-    ];
-    $checked = elevaro_teacher_ai_disambiguate_questions_before_review($analysis, [$candidate], (string)($payload['mode'] ?? 'quiz'));
-    if (!empty($checked[0])) {
-        $json['options'] = array_values((array)$checked[0]['options']);
-        $json['answer'] = (string)$checked[0]['answer'];
-        $json['explanation'] = (string)($checked[0]['explanation'] ?? $json['explanation']);
-        $json['_quality_checked'] = true;
-        $json['_quality_changed'] = !empty($checked[0]['_quality_changed']);
-        $json['_quality_reason'] = (string)($checked[0]['_quality_reason'] ?? '');
-    }
+    ]) : '';
 
+    $prompt = "Erstelle vier Multiple-Choice-Antworten für diese Frage.
+
+" .
+        "Kontext:
+- Fach: {$subject}
+- Sprache: {$language}
+
+" .
+        "Regeln:
+- Genau eine Antwort ist richtig.
+- Wenn mehrere Antworten möglich wären, wandle die falschen Optionen so ab, dass sie eindeutig falsch sind.
+- Füge keine Übersetzungen, Hinweise oder Kontextinformationen hinzu, wenn sie nicht bereits Teil der Aufgabe sind.
+- Erhalte Stil und Schwierigkeit der Aufgabe.
+
+" .
+        "Frage:
+{$question}
+" . $promptLibrary;
+
+    $result = elevaro_openai_chat_json([
+        ['role' => 'system', 'content' => 'Du bist Lehrer, Fachdidaktiker und Qualitätsprüfer. Erstelle plausible Multiple-Choice-Optionen. Antworte nur als JSON.'],
+        ['role' => 'user', 'content' => $prompt],
+    ], $schema, 0.25);
+    $json = $result['json'];
     elevaro_teacher_ai_json_response(['ok' => true, 'suggestion' => $json]);
 } catch (Throwable $e) {
     elevaro_teacher_ai_json_response(['ok' => false, 'error' => $e->getMessage()], 400);
