@@ -18,7 +18,7 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
 ?>
 <link href="/assets/css/teacher-ai-wizard.css" rel="stylesheet">
 
-<div class="ai-wizard" data-class-id="<?= (int)$classId ?>">
+<div class="ai-wizard" data-class-id="<?= (int)$classId ?>" data-subject-label="<?= teacher_h($subjectLabel) ?>">
   <div class="ai-wizard-hero">
     <div>
       <span class="ai-wizard-kicker">✨ Neuer Lehrer-Assistent</span>
@@ -198,18 +198,21 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
       </div>
       <h3>Elevaro baut dein Quiz</h3>
       <p id="aiWizardProgressText">Material wird gelesen und didaktisch sortiert...</p>
-      <div class="ai-route-card d-none" id="aiRouteCard">
-        <strong id="aiRouteHeadline">Material wird erkannt</strong>
-        <ul id="aiRouteSteps">
-          <li>Ich analysiere, ob es ein Lerntext oder ein Übungsformat ist.</li>
-        </ul>
+
+      <div class="ai-progress"><i id="aiWizardProgressBar"></i></div>
+
+      <div class="ai-stage-track" id="aiStageTrack" aria-label="KI-Fortschritt">
+        <span class="is-active" data-stage="source">📄 Quelle verstehen</span>
+        <span data-stage="material">🧠 Materialtyp erkennen</span>
+        <span data-stage="strategy">🧩 Strategie wählen</span>
+        <span data-stage="check">✅ Antworten prüfen</span>
       </div>
-      <div class="ai-progress"><i></i></div>
-      <div class="ai-progress-list">
-        <span data-loading-copy>📄 Quelle verstehen</span>
-        <span data-loading-copy>🧠 Materialtyp erkennen</span>
-        <span data-loading-copy>🧩 Aufgabenstrategie wählen</span>
-        <span data-loading-copy>✅ Antworten prüfen</span>
+
+      <div class="ai-progress-ticker" id="aiProgressTicker" aria-live="polite">
+        <strong id="aiTickerHeadline">Gerade läuft</strong>
+        <div class="ai-ticker-window">
+          <span id="aiTickerText">Ich lese die Quelle und übernehme nur Informationen, die später auch im Quiz sichtbar sind.</span>
+        </div>
       </div>
       <div id="aiWizardErrorBox" class="alert alert-danger d-none mt-4 text-start"></div>
     </div>

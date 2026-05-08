@@ -230,54 +230,120 @@
   $('#aiCurriculumTopicSelect')?.addEventListener('change', updateSubtopics);
 
 
-  const loadingTexts = [
-    'Material wird gelesen und strukturiert...',
-    'Die KI erkennt, ob es um Inhalte oder Übungen geht...',
-    'Lernziele werden herausgearbeitet...',
-    'Relevante Themen werden pädagogisch sortiert...',
-    'Fragen werden passend zum Aufgabentyp formuliert...',
-    'Antwortmöglichkeiten werden didaktisch geprüft...',
-    'Der Quizentwurf wird vorbereitet...'
-  ];
-  let loadingTimer = null;
-  function startLoadingCopy() {
-    let i = 0;
-    $('#aiWizardProgressText').textContent = loadingTexts[0];
-    setProgress(10, loadingTexts[0]);
-    loadingTimer = setInterval(() => {
-      i = (i + 1) % loadingTexts.length;
-      $('#aiWizardProgressText').textContent = loadingTexts[i];
-    }, 2300);
+  function getLoadingTexts() {
+    const subject = String(root.dataset.subjectLabel || '').toLowerCase();
+    const sourceKind = $('#aiWizardSourceKind')?.value || 'material';
+    const mode = document.querySelector('input[name="mode"]:checked')?.value || 'quiz';
+    const goal = document.querySelector('input[name="material_goal"]:checked')?.value || '';
+
+    if (mode === 'listening') {
+      return [
+        'Ich baue einen hörbaren Text mit altersgerechter Sprache…',
+        'Wortschatz, Tempo und Verständnisfragen werden abgeglichen…',
+        'Die Fragen werden so formuliert, dass sie ohne Bildkontext lösbar sind…',
+        'Antwortoptionen werden auf eindeutige Hörverständnis-Logik geprüft…'
+      ];
+    }
+
+    if (subject.includes('engl') || subject.includes('franz') || subject.includes('sprach') || goal === 'grammar' || goal === 'vocabulary') {
+      return [
+        'Ich erkenne Wortschatz, Grammatikmuster und Aufgabenmechanik…',
+        'Übersetzungen und Zusatzhinweise werden nur übernommen, wenn sie im Original vorkommen…',
+        'Bei Wortpaaren wird der Gesamtpool als Kontext berücksichtigt…',
+        'Distraktoren werden geprüft, ohne die Aufgabe unnötig einfacher zu machen…'
+      ];
+    }
+
+    if (subject.includes('math') || subject.includes('mathe')) {
+      return [
+        'Ich erkenne Rechenart, Einheiten und benötigte Zwischenschritte…',
+        'Ergebnisse und Antwortoptionen werden rechnerisch gegengeprüft…',
+        'Falsche Antworten orientieren sich an typischen Schülerfehlern…',
+        'Die Lösung wird eindeutig und ohne Ratespiel aufgebaut…'
+      ];
+    }
+
+    if (sourceKind === 'curriculum') {
+      return [
+        'Ich lese Lerninhalt, Klasse und Fach aus dem Lehrplan-Kontext…',
+        'Die Fragen werden nach Kompetenz und Schwierigkeit sortiert…',
+        'Der Quizentwurf wird auf eindeutige Antworten geprüft…',
+        'Erklärungen werden kurz und schülerverständlich formuliert…'
+      ];
+    }
+
+    return [
+      'Ich lese die Quelle und erkenne, was später sichtbar im Quiz stehen muss…',
+      'Materialtyp und Aufgabenlogik werden eingeordnet…',
+      'Fragen werden aus dem vorhandenen Kontext gebaut, nicht frei dazu erfunden…',
+      'Antwortoptionen und Erklärungen werden auf Eindeutigkeit geprüft…'
+    ];
   }
-  function stopLoadingCopy() { if (loadingTimer) clearInterval(loadingTimer); }
+
+  let loadingTimer = null;
+  let tickerTimer = null;
+
+  function setStage(activeStage) {
+    const order = ['source', 'material', 'strategy', 'check'];
+    const activeIndex = Math.max(0, order.indexOf(activeStage));
+    $$('#aiStageTrack [data-stage]').forEach(el => {
+      const index = order.indexOf(el.dataset.stage);
+      el.classList.toggle('is-done', index >= 0 && index < activeIndex);
+      el.classList.toggle('is-active', el.dataset.stage === activeStage);
+    });
+  }
+
+  function setTicker(headline, items) {
+    const headlineEl = $('#aiTickerHeadline');
+    const textEl = $('#aiTickerText');
+    const cleanItems = (items || []).filter(Boolean).map(v => String(v).trim()).filter(Boolean);
+    if (headlineEl && headline) headlineEl.textContent = headline;
+    if (!textEl || !cleanItems.length) return;
+
+    if (tickerTimer) clearInterval(tickerTimer);
+    let i = 0;
+    textEl.textContent = cleanItems[0];
+    textEl.classList.remove('is-changing');
+
+    if (cleanItems.length > 1) {
+      tickerTimer = setInterval(() => {
+        i = (i + 1) % cleanItems.length;
+        textEl.classList.add('is-changing');
+        setTimeout(() => {
+          textEl.textContent = cleanItems[i];
+          textEl.classList.remove('is-changing');
+        }, 150);
+      }, 2900);
+    }
+  }
+
+  function startLoadingCopy() {
+    const texts = getLoadingTexts();
+    let i = 0;
+    setProgress(10, texts[0]);
+    setTicker('Gerade läuft', texts);
+    if (loadingTimer) clearInterval(loadingTimer);
+    loadingTimer = setInterval(() => {
+      i = (i + 1) % texts.length;
+      setProgress(Math.min(82, 12 + i * 9), texts[i]);
+    }, 2600);
+  }
+
+  function stopLoadingCopy() {
+    if (loadingTimer) clearInterval(loadingTimer);
+    loadingTimer = null;
+  }
 
 
   function showAnalysisRoute(route) {
     if (!route) return;
-    const card = $('#aiRouteCard');
-    const headline = $('#aiRouteHeadline');
-    const steps = $('#aiRouteSteps');
-    if (!card || !headline || !steps) return;
-
-    headline.textContent = route.headline || 'Material erkannt';
-    steps.innerHTML = '';
-
-    (route.steps || []).forEach((stepText, index) => {
-      const li = document.createElement('li');
-      li.textContent = stepText;
-      li.style.animationDelay = `${index * 120}ms`;
-      steps.appendChild(li);
-    });
-
-    card.classList.remove('d-none');
-    card.dataset.route = route.route || 'general';
+    const headline = route.headline || 'Material erkannt';
+    const steps = route.steps || [];
+    setTicker(headline, steps.length ? steps : ['Die KI hat Materialtyp und Aufgabenstrategie erkannt.']);
   }
 
   function resetAnalysisRoute() {
-    const card = $('#aiRouteCard');
-    if (!card) return;
-    card.classList.add('d-none');
-    card.removeAttribute('data-route');
+    setTicker('Gerade läuft', getLoadingTexts());
   }
 
 
@@ -285,7 +351,9 @@
     const bar = document.querySelector('#aiWizardProgressBar');
     const labelEl = $('#aiWizardProgressText');
     const generatingCard = document.querySelector('.ai-generating-card');
-    const isPlausibility = String(label || '').toLowerCase().includes('plausibilität') || String(label || '').toLowerCase().includes('fachliche richtigkeit');
+    const labelText = String(label || '');
+    const lowerLabel = labelText.toLowerCase();
+    const isPlausibility = lowerLabel.includes('plausibilität') || lowerLabel.includes('fachliche richtigkeit') || lowerLabel.includes('antwort');
     if (generatingCard) generatingCard.classList.toggle('is-plausibility-check', isPlausibility);
     if (isPlausibility && loadingTimer) {
       clearInterval(loadingTimer);
@@ -297,6 +365,12 @@
       bar.style.transform = 'none';
       bar.style.width = safePercent + '%';
     }
+
+    if (safePercent < 25) setStage('source');
+    else if (safePercent < 50) setStage('material');
+    else if (safePercent < 88) setStage('strategy');
+    else setStage('check');
+
     if (labelEl && label) labelEl.textContent = label;
   }
 
