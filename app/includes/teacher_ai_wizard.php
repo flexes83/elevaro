@@ -874,6 +874,13 @@ function elevaro_teacher_ai_publish_draft(int $draftId, int $teacherId): int
     if (count($payload['questions']) < 1) throw new RuntimeException('Der Entwurf enthält keine Fragen.');
 
     $pdo = elevaro_teacher_ai_wizard_db();
+
+    // Wichtig: Schema-/DDL-Prüfungen müssen vor der Transaktion laufen.
+    // MySQL führt bei CREATE/ALTER TABLE einen impliziten COMMIT aus. Wenn das
+    // während der Veröffentlichungstransaktion passiert, wirft PDO später
+    // "There is no active transaction" beim commit().
+    elevaro_teacher_ai_split_ensure_schema();
+
     $pdo->beginTransaction();
     try {
         $subjectId = null;
@@ -1006,7 +1013,9 @@ function elevaro_teacher_ai_publish_draft(int $draftId, int $teacherId): int
         $pdo->prepare("UPDATE teacher_ai_quiz_drafts SET status = 'published', published_quiz_id = :quiz_id WHERE id = :id")
             ->execute(['quiz_id' => $quizId, 'id' => $draftId]);
 
-        $pdo->commit();
+        if ($pdo->inTransaction()) {
+            $pdo->commit();
+        }
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         throw $e;
@@ -1255,6 +1264,10 @@ if (!function_exists('elevaro_teacher_ai_questions_block_schema')) {
 if (!function_exists('elevaro_teacher_ai_split_ensure_schema')) {
     function elevaro_teacher_ai_split_ensure_schema(): void
     {
+        static $done = false;
+        if ($done) return;
+        $done = true;
+
         elevaro_teacher_ai_wizard_ensure_schema();
         elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'generation_step', "generation_step VARCHAR(60) NULL AFTER status");
         elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'analysis_json', "analysis_json LONGTEXT NULL AFTER generated_payload_json");
