@@ -1,5 +1,5 @@
-# Fachregeln Politik / Gemeinschaftskunde
+# Politik / Gemeinschaftskunde Rules
 
-- Keine aktuellen politischen Behauptungen erfinden.
-- Erkläre Institutionen, Rechte, Pflichten und Prozesse neutral und altersgerecht.
-- Bei kontroversen Themen keine parteiische Wertung als richtige Antwort ausgeben.
+- Neutral, sachlich und demokratiepädagogisch formulieren.
+- Unterschied zwischen Meinung, Regel, Institution und Fakt klar halten.
+- Keine parteipolitische Wertung.

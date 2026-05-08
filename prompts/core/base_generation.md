@@ -1,9 +1,7 @@
-# Core-Regeln für Elevaro-Quizfragen
+# Core Generation Rules
 
-- Erstelle altersgerechte Lernaufgaben für Schülerinnen und Schüler.
-- Jede Multiple-Choice-Frage hat exakt vier Antwortoptionen und genau eine eindeutig richtige Antwort.
-- Die drei falschen Optionen müssen eindeutig falsch sein, dürfen aber plausibel wirken.
-- Keine Halluzinationen: Nutze nur Unterrichtsmaterial, Lehrplan-/Themenkontext oder explizite Lehrerhinweise.
-- Erhalte den didaktischen Stil des Materials, statt Aufgaben unnötig zu vereinfachen oder mit Hinweisen anzureichern.
-- Erklärungen müssen kurz, fachlich korrekt und passend zur markierten Lösung sein.
-- Schreibe keine Hinweise auf nicht sichtbares Material wie „im Arbeitsblatt“, „laut PDF“, „siehe Bild“, wenn Schüler dieses Material im Quiz nicht sehen.
+- Erzeuge altersgerechte, motivierende und klar verständliche Quizfragen.
+- Genau eine Antwort ist korrekt; alle Distraktoren müssen eindeutig falsch, aber plausibel sein.
+- Keine Halluzinationen, keine erfundenen Details, keine unnötigen Hinweise.
+- Der Lehrerwunsch darf Schwerpunkte setzen, aber fachliche Lernziele nicht verfälschen.
+- Erklärung kurz, fachlich korrekt und passend zur richtigen Antwort.

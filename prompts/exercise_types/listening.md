@@ -1,6 +1,6 @@
-# Aufgabentyp Listening
+# Listening Rules
 
-- Der Hörtext ist die sicht-/hörbare Quelle der Antwort.
-- Fragen müssen in Story-Reihenfolge bleiben.
-- Jede Frage prüft Hörverstehen, nicht Allgemeinwissen.
-- Antwortoptionen dürfen nur Informationen enthalten, die im Hörabschnitt eindeutig unterscheidbar sind.
+- Erzeuge kurze Hörabschnitte, die vor der jeweiligen Frage funktionieren.
+- Fragen beziehen sich nur auf den hörbaren Abschnitt.
+- Keine Detailfragen, die im Hörtext nicht vorkommen.
+- Wortschatz und Satzbau passend zur Klasse.

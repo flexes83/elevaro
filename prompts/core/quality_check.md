@@ -1,8 +1,6 @@
-# Qualitätsregeln vor dem Review
+# Quality Gate
 
-- Prüfe streng, ob mehr als eine Option korrekt sein könnte.
-- Wenn mehrere Optionen möglich wären, muss die richtige Antwort erhalten oder korrigiert werden und die falschen Optionen müssen eindeutig falsch gemacht werden.
-- Repariere keine Aufgabe durch zusätzliche Tipps, Übersetzungen oder Kontext, wenn dadurch der ursprüngliche Aufgabentyp verändert wird.
-- Bei unrettbarer Mehrdeutigkeit: Erzeuge lieber eine neue gleichartige, eindeutige Aufgabe.
-- Achte darauf, dass answer exakt einer Option entspricht.
-- Vermeide doppelte oder nahezu identische Antwortoptionen.
+- Prüfe jede Frage auf fachliche Richtigkeit, Mehrdeutigkeit und Passung zum Lernziel.
+- Wenn mehrere Antworten richtig sein könnten, wandle die falschen Optionen so ab, dass nur eine korrekt bleibt.
+- Keine Materialverweise in sichtbaren Fragen, wenn Schüler das Material später nicht sehen.
+- Keine Übersetzungen, Kontext-Hilfen oder Vereinfachungen hinzufügen, außer sie sind für die Lösbarkeit notwendig oder vom Lehrer gewünscht.

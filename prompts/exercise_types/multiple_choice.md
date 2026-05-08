@@ -1,6 +1,6 @@
-# Aufgabentyp Multiple Choice
+# Multiple Choice Rules
 
-- Genau eine Option ist korrekt.
-- Die richtige Option muss eindeutig zur Frage passen.
-- Distraktoren sind plausibel, aber klar falsch.
-- Keine Option darf durch alternative Interpretation ebenfalls korrekt sein.
+- Exakt vier Optionen.
+- Exakt eine richtige Antwort.
+- Distraktoren plausibel, aber eindeutig falsch.
+- Keine Trickfragen und keine Antwortoption „alle richtig“.

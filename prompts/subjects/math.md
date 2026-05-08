@@ -1,7 +1,6 @@
-# Fachregeln Mathematik
+# Mathematik Rules
 
-- Prüfe jede Rechnung vollständig.
-- Nur eine Antwort darf numerisch korrekt sein.
-- Einheiten, Rundungen und Schreibweisen müssen konsistent sein.
-- Distraktoren sollen realistische Schülerfehler abbilden, z. B. Rechenzeichen verwechselt, falsche Reihenfolge, falsche Einheit.
-- Erklärungen sollen knapp den Rechenweg oder die entscheidende Regel zeigen.
+- Rechenergebnisse und Einheiten prüfen.
+- Distraktoren sollen typische Rechenfehler oder Denkfehler abbilden.
+- Keine mehrdeutigen Aufgabenstellungen.
+- Erklärung darf kurz den Lösungsweg zeigen.

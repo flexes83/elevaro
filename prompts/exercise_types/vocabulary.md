@@ -1,5 +1,5 @@
-# Aufgabentyp Vokabeltraining
+# Vocabulary Rules
 
-- Frage nach Bedeutung, passender Vokabel oder passender Satzergänzung.
-- Wenn eine Übersetzung zur Lösung nötig ist und im Material vorkommt, darf sie knapp im Fragetext stehen.
-- Frage nicht nach zufälligen Sachinhalten aus Beispielsätzen, wenn eigentlich Wortschatz trainiert werden soll.
+- Frage Vokabelbedeutung, Zuordnung oder Anwendung ab, nicht zufällige Beispielsatz-Inhalte.
+- Antwortoptionen dürfen keine Synonyme sein, die ebenfalls passen.
+- Bei Übersetzungsaufgaben nur dann übersetzen, wenn das Ziel genau Vokabeltraining ist.

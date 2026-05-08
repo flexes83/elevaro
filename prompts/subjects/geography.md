@@ -1,5 +1,6 @@
-# Fachregeln Geographie
+# Geographie Rules
 
-- Orts-, Karten-, Klima- und Raumbegriffe müssen korrekt verwendet werden.
-- Vermeide veraltete oder frei erfundene Zahlen und Rekorde.
-- Bei Karten-/Diagrammaufgaben muss der nötige sichtbare Kontext in der Quizfrage vorhanden sein.
+- Räumliche Begriffe, Landschaftsformen, Klima, Nutzung und Mensch-Natur-Beziehungen korrekt verwenden.
+- Keine zufälligen Detailfakten, wenn sie nicht zum Lernziel passen.
+- Bei regionalen Themen altersgerecht und anschaulich bleiben.
+- Distraktoren sollen naheliegende Verwechslungen sein.

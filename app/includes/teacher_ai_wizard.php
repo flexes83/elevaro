@@ -102,7 +102,6 @@ function elevaro_teacher_ai_debug_dump_response(string $stage, string $content, 
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/openai_client.php';
-require_once __DIR__ . '/prompt_library.php';
 require_once __DIR__ . '/image_tools.php';
 require_once __DIR__ . '/elevenlabs_client.php';
 
@@ -875,13 +874,6 @@ function elevaro_teacher_ai_publish_draft(int $draftId, int $teacherId): int
     if (count($payload['questions']) < 1) throw new RuntimeException('Der Entwurf enthält keine Fragen.');
 
     $pdo = elevaro_teacher_ai_wizard_db();
-
-    // Wichtig: Schema-/Migration-Checks muessen VOR der Transaction laufen.
-    // MySQL beendet Transactions bei CREATE/ALTER TABLE implizit. Wenn so ein
-    // DDL-Statement innerhalb des Publish-Flows laeuft, ist beim spaeteren
-    // commit() keine aktive Transaction mehr vorhanden.
-    elevaro_teacher_ai_split_ensure_schema();
-
     $pdo->beginTransaction();
     try {
         $subjectId = null;
@@ -1014,14 +1006,7 @@ function elevaro_teacher_ai_publish_draft(int $draftId, int $teacherId): int
         $pdo->prepare("UPDATE teacher_ai_quiz_drafts SET status = 'published', published_quiz_id = :quiz_id WHERE id = :id")
             ->execute(['quiz_id' => $quizId, 'id' => $draftId]);
 
-        if ($pdo->inTransaction()) {
-            $pdo->commit();
-        } else {
-            // Sollte nach dem Vorab-Schema-Check nicht mehr passieren. Falls doch,
-            // ist die DB-Arbeit durch ein implizites MySQL-COMMIT bereits beendet;
-            // wir vermeiden hier den fatalen Fehler "There is no active transaction".
-            error_log('[Elevaro AI Wizard] Publish transaction was already closed before commit for draft ' . $draftId . ', quiz ' . $quizId);
-        }
+        $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         throw $e;
@@ -1270,12 +1255,6 @@ if (!function_exists('elevaro_teacher_ai_questions_block_schema')) {
 if (!function_exists('elevaro_teacher_ai_split_ensure_schema')) {
     function elevaro_teacher_ai_split_ensure_schema(): void
     {
-        static $done = false;
-        if ($done) {
-            return;
-        }
-        $done = true;
-
         elevaro_teacher_ai_wizard_ensure_schema();
         elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'generation_step', "generation_step VARCHAR(60) NULL AFTER status");
         elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'analysis_json', "analysis_json LONGTEXT NULL AFTER generated_payload_json");
@@ -1432,6 +1411,78 @@ if (!function_exists('elevaro_teacher_ai_curriculum_prompt_block')) {
         if ($keywords) $lines[]='- Keywords: '.implode(', ', array_slice($keywords,0,18));
         if ($aliases) $lines[]='- Aliasbegriffe: '.implode(', ', array_slice($aliases,0,12));
         return implode("\n",$lines);
+    }
+}
+
+
+if (!function_exists('elevaro_teacher_ai_prompt_root')) {
+    function elevaro_teacher_ai_prompt_root(): string
+    {
+        return dirname(__DIR__, 2) . '/prompts';
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_prompt_file')) {
+    function elevaro_teacher_ai_prompt_file(string $relativePath): string
+    {
+        $file = elevaro_teacher_ai_prompt_root() . '/' . ltrim($relativePath, '/');
+        return is_file($file) ? trim((string)file_get_contents($file)) : '';
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_subject_prompt_key')) {
+    function elevaro_teacher_ai_subject_prompt_key(array $class): string
+    {
+        $raw = strtolower(trim((string)($class['subject_code'] ?? $class['subject'] ?? '')));
+        $map = [
+            'englisch' => 'english', 'english' => 'english', 'en' => 'english',
+            'deutsch' => 'german', 'german' => 'german', 'de' => 'german',
+            'mathematik' => 'math', 'mathe' => 'math', 'math' => 'math', 'ma' => 'math',
+            'geographie' => 'geography', 'geografie' => 'geography', 'erdkunde' => 'geography', 'geo' => 'geography',
+            'biologie' => 'biology', 'bio' => 'biology',
+            'geschichte' => 'history', 'history' => 'history',
+            'gemeinschaftskunde' => 'politics', 'politik' => 'politics', 'politics' => 'politics',
+            'physik' => 'science', 'chemie' => 'science', 'naturwissenschaften' => 'science', 'bnt' => 'science',
+        ];
+        return $map[$raw] ?? preg_replace('/[^a-z0-9_-]+/', '_', $raw ?: 'general');
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_exercise_prompt_key')) {
+    function elevaro_teacher_ai_exercise_prompt_key(string $mode, array $analysis = []): string
+    {
+        if ($mode === 'listening') return 'listening';
+        $materialType = (string)($analysis['material_type'] ?? '');
+        $taskIntent = (string)($analysis['task_intent'] ?? '');
+        if ($materialType === 'grammar_exercise' || $taskIntent === 'grammar_training') return 'grammar_cloze';
+        if ($materialType === 'vocabulary_list' || $taskIntent === 'vocabulary_training') return 'vocabulary';
+        if (($analysis['content_mode'] ?? '') === 'context_dependent_exercises') return 'context_dependent';
+        return 'multiple_choice';
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_prompt_library_block')) {
+    function elevaro_teacher_ai_prompt_library_block(array $class, string $sourceKind, string $mode, array $analysis = []): string
+    {
+        $subjectKey = elevaro_teacher_ai_subject_prompt_key($class);
+        $exerciseKey = elevaro_teacher_ai_exercise_prompt_key($mode, $analysis);
+        $parts = array_filter([
+            elevaro_teacher_ai_prompt_file('core/base_generation.md'),
+            elevaro_teacher_ai_prompt_file('modes/' . ($sourceKind === 'curriculum' ? 'curriculum_generation' : 'material_analysis') . '.md'),
+            elevaro_teacher_ai_prompt_file('subjects/' . $subjectKey . '.md') ?: elevaro_teacher_ai_prompt_file('subjects/general.md'),
+            elevaro_teacher_ai_prompt_file('exercise_types/' . $exerciseKey . '.md') ?: elevaro_teacher_ai_prompt_file('exercise_types/multiple_choice.md'),
+            elevaro_teacher_ai_prompt_file('core/quality_check.md'),
+        ]);
+
+        return $parts ? "
+
+PROMPT-BIBLIOTHEK / FACHDIDAKTISCHE REGELN:
+" . implode("
+
+---
+
+", $parts) . "
+" : '';
     }
 }
 
@@ -1675,7 +1726,7 @@ if (!function_exists('elevaro_teacher_ai_listening_story_instruction')) {
 
 
 if (!function_exists('elevaro_teacher_ai_split_build_analysis_prompt')) {
-    function elevaro_teacher_ai_split_build_analysis_prompt(array $class, string $mode, string $sourceText, string $extraPrompt, array $files): string
+    function elevaro_teacher_ai_split_build_analysis_prompt(array $class, string $mode, string $sourceText, string $extraPrompt, array $files, string $sourceKind = 'material'): string
     {
         $subject = elevaro_teacher_ai_subject_label($class['subject_code'] ?? '');
         $grade = (string)($class['grade'] ?? '');
@@ -1683,12 +1734,31 @@ if (!function_exists('elevaro_teacher_ai_split_build_analysis_prompt')) {
         $school = (string)($class['school_type_code'] ?? '');
         $language = elevaro_teacher_ai_language_for_class($class, $mode);
         $fileList = array_map(static fn($file) => '- ' . (string)($file['original_name'] ?? 'Material') . ' (' . (string)($file['mime'] ?? 'Datei') . ')', $files);
-        $promptLibrary = function_exists('elevaro_prompt_library_build') ? elevaro_prompt_library_build([
-            'stage' => 'analysis',
-            'mode' => $mode,
-            'subject_code' => (string)($class['subject_code'] ?? ''),
-            'subject_label' => $subject,
-        ]) : '';
+        $libraryRules = elevaro_teacher_ai_prompt_library_block($class, $sourceKind, $mode);
+
+        if ($sourceKind === 'curriculum') {
+            return trim("Erstelle die Planungsanalyse für einen Elevaro-KI-Quiz-Wizard im CURRICULUM-MODUS. Es wurde KEIN Unterrichtsmaterial hochgeladen. Grundlage sind ausschließlich Klassenkontext, ausgewählter Lehrplaninhalt/Lernziele und der Lehrerwunsch.\n\n" .
+                "Klassenkontext:\n- Klasse: {$grade}\n- Schulart/Level: {$school} / {$level}\n- Fach: {$subject}\n- Modus: " . ($mode === 'listening' ? 'Listening + Comprehension' : 'normales Multiple-Choice-Quiz') . "\n- Erwartete Sprache der Fragen: {$language}\n\n" .
+                "Verbindlicher Lehrplan-/Lernzielblock plus benutzerdefinierter Lehrerwunsch:\n" . ($sourceText !== '' ? $sourceText : '[Kein Lerninhalt übergeben.]') . "\n\n" .
+                "Zusatzregeln / Systemkontext:\n" . ($extraPrompt !== '' ? $extraPrompt : '[Keine Zusatzanweisung.]') . "\n" .
+                $libraryRules . "\n" .
+                "Aufgabe für diesen Schritt: Erstelle KEINE fertigen Fragen. Erstelle eine didaktische Planungsanalyse für das spätere Quiz.\n\n" .
+                "Wichtige Regeln für Curriculum-Modus:\n" .
+                "- Behandle den learning_goal aus curriculum_topic_topics bzw. curriculum_topic_subtopics als verbindliches Lernziel.\n" .
+                "- Der benutzerdefinierte Prompt des Lehrers darf Schwerpunkte setzen, darf das Lernziel aber nicht verfälschen.\n" .
+                "- material_type = mixed, task_intent = quiz_about_content, content_mode = content_source, requires_visible_context = false.\n" .
+                "- Keine Formulierungen wie 'im Material', 'im Arbeitsblatt', 'auf der Quelle', weil kein Material hochgeladen wurde.\n" .
+                "- Erzeuge eine content_map aus den Lernzielen, Unterthemen, Keywords und dem Lehrerwunsch.\n" .
+                "- Die spätere Fragenplanung soll lehrplannah, altersgerecht, fachlich korrekt und abwechslungsreich sein.\n" .
+                "- Keine Wikipedia-Zufallsfakten, sondern Fragen, die direkt auf die angegebenen Lernziele einzahlen.\n\n" .
+                "Zielumfang: " . elevaro_teacher_ai_target_question_count($mode) . " Fragen insgesamt. Bei normalen Quizzen 15 Fragen in 3 Blöcken à 5 Fragen. Bei Listening 5 Fragen mit je einem kurzen Hörabschnitt.\n" .
+                ($mode === 'listening'
+                    ? elevaro_teacher_ai_listening_story_instruction(elevaro_teacher_ai_target_question_count($mode)) . "Plane 5 Hörabschnitte passend zum Lernziel. listening_text ist nur eine kurze Gesamtzusammenfassung.\n"
+                    : "Erstelle eine belastbare question_plan für 3 Blöcke: leicht, mittel, anspruchsvoller. Jeder Block soll andere Aspekte der content_map abdecken.\n") .
+                "description ist eine kurze, motivierende Quizbeschreibung für Schülerinnen und Schüler.\n" .
+                "image_prompt beschreibt ein passendes modernes Elevaro-Quizbild zum Thema, nicht ein Arbeitsblatt.\n" .
+                "Liefere ausschließlich valides JSON nach Schema.");
+        }
 
         return trim("Analysiere die Quelle für einen Elevaro-KI-Quiz-Wizard. Die Quelle kann hochgeladenes Unterrichtsmaterial oder ein ausgewähltes Lerninhalt sein.\n\n" .
             "Klassenkontext:\n- Klasse: {$grade}\n- Schulart/Level: {$school} / {$level}\n- Fach: {$subject}\n- Modus: " . ($mode === 'listening' ? 'Listening + Comprehension' : 'normales Multiple-Choice-Quiz') . "\n- Erwartete Sprache der Fragen: {$language}\n\n" .
@@ -1710,13 +1780,12 @@ if (!function_exists('elevaro_teacher_ai_split_build_analysis_prompt')) {
             "description ist eine kurze, motivierende Quizbeschreibung für Schülerinnen und Schüler, keine Beschreibung der hochgeladenen Quelle.\n" .
             "image_prompt beschreibt ein passendes Elevaro-Quizbild im bestehenden modernen, freundlichen, spielerisch-edukativen Stil für die Zielgruppe; beschreibe NICHT das PDF, Arbeitsblatt oder Handschriften.\n" .
             "Der Klassenkontext darf Niveau und Sprache steuern, aber keine Fakten ergänzen. Wenn Inhalte unleserlich sind, benenne das offen.\n" .
-            "Bei Listening: Erstelle keinen langen Sprechertext für das ganze Quiz, sondern nutze listening_segments als Story-/Abschnittsplan. Erzeuge einen neuen, passenden Hörtext ähnlich zum Thema/Wortschatz des Materials oder Lerninhalts; die Fragen beziehen sich auf diesen neuen Hörtext. listening_text darf nur eine kurze Zusammenfassung der Story sein." .
-            $promptLibrary);
+            "Bei Listening: Erstelle keinen langen Sprechertext für das ganze Quiz, sondern nutze listening_segments als Story-/Abschnittsplan. Erzeuge einen neuen, passenden Hörtext ähnlich zum Thema/Wortschatz des Materials oder Lerninhalts; die Fragen beziehen sich auf diesen neuen Hörtext. listening_text darf nur eine kurze Zusammenfassung der Story sein.");
     }
 }
 
 if (!function_exists('elevaro_teacher_ai_split_build_questions_prompt')) {
-    function elevaro_teacher_ai_split_build_questions_prompt(array $class, array $analysis, int $blockIndex, int $blockSize, string $mode, string $sourceText, string $extraPrompt, array $existingQuestions): string
+    function elevaro_teacher_ai_split_build_questions_prompt(array $class, array $analysis, int $blockIndex, int $blockSize, string $mode, string $sourceText, string $extraPrompt, array $existingQuestions, string $sourceKind = 'material'): string
     {
         $start = $blockIndex * $blockSize + 1;
         $end = $start + $blockSize - 1;
@@ -1732,13 +1801,18 @@ if (!function_exists('elevaro_teacher_ai_split_build_questions_prompt')) {
         }
         if ($focus === '') $focus = '- Nutze content_map, Analyse und Originalmaterial für diesen Block.\n';
 
-        $subject = elevaro_teacher_ai_subject_label($class['subject_code'] ?? '');
 
         $contentMode = (string)($analysis['content_mode'] ?? '');
         $generationStrategy = (string)($analysis['generation_strategy'] ?? '');
         $requiresVisibleContext = !empty($analysis['requires_visible_context']);
+        $libraryRules = elevaro_teacher_ai_prompt_library_block($class, $sourceKind, $mode, $analysis);
         $contextRules = "\nKONTEXTBEWUSSTE GENERIERUNGSSTRATEGIE:\n";
-        if ($mode === 'listening') {
+        if ($sourceKind === 'curriculum') {
+            $contextRules .= "- Curriculum-Modus: Es gibt kein hochgeladenes Material. Nutze ausschließlich Klassenkontext, Lernzielblock, content_map, Frageplanung und Lehrerwunsch.\n";
+            $contextRules .= "- Jede Frage muss direkt auf die learning_goals aus Thema/Unterthema oder den Lehrerwunsch einzahlen.\n";
+            $contextRules .= "- Schreibe keine Materialverweise wie 'im Material', 'im Arbeitsblatt', 'in der Quelle'.\n";
+            $contextRules .= "- Erzeuge abwechslungsreiche, lehrplanorientierte Multiple-Choice-Fragen mit plausiblen Distraktoren.\n";
+        } elseif ($mode === 'listening') {
             $contextRules .= "- Erstelle einen neuen passenden Hörtext. Material/Lerninhalt liefert Thema, Wortschatz, Niveau und Kontext; Fragen beziehen sich auf den Hörtext.\n";
         } elseif ($contentMode === 'content_source' || $generationStrategy === 'content_questions') {
             $contextRules .= "- Der hochgeladene Inhalt ist Lernstoff. Stelle Fragen zum tatsächlichen Inhalt. Der Stoff wird als gelernt vorausgesetzt.\n";
@@ -1787,19 +1861,6 @@ if (!function_exists('elevaro_teacher_ai_split_build_questions_prompt')) {
                 "- Erstelle gern neue, gleichartige Beispielsätze, damit nicht nur die Lösungen des Arbeitsblatts abgefragt werden.\n";
         }
 
-        $promptLibrary = function_exists('elevaro_prompt_library_build') ? elevaro_prompt_library_build([
-            'stage' => 'questions',
-            'mode' => $mode,
-            'subject_code' => (string)($class['subject_code'] ?? ''),
-            'subject_label' => $subject,
-            'material_type' => $materialType,
-            'task_intent' => $taskIntent,
-            'content_mode' => $contentMode,
-            'generation_strategy' => $generationStrategy,
-            'detected_skills' => $analysis['detected_skills'] ?? [],
-            'topics' => $analysis['topics'] ?? [],
-        ]) : '';
-
         return trim("Erstelle Fragen {$start} bis {$end} für ein Elevaro-Schülerquiz.\n\n" .
             "Sprache der sichtbaren Fragen: {$language}\n" .
             "Modus: {$mode}\n" .
@@ -1816,8 +1877,7 @@ if (!function_exists('elevaro_teacher_ai_split_build_questions_prompt')) {
                 ? "Die Listening-Fragen sollen in Story-Reihenfolge bleiben und nicht zufällig gemischt werden. "
                 : "Die Schwierigkeit soll über alle 3 Blöcke sanft ansteigen: Block 1 eher leicht, Block 2 mittel, Block 3 etwas anspruchsvoller. ") .
             "Decke in diesem Block den angegebenen Fokus ab und vermeide Wiederholungen. " .
-            "Wichtig: In Frage, Antwortoptionen und Erklärung dürfen keine Materialverweise stehen wie 'laut Mindmap', 'im Arbeitsblatt', 'auf der Seite', 'in der Quelle', 'im Material' oder ähnliche Formulierungen, weil Schülerinnen und Schüler das Material später nicht sehen. source_reference darf intern knapp bleiben." .
-            $promptLibrary);
+            "Wichtig: In Frage, Antwortoptionen und Erklärung dürfen keine Materialverweise stehen wie 'laut Mindmap', 'im Arbeitsblatt', 'auf der Seite', 'in der Quelle', 'im Material' oder ähnliche Formulierungen, weil Schülerinnen und Schüler das Material später nicht sehen. source_reference darf intern knapp bleiben.");
     }
 }
 
@@ -1898,18 +1958,6 @@ if (!function_exists('elevaro_teacher_ai_build_plausibility_prompt')) {
             'question_plan' => $analysis['question_plan'] ?? [],
         ];
 
-        $promptLibrary = function_exists('elevaro_prompt_library_build') ? elevaro_prompt_library_build([
-            'stage' => 'plausibility',
-            'mode' => $mode,
-            'subject_label' => (string)($analysis['subject'] ?? $analysis['subject_label'] ?? ''),
-            'material_type' => (string)($analysis['material_type'] ?? ''),
-            'task_intent' => (string)($analysis['task_intent'] ?? ''),
-            'content_mode' => (string)($analysis['content_mode'] ?? ''),
-            'generation_strategy' => (string)($analysis['generation_strategy'] ?? ''),
-            'detected_skills' => $analysis['detected_skills'] ?? [],
-            'topics' => $analysis['topics'] ?? [],
-        ]) : '';
-
         return trim("Prüfe diesen Elevaro-Quizentwurf abschließend kurz und fachlich.\n\n" .
             "Modus: {$mode}\n\n" .
             "Verbindliche Inhaltslandkarte aus dem Unterrichtsmaterial:\n" . json_encode($compactAnalysis, JSON_UNESCAPED_UNICODE) . "\n\n" .
@@ -1919,8 +1967,7 @@ if (!function_exists('elevaro_teacher_ai_build_plausibility_prompt')) {
             "2. Markiere nur echte Probleme: nicht ableitbar, fachlich falsch, mehrdeutig, doppelt oder zu schwer/zu leicht.\n" .
             "3. Achte auf sichtbare Materialverweise wie 'laut Mindmap', 'im Arbeitsblatt', 'auf der Seite', 'im Material' oder 'in der Quelle'. Schüler sehen das Material später nicht.\n" .
             "4. Wenn material_type ein Arbeitsblatt, eine Grammatikübung oder Vokabelliste ist: Prüfe, ob die Fragen das Lernziel trainieren und nicht zufällige Beispielsatz-Inhalte abfragen oder unnötig übersetzen.\n" .
-            "5. Gib nur kurze Lehrerhinweise und Issues zurück. Schreibe NICHT alle Fragen neu aus. Liefere ausschließlich valides JSON." .
-            $promptLibrary);
+            "5. Gib nur kurze Lehrerhinweise und Issues zurück. Schreibe NICHT alle Fragen neu aus. Liefere ausschließlich valides JSON.");
     }
 }
 
@@ -2119,7 +2166,7 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
 
         try {
             if (!is_array($analysis)) {
-                $prompt = elevaro_teacher_ai_split_build_analysis_prompt($class, $mode, $sourceText, $extraPrompt, $files);
+                $prompt = elevaro_teacher_ai_split_build_analysis_prompt($class, $mode, $sourceText, $extraPrompt, $files, (string)($draft['source_kind'] ?? 'material'));
                 $content = [['type' => 'input_text', 'text' => $prompt]];
                 $content = array_merge($content, elevaro_teacher_ai_responses_content_for_material($files));
                 $system = 'Du bist ein erfahrener Lehrer und Fachdidaktiker. Analysiere Unterrichtsmaterial quellengebunden. Keine Fantasieinhalte. Liefere ausschließlich valides JSON nach Schema.';
@@ -2150,7 +2197,7 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
             $targetBlocks = elevaro_teacher_ai_generation_block_count($mode);
             if (count($blocks) < $targetBlocks) {
                 $blockIndex = count($blocks);
-                $prompt = elevaro_teacher_ai_split_build_questions_prompt($class, $analysis, $blockIndex, $blockSize, $mode, $sourceText, $extraPrompt, $allQuestions);
+                $prompt = elevaro_teacher_ai_split_build_questions_prompt($class, $analysis, $blockIndex, $blockSize, $mode, $sourceText, $extraPrompt, $allQuestions, (string)($draft['source_kind'] ?? 'material'));
                 $content = [['type' => 'input_text', 'text' => $prompt]];
                 $content = array_merge($content, elevaro_teacher_ai_responses_content_for_material($files));
                 $system = 'Du bist ein präziser Quizautor. Erzeuge ausschließlich valides JSON. Jede Frage muss quellengebunden aus dem Material ableitbar sein. Keine Wiederholungen.';

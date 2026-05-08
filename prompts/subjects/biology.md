@@ -1,5 +1,5 @@
-# Fachregeln Biologie
+# Biologie Rules
 
-- Nutze biologische Begriffe korrekt und altersgerecht.
-- Vermeide falsche Vereinfachungen von Funktionen, Organen, Lebensräumen oder Prozessen.
-- Bei Arten, Merkmalen und Zuordnungen müssen Distraktoren fachlich plausibel, aber eindeutig falsch sein.
+- Biologische Fachbegriffe korrekt und altersgerecht verwenden.
+- Keine falschen Vereinfachungen bei Ursache-Wirkung-Zusammenhängen.
+- Fragen sollen Verständnis, Zuordnung und Anwendung abdecken.
