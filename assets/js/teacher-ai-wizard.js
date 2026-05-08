@@ -767,12 +767,19 @@
       const routePayload = route || {};
       if (isCurriculum) {
         headline.textContent = 'Lernziel-Fokus';
-        const plans = (state.analysis.question_plan || []).slice(0, 3);
-        steps.innerHTML = `
-          <li class="ai-focus-item is-primary"><span>🎯</span><div><strong>${escapeHtml(ctx.focusTitle)}</strong><small>${escapeHtml(ctx.learningGoal)}</small></div></li>
-          ${ctx.keywords.length ? `<li class="ai-focus-item"><span>🏷️</span><div><strong>Fokusbegriffe</strong><small>${escapeHtml(ctx.keywords.slice(0, 6).join(', '))}</small></div></li>` : ''}
-          ${plans.map((plan, idx) => `<li class="ai-focus-item"><span>${idx + 1}</span><div><strong>Block ${idx + 1}: ${escapeHtml(plan.difficulty || ['leicht','mittel','anspruchsvoller'][idx] || '')}</strong><small>${escapeHtml(plan.focus || 'Fragen passend zum aktiven Lernziel')}</small></div></li>`).join('')}
-        `;
+        const teacherNote = ($('#aiExtraPrompt')?.value || '').trim();
+        const focusRows = [
+          { icon: '🎯', title: ctx.focusTitle, text: ctx.learningGoal, primary: true },
+          ctx.topicTitle && ctx.topicTitle !== ctx.focusTitle ? { icon: '🧭', title: 'Kontext', text: ctx.topicTitle } : null,
+          ctx.keywords.length ? { icon: '🏷️', title: 'Fokusbegriffe', text: ctx.keywords.slice(0, 6).join(', ') } : null,
+          teacherNote ? { icon: '✍️', title: 'Lehrerwunsch', text: teacherNote.slice(0, 180) } : null,
+          { icon: '✨', title: 'Fragenaufbau', text: 'Leicht einsteigen, dann Merkmale und Begriffe sicher festigen.' }
+        ].filter(Boolean);
+        steps.innerHTML = focusRows.map(row => `
+          <li class="ai-focus-item ${row.primary ? 'is-primary' : ''}">
+            <span>${escapeHtml(row.icon)}</span>
+            <div><strong>${escapeHtml(row.title)}</strong><small>${escapeHtml(row.text)}</small></div>
+          </li>`).join('');
       } else {
         headline.textContent = routePayload.headline || 'Analyse prüfen';
         steps.innerHTML = '';
@@ -988,19 +995,56 @@
     return String(s || '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
   }
 
-  $('#aiAddQuestion')?.addEventListener('click', () => {
+  function appendBlankQuestion(initialQuestion = '') {
     const box = $('#aiQuestionEditor');
-    box.appendChild(questionCard({ question: '', options: ['', '', '', ''], answer: '', explanation: '', difficulty: 0.35 }, $$('.ai-question-card').length));
+    const card = questionCard({ question: initialQuestion, options: ['', '', '', ''], answer: '', explanation: '', difficulty: 0.35 }, $$('.ai-question-card').length);
+    box.appendChild(card);
+    renumber();
+    return card;
+  }
+
+  $('#aiAddQuestion')?.addEventListener('click', () => {
+    const card = appendBlankQuestion('');
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    $('.ai-question-text', card)?.focus();
   });
 
-  async function suggestOptions(card) {
+  $('#aiBuildCustomQuestion')?.addEventListener('click', async () => {
+    const textarea = $('#aiCustomQuestionInput');
+    const rawQuestion = (textarea?.value || '').trim();
+    if (!rawQuestion) {
+      toast('Bitte zuerst eine grobe Frage eingeben.');
+      textarea?.focus();
+      return;
+    }
+    const btn = $('#aiBuildCustomQuestion');
+    const oldText = btn ? btn.textContent : '';
+    try {
+      if (btn) { btn.disabled = true; btn.textContent = '✨ Elevaro formuliert...'; }
+      const card = appendBlankQuestion(rawQuestion);
+      card.classList.add('is-new-question');
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      await suggestOptions(card, { button: btn, resetButtonText: oldText || '✨ Frage ausarbeiten', keepButtonState: true });
+      if (textarea) textarea.value = '';
+      toast('Frage wurde ergänzt. Du kannst sie unten noch anpassen.');
+    } catch (err) {
+      toast(err.message || String(err));
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = oldText || '✨ Frage ausarbeiten'; }
+    }
+  });
+
+  async function suggestOptions(card, optsArg = {}) {
+    const btn = optsArg.button || $('.ai-suggest-options', card);
     try {
       readPayload();
       const question = $('.ai-question-text', card).value.trim();
-      const btn = $('.ai-suggest-options', card);
-      btn.disabled = true; btn.textContent = 'KI denkt...';
+      if (!question) throw new Error('Bitte zuerst eine Frage eingeben.');
+      if (btn && !optsArg.keepButtonState) { btn.disabled = true; btn.textContent = 'KI denkt...'; }
       const res = await apiJson('/teacher/api/ai_wizard_suggest_options.php', { draft_id: Number(state.draftId || 0), question });
       const suggestion = res.suggestion || {};
+      const cleanQuestion = (suggestion.question || '').trim();
+      if (cleanQuestion) $('.ai-question-text', card).value = cleanQuestion;
       const opts = suggestion.options || [];
       $$('.ai-option-text', card).forEach((input, i) => { input.value = opts[i] || ''; });
       $('.ai-question-explanation', card).value = suggestion.explanation || '';
@@ -1010,10 +1054,12 @@
         if (radio) radio.checked = true;
       }
     } catch (err) {
-      toast(err.message || String(err));
+      if (!optsArg.button) toast(err.message || String(err));
+      else throw err;
     } finally {
-      const btn = $('.ai-suggest-options', card);
-      btn.disabled = false; btn.textContent = '✨ 4 Antworten vorschlagen';
+      if (btn && !optsArg.keepButtonState) {
+        btn.disabled = false; btn.textContent = '✨ 4 Antworten vorschlagen';
+      }
     }
   }
 
