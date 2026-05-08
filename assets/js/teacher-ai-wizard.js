@@ -2,7 +2,7 @@
   const root = document.querySelector('.ai-wizard');
   if (!root) return;
 
-  let state = { draftId: null, payload: null, imagePath: null, analysis: null, analysisRoute: null, debugPrompt: '' };
+  let state = { draftId: null, payload: null, imagePath: null, analysis: null, analysisRoute: null, debugPrompt: '', debugMeta: null };
   const $ = (sel, ctx = document) => ctx.querySelector(sel);
   const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
 
@@ -182,8 +182,6 @@
       loadCurriculumTopics();
     }
     updateExtraPromptPlaceholder();
-    updateLoadingStageLabels();
-    updateAnalysisModeLabels();
   }
 
   async function loadCurriculumTopics() {
@@ -231,93 +229,24 @@
   $$('.ai-source-kind-card input').forEach(input => input.addEventListener('change', () => updateSourceKind(input.value)));
   $('#aiCurriculumTopicSelect')?.addEventListener('change', updateSubtopics);
 
-  function currentWizardSourceKind() {
-    return $('#aiWizardSourceKind')?.value || 'material';
-  }
 
-  function selectedCurriculumNames() {
-    const topicSelect = $('#aiCurriculumTopicSelect');
-    const subtopicSelect = $('#aiCurriculumSubtopicSelect');
-    const topic = topicSelect?.selectedOptions?.[0]?.textContent?.trim() || '';
-    const subtopic = subtopicSelect?.selectedOptions?.[0]?.textContent?.trim() || '';
-    return {
-      topic: topic && !topic.includes('Bitte') && !topic.includes('Themen werden') ? topic : '',
-      subtopic: subtopic && !subtopic.includes('Ganzes Thema') ? subtopic : ''
-    };
-  }
-
-  function curriculumTickerTexts() {
-    const names = selectedCurriculumNames();
-    const items = [];
-    if (names.topic) items.push('Lerninhalt wird interpretiert: ' + names.topic + '…');
-    if (names.subtopic) items.push('Unterthema wird fokussiert: ' + names.subtopic + '…');
-    items.push(
-      'Lernziele werden in spielbare Fragen übersetzt…',
-      'Kompetenzen der Klassenstufe werden berücksichtigt…',
-      'Passende Distraktoren werden didaktisch geplant…',
-      'Fragen werden an Fach und Niveau angepasst…',
-      'Der Quizentwurf wird auf eindeutige Antworten geprüft…'
-    );
-    const prompt = ($('#aiExtraPrompt')?.value || '').trim();
-    if (prompt) items.splice(Math.min(2, items.length), 0, 'Dein Zusatzwunsch fließt ein: ' + prompt.slice(0, 90) + (prompt.length > 90 ? '…' : ''));
-    return items;
-  }
-
-  function materialTickerTexts() {
-    return [
-      'Material wird gelesen und strukturiert...',
-      'Die KI erkennt, ob es um Inhalte oder Übungen geht...',
-      'Lernziele werden herausgearbeitet...',
-      'Relevante Themen werden pädagogisch sortiert...',
-      'Fragen werden passend zum Aufgabentyp formuliert...',
-      'Antwortmöglichkeiten werden didaktisch geprüft...',
-      'Der Quizentwurf wird vorbereitet...'
-    ];
-  }
-
-  function loadingTextsForCurrentMode() {
-    return currentWizardSourceKind() === 'curriculum' ? curriculumTickerTexts() : materialTickerTexts();
-  }
-
-  function updateLoadingStageLabels() {
-    const isCurriculum = currentWizardSourceKind() === 'curriculum';
-    const labels = isCurriculum
-      ? ['🎯 Lernziel verstehen', '🧠 Kompetenzen ableiten', '🧩 Quizstrategie wählen', '✅ Antworten prüfen']
-      : ['📄 Quelle verstehen', '🧠 Materialtyp erkennen', '🧩 Aufgabenstrategie wählen', '✅ Antworten prüfen'];
-    $$('[data-loading-copy]').forEach((el, index) => { el.textContent = labels[index] || labels[labels.length - 1]; });
-    const title = $('#aiGeneratingTitle');
-    if (title) title.textContent = 'Elevaro baut dein Quiz';
-  }
-
-  const dynamicTickerItems = [];
-  function pushTickerItems(items) {
-    (items || []).forEach(item => {
-      const text = String(item || '').trim();
-      if (!text || dynamicTickerItems.includes(text)) return;
-      dynamicTickerItems.push(text);
-    });
-  }
-
-  function nextLoadingText(fallbackIndex) {
-    if (dynamicTickerItems.length) {
-      return dynamicTickerItems[fallbackIndex % dynamicTickerItems.length];
-    }
-    const items = loadingTextsForCurrentMode();
-    return items[fallbackIndex % items.length];
-  }
-
-
+  const loadingTexts = [
+    'Material wird gelesen und strukturiert...',
+    'Die KI erkennt, ob es um Inhalte oder Übungen geht...',
+    'Lernziele werden herausgearbeitet...',
+    'Relevante Themen werden pädagogisch sortiert...',
+    'Fragen werden passend zum Aufgabentyp formuliert...',
+    'Antwortmöglichkeiten werden didaktisch geprüft...',
+    'Der Quizentwurf wird vorbereitet...'
+  ];
   let loadingTimer = null;
   function startLoadingCopy() {
-    updateLoadingStageLabels();
-    dynamicTickerItems.length = 0;
     let i = 0;
-    const first = nextLoadingText(0);
-    $('#aiWizardProgressText').textContent = first;
-    setProgress(10, first);
+    $('#aiWizardProgressText').textContent = loadingTexts[0];
+    setProgress(10, loadingTexts[0]);
     loadingTimer = setInterval(() => {
-      i += 1;
-      $('#aiWizardProgressText').textContent = nextLoadingText(i);
+      i = (i + 1) % loadingTexts.length;
+      $('#aiWizardProgressText').textContent = loadingTexts[i];
     }, 2300);
   }
   function stopLoadingCopy() { if (loadingTimer) clearInterval(loadingTimer); }
@@ -388,7 +317,6 @@
     while (Date.now() - started < 8 * 60 * 1000) {
       await new Promise(resolve => setTimeout(resolve, 3500));
       const res = await apiJson('/teacher/api/ai_wizard_status.php', { draft_id: draftId });
-      if (res.ticker_items) pushTickerItems(res.ticker_items);
       if (res.needs_analysis_review) {
         state.analysis = res.analysis || {};
         state.analysisRoute = res.analysis_route || null;
@@ -397,17 +325,18 @@
         return 'analysis_review';
       }
 
-      if (res.ticker_items) pushTickerItems(res.ticker_items);
       if (res.done) {
         setProgress(100, 'Fertig. Dein Quizentwurf wird geladen…');
         state.payload = res.payload;
-        state.debugPrompt = res.debug_prompt || (res.payload && res.payload._debug_prompt) || state.debugPrompt || '';
+        if (res.payload) {
+          state.debugPrompt = res.payload._debug_prompt || '';
+          state.debugMeta = res.payload._debug_meta || null;
+        }
         if (res.payload && res.payload.analysis_route) {
           showAnalysisRoute(res.payload.analysis_route);
         }
         return 'done';
       }
-      if (res.ticker_items) pushTickerItems(res.ticker_items);
       if (res.status && res.status !== lastStatus) {
         lastStatus = res.status;
         setProgress(res.progress || progressFromStatus(res.status), res.status_label || 'Elevaro erstellt deinen Quizentwurf…');
@@ -416,9 +345,6 @@
 
     throw new Error('Die KI-Erstellung dauert ungewöhnlich lange. Bitte versuche es später erneut oder nutze weniger Seiten.');
   }
-
-  updateLoadingStageLabels();
-  updateAnalysisModeLabels();
 
   $('#aiWizardSourceForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -448,7 +374,10 @@
         }
       } else {
         state.payload = json.payload;
-        state.debugPrompt = json.debug_prompt || (json.payload && json.payload._debug_prompt) || state.debugPrompt || '';
+        if (json.payload) {
+          state.debugPrompt = json.payload._debug_prompt || '';
+          state.debugMeta = json.payload._debug_meta || null;
+        }
       }
 
       fillEditor();
@@ -526,41 +455,11 @@
     if (selectedSubtopic) subtopicSelect.value = String(selectedSubtopic);
   }
 
-  function updateAnalysisModeLabels() {
-    const isCurriculum = currentWizardSourceKind() === 'curriculum';
-    const kicker = $('#aiAnalysisKicker');
-    const title = $('#aiAnalysisTitle');
-    const intro = $('#aiAnalysisIntro');
-    const materialLabel = $('#aiAnalysisMaterialTypeLabel');
-
-    if (kicker) kicker.textContent = isCurriculum ? '🎯 Lernziel prüfen' : '🧭 Analyse prüfen';
-    if (title) title.textContent = isCurriculum
-      ? 'Elevaro hat deinen Lerninhalt didaktisch eingeordnet'
-      : 'Elevaro hat dein Material didaktisch eingeordnet';
-    if (intro) intro.textContent = isCurriculum
-      ? 'Prüfe kurz, ob Lernziel, Kompetenz-Fokus und Quizstrategie stimmen. Erst danach werden Fragen generiert.'
-      : 'Prüfe kurz, ob Materialtyp, Aufgaben-Kontext und Strategie stimmen. Erst danach werden Fragen generiert.';
-    if (materialLabel) materialLabel.textContent = isCurriculum ? 'Lernbasis' : 'Materialtyp';
-
-    const mt = $('#aiAnalysisMaterialType');
-    if (mt && isCurriculum) {
-      mt.innerHTML = '<option value="curriculum_topic">Ausgewählter Lehrplaninhalt</option><option value="curriculum_topic_with_prompt">Lehrplaninhalt + Zusatzwunsch</option>';
-      mt.value = ($('#aiExtraPrompt')?.value || '').trim() ? 'curriculum_topic_with_prompt' : 'curriculum_topic';
-    } else if (mt && !mt.querySelector('option[value="reading_text"]')) {
-      mt.innerHTML = '<option value="reading_text">Lerntext / Sachtext</option><option value="worksheet">Arbeitsblatt</option><option value="vocabulary_list">Vokabelliste</option><option value="grammar_exercise">Grammatikübung</option><option value="mixed">Gemischtes Material</option><option value="image_based_task">Bild-/Materialaufgabe</option>';
-    }
-  }
-
   function renderAnalysisReview(analysis, route) {
     state.analysis = analysis || {};
     state.analysisRoute = route || state.analysis.analysis_route || null;
-    updateAnalysisModeLabels();
 
-    if (currentWizardSourceKind() === 'curriculum') {
-      $('#aiAnalysisMaterialType').value = ($('#aiExtraPrompt')?.value || '').trim() ? 'curriculum_topic_with_prompt' : 'curriculum_topic';
-    } else {
-      $('#aiAnalysisMaterialType').value = state.analysis.material_type || 'mixed';
-    }
+    $('#aiAnalysisMaterialType').value = state.analysis.material_type || 'mixed';
     $('#aiAnalysisContentMode').value = state.analysis.content_mode || (
       state.analysis.task_intent === 'quiz_about_content' ? 'content_source' : 'self_contained_exercises'
     );
@@ -669,7 +568,7 @@
     $('#aiListeningBox').classList.toggle('d-none', p.mode !== 'listening');
     renderPlausibilityReview();
     renderQuestions();
-    renderPromptDebug();
+    renderPromptDebugBox();
     populateReviewCurriculumSelect();
     updatePublishSummary();
   }
@@ -688,8 +587,12 @@
       };
     }).filter(q => q.question && q.options.length);
 
+    const currentPayload = { ...(state.payload || {}) };
+    delete currentPayload._debug_prompt;
+    delete currentPayload._debug_meta;
+
     state.payload = {
-      ...(state.payload || {}),
+      ...currentPayload,
       curriculum_topic_content_id: $('#aiReviewCurriculumTopic') ? Number($('#aiReviewCurriculumTopic').value || 0) : Number((state.payload || {}).curriculum_topic_content_id || 0),
       curriculum_topic_subtopic_id: $('#aiReviewCurriculumSubtopic') ? Number($('#aiReviewCurriculumSubtopic').value || 0) : Number((state.payload || {}).curriculum_topic_subtopic_id || 0),
       title: $('#aiQuizTitle').value.trim(),
@@ -702,72 +605,54 @@
   }
 
 
-  function renderPromptDebug() {
-    const box = $('#aiPromptDebugBox');
-    const code = $('#aiPromptDebugCode');
-    if (!box || !code) return;
-    const prompt = String(state.debugPrompt || (state.payload && state.payload._debug_prompt) || '').trim();
+
+  function renderPromptDebugBox() {
+    const questionEditor = $('#aiQuestionEditor');
+    if (!questionEditor) return;
+
+    let box = $('#aiPromptDebugBox');
+    if (!box) {
+      box = document.createElement('details');
+      box.id = 'aiPromptDebugBox';
+      box.className = 'ai-prompt-debug-box';
+      questionEditor.parentNode.insertBefore(box, questionEditor.nextSibling);
+    }
+
+    const prompt = state.debugPrompt || (state.payload && state.payload._debug_prompt) || '';
+    const meta = state.debugMeta || (state.payload && state.payload._debug_meta) || null;
+
     if (!prompt) {
       box.classList.add('d-none');
-      code.textContent = '';
+      box.innerHTML = '';
       return;
     }
+
     box.classList.remove('d-none');
-    code.textContent = prompt;
-    logPromptDebugToConsole('review-rendered');
-  }
+    const metaLine = meta ? Object.entries(meta)
+      .filter(([, value]) => value !== '' && value !== 0 && value !== null && value !== undefined)
+      .map(([key, value]) => `${key}: ${value}`)
+      .join(' · ') : '';
 
-  function elevaroSelectedText(selector) {
-    const el = $(selector);
-    if (!el) return '';
-    if (el.tagName === 'SELECT') {
-      return el.options[el.selectedIndex]?.textContent || '';
-    }
-    return el.textContent || el.value || '';
-  }
+    box.innerHTML = `
+      <summary>🧠 KI-Debug: verwendeter Prompt anzeigen</summary>
+      ${metaLine ? `<div class="ai-prompt-debug-meta">${esc(metaLine)}</div>` : ''}
+      <textarea class="form-control ai-prompt-debug-textarea" rows="14" readonly>${esc(prompt)}</textarea>
+      <div class="ai-prompt-debug-hint">Dieser Block ist nur zum Debuggen gedacht. Du kannst den Prompt hier direkt kopieren.</div>
+    `;
 
-  function logPromptDebugToConsole(reason) {
-    const prompt = String(state.debugPrompt || (state.payload && state.payload._debug_prompt) || '').trim();
-    if (!prompt) return;
-
-    const sourceKind = $('#aiWizardSourceKind')?.value || '';
-    const topicText = elevaroSelectedText('#aiCurriculumTopicSelect') || elevaroSelectedText('#aiReviewCurriculumTopic');
-    const subtopicText = elevaroSelectedText('#aiCurriculumSubtopicSelect') || elevaroSelectedText('#aiReviewCurriculumSubtopic');
-    const teacherPrompt = ($('#aiExtraPrompt')?.value || '').trim();
-
-    const debugObject = {
-      reason: reason || 'updated',
-      draftId: state.draftId || null,
-      mode: document.querySelector('input[name="mode"]:checked')?.value || (state.payload && state.payload.mode) || null,
-      sourceKind: sourceKind || null,
-      curriculumTopic: topicText || null,
-      curriculumSubtopic: subtopicText || null,
-      teacherPrompt: teacherPrompt || null,
-      analysis: state.analysis || null,
-      payloadPreview: state.payload ? {
-        title: state.payload.title || null,
-        description: state.payload.description || null,
-        questionCount: Array.isArray(state.payload.questions) ? state.payload.questions.length : null,
-        imagePrompt: state.payload.image_prompt || null
-      } : null,
-      finalPrompt: prompt
+    window.ELEVARO_DEBUG = {
+      draftId: state.draftId,
+      prompt,
+      meta,
+      payload: state.payload || null
     };
 
-    window.ELEVARO_DEBUG = debugObject;
-
-    const hash = [state.draftId || '', prompt.length, prompt.slice(0, 160)].join('|');
-    if (state._lastPromptDebugHash === hash) return;
-    state._lastPromptDebugHash = hash;
-
-    if (window.console && typeof console.groupCollapsed === 'function') {
-      console.groupCollapsed('%cELEVARO DEBUG%c verwendeter KI-Prompt', 'background:#5a4ff3;color:#fff;border-radius:4px;padding:2px 6px;font-weight:700;', 'color:#5a4ff3;font-weight:700;');
-      console.log('Debug-Objekt: window.ELEVARO_DEBUG', debugObject);
-      console.log('Finaler Prompt:\n' + prompt);
+    try {
+      console.groupCollapsed('ELEVARO DEBUG verwendeter KI-Prompt');
+      console.log(window.ELEVARO_DEBUG);
+      console.log(prompt);
       console.groupEnd();
-    } else if (window.console) {
-      console.log('ELEVARO DEBUG', debugObject);
-      console.log('ELEVARO FINAL PROMPT\n' + prompt);
-    }
+    } catch (e) {}
   }
 
   function renderPlausibilityReview() {
@@ -868,7 +753,7 @@
       const question = $('.ai-question-text', card).value.trim();
       const btn = $('.ai-suggest-options', card);
       btn.disabled = true; btn.textContent = 'KI denkt...';
-      const res = await apiJson('/teacher/api/ai_wizard_suggest_options.php', { draft_id: Number(state.draftId || 0), question, payload: state.payload || {} });
+      const res = await apiJson('/teacher/api/ai_wizard_suggest_options.php', { draft_id: Number(state.draftId || 0), question });
       const suggestion = res.suggestion || {};
       const opts = suggestion.options || [];
       $$('.ai-option-text', card).forEach((input, i) => { input.value = opts[i] || ''; });
@@ -885,50 +770,6 @@
       btn.disabled = false; btn.textContent = '✨ 4 Antworten vorschlagen';
     }
   }
-
-  async function generateCustomQuestion() {
-    const input = $('#aiCustomQuestionText');
-    const btn = $('#aiCustomQuestionGenerate');
-    if (!input || !btn) return;
-    const question = input.value.trim();
-    if (!question) {
-      toast('Bitte zuerst eine eigene Frage eingeben.');
-      return;
-    }
-
-    try {
-      readPayload();
-      btn.disabled = true;
-      btn.textContent = 'KI formuliert...';
-      const res = await apiJson('/teacher/api/ai_wizard_suggest_options.php', {
-        draft_id: Number(state.draftId || 0),
-        question,
-        refine_question: true,
-        payload: state.payload || {}
-      });
-      const suggestion = res.suggestion || {};
-      const opts = Array.isArray(suggestion.options) ? suggestion.options : ['', '', '', ''];
-      const q = {
-        question: suggestion.question || question,
-        options: opts.slice(0, 4),
-        answer: suggestion.answer || opts[0] || '',
-        explanation: suggestion.explanation || '',
-        difficulty: 0.35
-      };
-      while (q.options.length < 4) q.options.push('');
-      $('#aiQuestionEditor').appendChild(questionCard(q, $$('.ai-question-card').length));
-      renumber();
-      input.value = '';
-      toast('Eigene Frage wurde ergänzt.');
-    } catch (err) {
-      toast(err.message || String(err));
-    } finally {
-      btn.disabled = false;
-      btn.textContent = '✨ Frage ausarbeiten & Antworten erstellen';
-    }
-  }
-
-  $('#aiCustomQuestionGenerate')?.addEventListener('click', generateCustomQuestion);
 
   async function saveDraft() {
     const payload = readPayload();

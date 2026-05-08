@@ -542,66 +542,35 @@
   }
 }
 
-/* Custom teacher question composer */
-.ai-custom-question-card {
-  padding: 22px;
-  border-radius: 28px;
-  background: linear-gradient(135deg, rgba(90,79,243,.07), rgba(0,194,255,.04));
-  border: 1px solid rgba(90,79,243,.14);
-  box-shadow: 0 18px 46px rgba(23,32,51,.06);
-}
 
-.ai-custom-question-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 14px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
+/* KI-Prompt-Debug im Review */
+.ai-prompt-debug-box {
+  margin-top: 1.25rem;
+  padding: 1rem 1.15rem;
+  border: 1px dashed rgba(98, 81, 236, .35);
+  border-radius: 1rem;
+  background: rgba(248, 247, 255, .8);
+  color: #1d263f;
 }
-
-.ai-custom-question-head span {
-  color: #172033;
-  font-weight: 950;
-  font-size: 1.05rem;
-}
-
-.ai-custom-question-head small {
-  color: #64748b;
-  font-weight: 750;
-  max-width: 520px;
-}
-
-.ai-custom-question-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 12px;
-}
-
-.ai-debug-prompt {
-  border: 1px dashed rgba(100,116,139,.28);
-  border-radius: 18px;
-  background: rgba(248,250,252,.75);
-  padding: 12px 14px;
-  color: #64748b;
-}
-
-.ai-debug-prompt summary {
+.ai-prompt-debug-box summary {
   cursor: pointer;
-  font-weight: 850;
-  font-size: .86rem;
-  color: #64748b;
+  font-weight: 800;
+  color: #6251ec;
 }
-
-.ai-debug-prompt pre {
-  margin: 12px 0 0;
-  max-height: 360px;
-  overflow: auto;
-  white-space: pre-wrap;
-  font-size: .78rem;
+.ai-prompt-debug-meta {
+  margin: .75rem 0;
+  font-size: .8rem;
+  color: #667085;
+}
+.ai-prompt-debug-textarea {
+  margin-top: .75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: .8rem;
   line-height: 1.45;
-  color: #334155;
-  background: #fff;
-  border-radius: 14px;
-  padding: 14px;
-  border: 1px solid rgba(100,116,139,.16);
+  white-space: pre;
+}
+.ai-prompt-debug-hint {
+  margin-top: .5rem;
+  font-size: .8rem;
+  color: #667085;
 }

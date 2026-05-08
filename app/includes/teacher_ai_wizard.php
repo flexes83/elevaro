@@ -847,7 +847,26 @@ function elevaro_teacher_ai_load_draft(int $draftId, int $teacherId): array
 function elevaro_teacher_ai_draft_payload(array $draft): array
 {
     $payload = json_decode((string)($draft['generated_payload_json'] ?? ''), true);
-    return is_array($payload) ? $payload : [];
+    if (!is_array($payload)) {
+        $payload = [];
+    }
+
+    // Debug-Hilfe für den Lehrer-Wizard: Der verwendete Prompt soll im Review sichtbar sein.
+    // Wird nur im Entwurf/Frontend mitgegeben und beim Speichern/Veröffentlichen wieder ignoriert.
+    $debugPrompt = trim((string)($draft['prompt'] ?? ''));
+    if ($debugPrompt !== '') {
+        $payload['_debug_prompt'] = $debugPrompt;
+        $payload['_debug_meta'] = [
+            'draft_id' => (int)($draft['id'] ?? 0),
+            'mode' => (string)($draft['mode'] ?? ''),
+            'source_kind' => (string)($draft['source_kind'] ?? ''),
+            'generation_step' => (string)($draft['generation_step'] ?? ''),
+            'curriculum_topic_content_id' => isset($draft['curriculum_topic_content_id']) ? (int)$draft['curriculum_topic_content_id'] : 0,
+            'curriculum_topic_subtopic_id' => isset($draft['curriculum_topic_subtopic_id']) ? (int)$draft['curriculum_topic_subtopic_id'] : 0,
+        ];
+    }
+
+    return $payload;
 }
 
 function elevaro_teacher_ai_save_payload(int $draftId, int $teacherId, array $payload): void
@@ -1085,9 +1104,7 @@ if (!function_exists('elevaro_teacher_ai_poll_background_draft')) {
         $draft = elevaro_teacher_ai_load_draft($draftId, $teacherId);
 
         if (($draft['status'] ?? '') === 'draft' && !empty($draft['generated_payload_json'])) {
-            $payload = elevaro_teacher_ai_draft_payload($draft);
-            $payload['_debug_prompt'] = (string)($draft['prompt'] ?? '');
-            return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => $payload, 'debug_prompt' => (string)($draft['prompt'] ?? ''), 'ticker_items' => elevaro_teacher_ai_generation_ticker_items($draft, json_decode((string)($draft['analysis_json'] ?? ''), true) ?: null, [])];
+            return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => elevaro_teacher_ai_draft_payload($draft)];
         }
         if (!empty($draft['generation_error'])) {
             throw new RuntimeException((string)$draft['generation_error']);
@@ -1130,7 +1147,7 @@ if (!function_exists('elevaro_teacher_ai_poll_background_draft')) {
             'teacher_id' => $teacherId,
         ]);
 
-        return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => $payload, 'ticker_items' => elevaro_teacher_ai_generation_ticker_items($draft, $analysis, $checkedQuestions)];
+        return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => $payload];
     }
 }
 
@@ -2016,66 +2033,6 @@ if (!function_exists('elevaro_teacher_ai_analysis_route_label')) {
 }
 
 
-
-if (!function_exists('elevaro_teacher_ai_generation_ticker_items')) {
-    function elevaro_teacher_ai_generation_ticker_items(array $draft, ?array $analysis = null, array $questions = []): array
-    {
-        $items = [];
-        $sourceKind = (string)($draft['source_kind'] ?? 'material');
-
-        if ($sourceKind === 'curriculum') {
-            try {
-                $class = elevaro_teacher_ai_class_for_teacher((int)$draft['class_id'], (int)$draft['teacher_id']);
-                $topicId = !empty($draft['curriculum_topic_content_id']) ? (int)$draft['curriculum_topic_content_id'] : 0;
-                $subtopicId = !empty($draft['curriculum_topic_subtopic_id']) ? (int)$draft['curriculum_topic_subtopic_id'] : null;
-                if ($topicId > 0) {
-                    $ctx = elevaro_teacher_ai_curriculum_context($topicId, $subtopicId, $class);
-                    $topic = $ctx['topic'] ?? [];
-                    $subtopic = $ctx['subtopic'] ?? [];
-                    $topicTitle = trim((string)(($topic['title_short'] ?? '') ?: ($topic['topic_title'] ?? '') ?: ($topic['title_long'] ?? '')));
-                    $topicGoal = trim((string)($topic['learning_goal'] ?? ''));
-                    $subTitle = trim((string)(($subtopic['title_short'] ?? '') ?: ($subtopic['subtopic_title'] ?? '') ?: ($subtopic['title_long'] ?? '')));
-                    $subGoal = trim((string)($subtopic['learning_goal'] ?? ''));
-                    if ($topicTitle !== '') $items[] = 'Lerninhalt: ' . $topicTitle;
-                    if ($subTitle !== '') $items[] = 'Unterthema: ' . $subTitle;
-                    if ($subGoal !== '') $items[] = 'Lernziel: ' . mb_substr($subGoal, 0, 140);
-                    elseif ($topicGoal !== '') $items[] = 'Lernziel: ' . mb_substr($topicGoal, 0, 140);
-                    $keywords = array_values(array_filter(array_merge((array)($ctx['keywords'] ?? []), (array)($ctx['subtopic_keywords'] ?? []))));
-                    if ($keywords) $items[] = 'Begriffe im Fokus: ' . implode(', ', array_slice($keywords, 0, 5));
-                }
-            } catch (Throwable $e) {
-                // Ticker darf die Generierung nie blockieren.
-            }
-
-            foreach (($analysis['detected_skills'] ?? []) as $skill) {
-                $skill = trim((string)$skill);
-                if ($skill !== '') $items[] = 'Kompetenz: ' . mb_substr($skill, 0, 120);
-            }
-        } else {
-            if (is_array($analysis)) {
-                $headline = trim((string)($analysis['title'] ?? $analysis['headline'] ?? ''));
-                if ($headline !== '') $items[] = 'Materialfokus: ' . mb_substr($headline, 0, 120);
-                foreach (($analysis['detected_skills'] ?? $analysis['topics'] ?? []) as $skill) {
-                    $skill = trim((string)$skill);
-                    if ($skill !== '') $items[] = 'Erkannt: ' . mb_substr($skill, 0, 120);
-                }
-            }
-        }
-
-        $questionPreviewCount = 0;
-        foreach ($questions as $question) {
-            $text = trim((string)($question['question'] ?? $question['text'] ?? ''));
-            if ($text === '') continue;
-            $items[] = 'Erste Frage: ' . mb_substr($text, 0, 150) . (mb_strlen($text) > 150 ? '…' : '');
-            $questionPreviewCount++;
-            if ($questionPreviewCount >= 3) break;
-        }
-
-        $items = array_values(array_unique(array_filter($items)));
-        return array_slice($items, 0, 8);
-    }
-}
-
 if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
     function elevaro_teacher_ai_poll_split_draft(int $draftId, int $teacherId): array
     {
@@ -2095,16 +2052,13 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
                     'status_label' => elevaro_teacher_ai_analysis_route_label($analysisReview, (string)($draft['mode'] ?? 'quiz')),
                     'analysis' => $analysisReview,
                     'analysis_route' => elevaro_teacher_ai_analysis_route_payload($analysisReview, (string)($draft['mode'] ?? 'quiz')),
-                    'ticker_items' => elevaro_teacher_ai_generation_ticker_items($draft, $analysisReview, []),
                 ];
             }
         }
 
 
         if (($draft['status'] ?? '') === 'draft' && !empty($draft['generated_payload_json'])) {
-            $payload = elevaro_teacher_ai_draft_payload($draft);
-            $payload['_debug_prompt'] = (string)($draft['prompt'] ?? '');
-            return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => $payload, 'debug_prompt' => (string)($draft['prompt'] ?? '')];
+            return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => elevaro_teacher_ai_draft_payload($draft)];
         }
         if (($draft['status'] ?? '') === 'failed' && !empty($draft['generation_error'])) {
             throw new RuntimeException((string)$draft['generation_error']);
@@ -2152,7 +2106,6 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
                     'status_label' => $routeLabel,
                     'analysis' => $analysis,
                     'analysis_route' => elevaro_teacher_ai_analysis_route_payload($analysis, $mode),
-                    'ticker_items' => elevaro_teacher_ai_generation_ticker_items($draft, $analysis, $allQuestions),
                 ];
             }
 
@@ -2178,13 +2131,13 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
                         'teacher_id' => $teacherId,
                     ]);
                 $progress = 25 + (int)round((count($blocks) / max(1, $targetBlocks)) * 62);
-                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'questions_' . count($blocks), 'progress' => $progress, 'status_label' => ($mode === 'listening' ? 'Hörabschnitt ' : 'Fragenblock ') . count($blocks) . '/' . $targetBlocks . ' ist fertig…', 'ticker_items' => elevaro_teacher_ai_generation_ticker_items($draft, $analysis, $allQuestions)];
+                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'questions_' . count($blocks), 'progress' => $progress, 'status_label' => ($mode === 'listening' ? 'Hörabschnitt ' : 'Fragenblock ') . count($blocks) . '/' . $targetBlocks . ' ist fertig…'];
             }
 
             if (($draft['generation_step'] ?? '') !== 'plausibility') {
                 elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts SET generation_step = 'plausibility' WHERE id = :id AND teacher_id = :teacher_id")
                     ->execute(['id' => $draftId, 'teacher_id' => $teacherId]);
-                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'plausibility', 'progress' => 93, 'status_label' => (($draft['source_kind'] ?? 'material') === 'curriculum' ? 'Prüfe Lehrplanbezug, Eindeutigkeit und Niveau…' : 'Prüfe fachliche Richtigkeit und Plausibilität…'), 'ticker_items' => elevaro_teacher_ai_generation_ticker_items($draft, $analysis, $allQuestions)];
+                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'plausibility', 'progress' => 93, 'status_label' => 'Prüfe fachliche Richtigkeit und Plausibilität…'];
             }
 
             $plausibility = elevaro_teacher_ai_apply_plausibility_review($analysis, $allQuestions, $mode, $files);
@@ -2192,6 +2145,18 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
             $payload = elevaro_teacher_ai_split_base_payload($analysis, $mode, $checkedQuestions);
             $payload['analysis_route'] = elevaro_teacher_ai_analysis_route_payload($analysis, $mode);
             $payload['plausibility_review'] = $plausibility['review'];
+            $debugPrompt = trim((string)($draft['prompt'] ?? ''));
+            if ($debugPrompt !== '') {
+                $payload['_debug_prompt'] = $debugPrompt;
+                $payload['_debug_meta'] = [
+                    'draft_id' => $draftId,
+                    'mode' => $mode,
+                    'source_kind' => (string)($draft['source_kind'] ?? ''),
+                    'generation_step' => 'done',
+                    'curriculum_topic_content_id' => isset($draft['curriculum_topic_content_id']) ? (int)$draft['curriculum_topic_content_id'] : 0,
+                    'curriculum_topic_subtopic_id' => isset($draft['curriculum_topic_subtopic_id']) ? (int)$draft['curriculum_topic_subtopic_id'] : 0,
+                ];
+            }
             $stmt = elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts
                 SET status = 'draft', generation_step = 'done', generated_payload_json = :payload, source_title = :title, image_prompt = :image_prompt, image_status = 'pending'
                 WHERE id = :id AND teacher_id = :teacher_id");
