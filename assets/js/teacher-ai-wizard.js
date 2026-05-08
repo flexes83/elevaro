@@ -77,7 +77,7 @@
     const field = $('#aiExtraPrompt');
     if (!field || field.value.trim() !== '') return;
 
-    const sourceKind = $('#aiWizardSourceKind')?.value || 'material';
+    const sourceKind = currentSourceKind();
     const mode = document.querySelector('input[name="mode"]:checked')?.value || 'quiz';
     const key = mode === 'listening' ? 'listening' : (sourceKind === 'curriculum' ? 'curriculum' : 'default');
     const items = promptPlaceholderSets[key] || promptPlaceholderSets.default;
@@ -168,6 +168,22 @@
     return String(value || '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[ch]));
   }
 
+  function currentSourceKind() {
+    return $('#aiWizardSourceKind')?.value || 'material';
+  }
+
+  function updateStageLabels() {
+    const isCurriculum = currentSourceKind() === 'curriculum';
+    const labels = isCurriculum
+      ? { source: '🎯 Lerninhalt lesen', material: '🧭 Schwerpunkt planen', strategy: '🧩 Quizstrategie wählen', check: '✅ Antworten prüfen' }
+      : { source: '📄 Quelle verstehen', material: '🧠 Materialtyp erkennen', strategy: '🧩 Aufgabenstrategie wählen', check: '✅ Antworten prüfen' };
+
+    Object.entries(labels).forEach(([stage, label]) => {
+      const el = $(`#aiStageTrack [data-stage="${stage}"]`);
+      if (el) el.textContent = label;
+    });
+  }
+
   function updateSourceKind(kind) {
     const hidden = $('#aiWizardSourceKind');
     if (hidden) hidden.value = kind;
@@ -182,6 +198,7 @@
       loadCurriculumTopics();
     }
     updateExtraPromptPlaceholder();
+    updateStageLabels();
   }
 
   async function loadCurriculumTopics() {
@@ -232,7 +249,7 @@
 
   function getLoadingTexts() {
     const subject = String(root.dataset.subjectLabel || '').toLowerCase();
-    const sourceKind = $('#aiWizardSourceKind')?.value || 'material';
+    const sourceKind = currentSourceKind();
     const mode = document.querySelector('input[name="mode"]:checked')?.value || 'quiz';
     const goal = document.querySelector('input[name="material_goal"]:checked')?.value || '';
 
@@ -242,6 +259,15 @@
         'Wortschatz, Tempo und Verständnisfragen werden abgeglichen…',
         'Die Fragen werden so formuliert, dass sie ohne Bildkontext lösbar sind…',
         'Antwortoptionen werden auf eindeutige Hörverständnis-Logik geprüft…'
+      ];
+    }
+
+    if (sourceKind === 'curriculum') {
+      return [
+        'Ich lese Lerninhalt, Klasse, Fach und deinen Zusatzwunsch…',
+        'Der Schwerpunkt wird aus Lehrplan und Prompt abgeleitet…',
+        'Die Fragen werden nach Kompetenz und Schwierigkeit sortiert…',
+        'Antworten und Erklärungen werden auf Eindeutigkeit geprüft…'
       ];
     }
 
@@ -263,14 +289,6 @@
       ];
     }
 
-    if (sourceKind === 'curriculum') {
-      return [
-        'Ich lese Lerninhalt, Klasse und Fach aus dem Lehrplan-Kontext…',
-        'Die Fragen werden nach Kompetenz und Schwierigkeit sortiert…',
-        'Der Quizentwurf wird auf eindeutige Antworten geprüft…',
-        'Erklärungen werden kurz und schülerverständlich formuliert…'
-      ];
-    }
 
     return [
       'Ich lese die Quelle und erkenne, was später sichtbar im Quiz stehen muss…',
@@ -423,7 +441,7 @@
     startLoadingCopy();
     try {
       const form = e.currentTarget;
-      const sourceKind = $('#aiWizardSourceKind')?.value || 'material';
+      const sourceKind = currentSourceKind();
       if (sourceKind === 'curriculum' && !($('#aiCurriculumTopicSelect')?.value || '')) {
         throw new Error('Bitte ein Lerninhalt auswählen.');
       }
@@ -521,7 +539,58 @@
     if (selectedSubtopic) subtopicSelect.value = String(selectedSubtopic);
   }
 
+  function applyAnalysisReviewMode() {
+    const isCurriculum = currentSourceKind() === 'curriculum';
+    const box = $('#aiAnalysisReviewBox');
+    if (box) {
+      box.classList.toggle('is-curriculum-review', isCurriculum);
+      box.classList.toggle('is-material-review', !isCurriculum);
+    }
+
+    const contextCard = $('[data-analysis-card="visible-context"]');
+    if (contextCard) contextCard.classList.toggle('d-none', isCurriculum);
+
+    const copy = isCurriculum ? {
+      kicker: '🎯 Lerninhalt prüfen',
+      title: 'Elevaro plant dein Quiz aus dem Lerninhalt',
+      intro: 'Prüfe kurz, ob Schwerpunkt, Kompetenz und Quizstrategie passen. Es wurde kein Material hochgeladen.',
+      materialType: 'Quizgrundlage',
+      contentMode: 'Aufgabenausrichtung',
+      strategy: 'Quizstrategie',
+      skills: 'Geplante Kompetenzen',
+      deps: 'Zusatzwünsche / Schwerpunkt',
+      depsHelp: 'Optional: Was soll die KI zusätzlich beachten? Zum Beispiel Wortschatz, Niveau oder Themenfokus.'
+    } : {
+      kicker: '🧭 Analyse prüfen',
+      title: 'Elevaro hat dein Material didaktisch eingeordnet',
+      intro: 'Prüfe kurz, ob Materialtyp, Aufgaben-Kontext und Strategie stimmen. Erst danach werden Fragen generiert.',
+      materialType: 'Materialtyp',
+      contentMode: 'Aufgaben-Kontext',
+      strategy: 'Generierungsstrategie',
+      skills: 'Erkannte Kompetenzen',
+      deps: 'Abhängigkeiten / Kontext',
+      depsHelp: 'Was müsste sichtbar sein, damit die Originalaufgabe lösbar wäre?'
+    };
+
+    const mapping = {
+      aiAnalysisKicker: copy.kicker,
+      aiAnalysisTitle: copy.title,
+      aiAnalysisIntro: copy.intro,
+      aiAnalysisMaterialTypeLabel: copy.materialType,
+      aiAnalysisContentModeLabel: copy.contentMode,
+      aiAnalysisStrategyLabel: copy.strategy,
+      aiAnalysisSkillsLabel: copy.skills,
+      aiAnalysisDependenciesLabel: copy.deps,
+      aiAnalysisDependenciesHelp: copy.depsHelp
+    };
+    Object.entries(mapping).forEach(([id, text]) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text;
+    });
+  }
+
   function renderAnalysisReview(analysis, route) {
+    applyAnalysisReviewMode();
     state.analysis = analysis || {};
     state.analysisRoute = route || state.analysis.analysis_route || null;
 
@@ -914,4 +983,6 @@
   });
 
 
+  updateStageLabels();
+  startPromptPlaceholderRotation();
 })();

@@ -220,16 +220,16 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
 
 
   <section class="ai-wizard-panel" data-step="analysis">
-    <div class="ai-analysis-review">
+    <div class="ai-analysis-review" id="aiAnalysisReviewBox">
       <div class="ai-analysis-review-head">
-        <span class="ai-wizard-kicker">🧭 Analyse prüfen</span>
-        <h3>Elevaro hat dein Material didaktisch eingeordnet</h3>
-        <p>Prüfe kurz, ob Materialtyp, Aufgaben-Kontext und Strategie stimmen. Erst danach werden Fragen generiert.</p>
+        <span class="ai-wizard-kicker" id="aiAnalysisKicker">🧭 Analyse prüfen</span>
+        <h3 id="aiAnalysisTitle">Elevaro hat dein Material didaktisch eingeordnet</h3>
+        <p id="aiAnalysisIntro">Prüfe kurz, ob Materialtyp, Aufgaben-Kontext und Strategie stimmen. Erst danach werden Fragen generiert.</p>
       </div>
 
       <div class="ai-analysis-grid">
-        <div class="ai-analysis-card">
-          <label>Materialtyp</label>
+        <div class="ai-analysis-card" data-analysis-card="material-type">
+          <label id="aiAnalysisMaterialTypeLabel">Materialtyp</label>
           <select class="form-select" id="aiAnalysisMaterialType">
             <option value="reading_text">Lerntext / Sachtext</option>
             <option value="worksheet">Arbeitsblatt</option>
@@ -240,8 +240,8 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
           </select>
         </div>
 
-        <div class="ai-analysis-card">
-          <label>Aufgaben-Kontext</label>
+        <div class="ai-analysis-card" data-analysis-card="content-mode">
+          <label id="aiAnalysisContentModeLabel">Aufgaben-Kontext</label>
           <select class="form-select" id="aiAnalysisContentMode">
             <option value="content_source">Lernstoff: Fragen zum Inhalt</option>
             <option value="self_contained_exercises">Selbstlösbare Übung: Beispiele nutzen/variieren</option>
@@ -249,8 +249,8 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
           </select>
         </div>
 
-        <div class="ai-analysis-card">
-          <label>Generierungsstrategie</label>
+        <div class="ai-analysis-card" data-analysis-card="strategy">
+          <label id="aiAnalysisStrategyLabel">Generierungsstrategie</label>
           <select class="form-select" id="aiAnalysisStrategy">
             <option value="content_questions">Fragen zum tatsächlichen Stoff</option>
             <option value="reuse_or_adapt_examples">Beispiele übernehmen oder leicht variieren</option>
@@ -259,8 +259,8 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
           </select>
         </div>
 
-        <div class="ai-analysis-card">
-          <label>Benötigt sichtbaren Kontext?</label>
+        <div class="ai-analysis-card" data-analysis-card="visible-context">
+          <label id="aiAnalysisRequiresContextLabel">Benötigt sichtbaren Kontext?</label>
           <select class="form-select" id="aiAnalysisRequiresContext">
             <option value="0">Nein, ohne Originalmaterial lösbar</option>
             <option value="1">Ja, Kontext wäre sonst nicht sichtbar</option>
@@ -275,14 +275,14 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
 
       <div class="ai-analysis-edit-grid">
         <div>
-          <label class="form-label fw-bold">Erkannte Kompetenzen</label>
+          <label class="form-label fw-bold" id="aiAnalysisSkillsLabel">Erkannte Kompetenzen</label>
           <textarea class="form-control" id="aiAnalysisSkills" rows="3" placeholder="z. B. months, ordinal numbers, dates"></textarea>
           <div class="form-text">Eine Kompetenz pro Zeile oder kommagetrennt.</div>
         </div>
         <div>
-          <label class="form-label fw-bold">Abhängigkeiten / Kontext</label>
+          <label class="form-label fw-bold" id="aiAnalysisDependenciesLabel">Abhängigkeiten / Kontext</label>
           <textarea class="form-control" id="aiAnalysisDependencies" rows="3" placeholder="z. B. Bild, Tabelle, rechte Lösungsspalte"></textarea>
-          <div class="form-text">Was müsste sichtbar sein, damit die Originalaufgabe lösbar wäre?</div>
+          <div class="form-text" id="aiAnalysisDependenciesHelp">Was müsste sichtbar sein, damit die Originalaufgabe lösbar wäre?</div>
         </div>
       </div>
 
