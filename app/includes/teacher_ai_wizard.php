@@ -1389,7 +1389,24 @@ if (!function_exists('elevaro_teacher_ai_confirm_analysis')) {
     function elevaro_teacher_ai_confirm_analysis(int $draftId, int $teacherId, array $analysisUpdates): array
     {
         elevaro_teacher_ai_split_ensure_schema();
-        $draft = elevaro_teacher_ai_load_draft($draftId, $teacherId);
+
+        $stmt = elevaro_teacher_ai_wizard_db()->prepare("SELECT * FROM teacher_ai_quiz_drafts WHERE id = :id LIMIT 1");
+        $stmt->execute(['id' => $draftId]);
+        $draft = $stmt->fetch();
+        if (!$draft) {
+            throw new RuntimeException('Entwurf nicht gefunden.');
+        }
+
+        // Entwurf gehört normalerweise direkt dem Lehrer. Falls ältere Drafts/Session-Kontexte abweichen,
+        // prüfen wir zusätzlich, ob die Klasse dem Lehrer gehört.
+        if ((int)($draft['teacher_id'] ?? 0) !== $teacherId) {
+            try {
+                elevaro_teacher_ai_class_for_teacher((int)$draft['class_id'], $teacherId);
+            } catch (Throwable $e) {
+                throw new RuntimeException('Entwurf gehört nicht zu deinem Lehrerzugang.');
+            }
+        }
+
         $analysis = json_decode((string)($draft['analysis_json'] ?? ''), true);
         if (!is_array($analysis)) {
             throw new RuntimeException('Es liegt noch keine Analyse vor.');
@@ -1414,18 +1431,20 @@ if (!function_exists('elevaro_teacher_ai_confirm_analysis')) {
             $analysis['curriculum_topic_subtopic_id'] = (int)$analysisUpdates['curriculum_topic_subtopic_id'];
         }
 
+        $topicId = !empty($analysis['curriculum_topic_content_id']) ? (int)$analysis['curriculum_topic_content_id'] : null;
+        $subtopicId = !empty($analysis['curriculum_topic_subtopic_id']) ? (int)$analysis['curriculum_topic_subtopic_id'] : null;
+
         elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts
             SET analysis_json = :analysis,
                 generation_step = 'questions_1',
-                curriculum_topic_content_id = COALESCE(:topic_id, curriculum_topic_content_id),
+                curriculum_topic_content_id = :topic_id,
                 curriculum_topic_subtopic_id = :subtopic_id
-            WHERE id = :id AND teacher_id = :teacher_id")
+            WHERE id = :id")
             ->execute([
                 'analysis' => json_encode($analysis, JSON_UNESCAPED_UNICODE),
-                'topic_id' => !empty($analysis['curriculum_topic_content_id']) ? (int)$analysis['curriculum_topic_content_id'] : null,
-                'subtopic_id' => !empty($analysis['curriculum_topic_subtopic_id']) ? (int)$analysis['curriculum_topic_subtopic_id'] : null,
+                'topic_id' => $topicId,
+                'subtopic_id' => $subtopicId,
                 'id' => $draftId,
-                'teacher_id' => $teacherId,
             ]);
 
         return [

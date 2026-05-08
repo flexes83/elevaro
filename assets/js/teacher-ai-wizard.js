@@ -375,11 +375,11 @@
     topicSelect.innerHTML = '<option value="">KI-Zuordnung verwenden</option>';
     curriculumState.domains.forEach(domain => {
       const group = document.createElement('optgroup');
-      group.label = domain.domain_title || 'Lerninhalte';
+      group.label = domain.domain_title || domain.title || domain.name || 'Lerninhalte';
       (domain.topics || []).forEach(topic => {
         const option = document.createElement('option');
         option.value = topic.id;
-        option.textContent = topic.title_short || topic.topic_title || ('Thema #' + topic.id);
+        option.textContent = topic.title || topic.title_short || topic.topic_title || topic.name || ('Thema #' + topic.id);
         group.appendChild(option);
       });
       topicSelect.appendChild(group);
@@ -475,11 +475,11 @@
     topicSelect.innerHTML = '<option value="">Automatisch zuordnen</option>';
     curriculumState.domains.forEach(domain => {
       const group = document.createElement('optgroup');
-      group.label = domain.domain_title || 'Lerninhalte';
+      group.label = domain.domain_title || domain.title || domain.name || 'Lerninhalte';
       (domain.topics || []).forEach(topic => {
         const option = document.createElement('option');
         option.value = topic.id;
-        option.textContent = topic.title_short || topic.topic_title || ('Thema #' + topic.id);
+        option.textContent = topic.title || topic.title_short || topic.topic_title || topic.name || ('Thema #' + topic.id);
         group.appendChild(option);
       });
       topicSelect.appendChild(group);
@@ -647,7 +647,7 @@
       const question = $('.ai-question-text', card).value.trim();
       const btn = $('.ai-suggest-options', card);
       btn.disabled = true; btn.textContent = 'KI denkt...';
-      const res = await apiJson('/teacher/api/ai_wizard_suggest_options.php', { draft_id: state.draftId, question });
+      const res = await apiJson('/teacher/api/ai_wizard_suggest_options.php', { draft_id: Number(state.draftId || 0), question });
       const suggestion = res.suggestion || {};
       const opts = suggestion.options || [];
       $$('.ai-option-text', card).forEach((input, i) => { input.value = opts[i] || ''; });
@@ -667,7 +667,7 @@
 
   async function saveDraft() {
     const payload = readPayload();
-    await apiJson('/teacher/api/ai_wizard_save.php', { draft_id: state.draftId, payload });
+    await apiJson('/teacher/api/ai_wizard_save.php', { draft_id: Number(state.draftId || 0), payload });
     updatePublishSummary();
   }
 
@@ -691,7 +691,7 @@
     const preview = $('#aiImagePreview');
     preview.innerHTML = '<span>🎨</span><p>Bild wird erstellt...</p>';
     try {
-      const res = await apiJson('/teacher/api/ai_wizard_image.php', { draft_id: state.draftId, image_prompt: $('#aiImagePrompt').value.trim() });
+      const res = await apiJson('/teacher/api/ai_wizard_image.php', { draft_id: Number(state.draftId || 0), image_prompt: $('#aiImagePrompt').value.trim() });
       state.imagePath = res.image_path;
       preview.innerHTML = `<img src="${esc(res.image_path)}" alt="Quizbild"><p>KI-Bild erstellt</p>`;
       if (showToast) toast('Bild wurde neu erstellt.');
@@ -712,7 +712,7 @@
         try { await generateImage(false); } catch (e) {}
         btn.textContent = 'Veröffentliche...';
       }
-      const res = await apiJson('/teacher/api/ai_wizard_publish.php', { draft_id: state.draftId, payload });
+      const res = await apiJson('/teacher/api/ai_wizard_publish.php', { draft_id: Number(state.draftId || 0), payload });
       toast('Quiz wurde veröffentlicht.');
       window.location.href = res.class_quizzes_url || '/teacher/quizzes.php';
     } catch (err) {
@@ -768,7 +768,7 @@
     try {
       const confirmedAnalysis = readAnalysisReview();
       const res = await apiJson('/teacher/api/ai_wizard_confirm_analysis.php', {
-        draft_id: state.draftId,
+        draft_id: Number(state.draftId || 0),
         analysis: confirmedAnalysis
       });
       if (res.analysis_route) showAnalysisRoute(res.analysis_route);

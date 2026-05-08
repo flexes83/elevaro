@@ -4,6 +4,9 @@ require_once __DIR__ . '/../../app/includes/teacher_ai_wizard.php';
 header('Content-Type: application/json; charset=utf-8');
 
 try {
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        @session_start();
+    }
     $teacherId = elevaro_teacher_ai_current_teacher_id();
     $raw = file_get_contents('php://input') ?: '';
     $data = json_decode($raw, true);
