@@ -1315,31 +1315,78 @@ if (!function_exists('elevaro_teacher_ai_curriculum_topics_for_class')) {
 
 if (!function_exists('elevaro_teacher_ai_curriculum_context')) {
     function elevaro_teacher_ai_curriculum_context(int $topicId, ?int $subtopicId, array $class): array
-    {
-        $pdo = elevaro_teacher_ai_wizard_db();
-        $stmt=$pdo->prepare("SELECT * FROM curriculum_topics_content WHERE id=:id LIMIT 1");
-        $stmt->execute(['id'=>$topicId]);
-        $topic=$stmt->fetch();
-        if (!$topic) throw new RuntimeException('Das ausgewählte Lerninhalt wurde nicht gefunden.');
-        $classGrade=(string)(($class['level_key'] ?? '') ?: ($class['grade'] ?? ''));
-        if ((string)$topic['state_code'] !== (string)($class['state_code'] ?? '') || (string)$topic['school_type_key'] !== (string)($class['school_type_code'] ?? '') || (string)$topic['grade_key'] !== $classGrade || (string)$topic['subject_key'] !== (string)($class['subject_code'] ?? '')) {
-            throw new RuntimeException('Das ausgewählte Lerninhalt passt nicht zur aktuellen Klasse.');
-        }
-        $subtopic=null;
-        if ($subtopicId) {
-            $sub=$pdo->prepare("SELECT * FROM curriculum_topic_subtopics WHERE id=:id AND curriculum_topic_content_id=:topic_id LIMIT 1");
-            $sub->execute(['id'=>$subtopicId,'topic_id'=>$topicId]);
-            $subtopic=$sub->fetch() ?: null;
-        }
-        return [
-            'topic'=>$topic,
-            'subtopic'=>$subtopic,
-            'aliases'=>json_decode((string)($topic['aliases_json'] ?? '[]'), true) ?: [],
-            'keywords'=>json_decode((string)($topic['keywords_json'] ?? '[]'), true) ?: [],
-            'subtopic_aliases'=>$subtopic ? (json_decode((string)($subtopic['aliases_json'] ?? '[]'), true) ?: []) : [],
-            'subtopic_keywords'=>$subtopic ? (json_decode((string)($subtopic['keywords_json'] ?? '[]'), true) ?: []) : [],
-        ];
+{
+    $pdo = elevaro_teacher_ai_wizard_db();
+    $classGrade = (string)(($class['level_key'] ?? '') ?: ($class['grade'] ?? ''));
+
+    $topic = null;
+    if ($topicId > 0) {
+        $stmt = $pdo->prepare("SELECT * FROM curriculum_topics_content WHERE id = :id LIMIT 1");
+        $stmt->execute(['id' => $topicId]);
+        $topic = $stmt->fetch() ?: null;
     }
+
+    // Fallback: manchmal liefert das Frontend veraltete/abweichende IDs.
+    // Dann nehmen wir KEIN hartes Failure, sondern versuchen, innerhalb des Klassenkontexts
+    // ein gültiges Thema zu finden. Das eigentliche Auto-Matching läuft später ohnehin nochmal.
+    if (!$topic) {
+        $topics = elevaro_teacher_ai_curriculum_topics_for_class($class);
+        if ($topics) {
+            $topic = $topics[0];
+            $topicId = (int)$topic['id'];
+            $subtopicId = null;
+        }
+    }
+
+    if (!$topic) {
+        throw new RuntimeException('Für diese Klasse wurden noch keine passenden Lerninhalte gefunden.');
+    }
+
+    $stateOk = (string)($topic['state_code'] ?? '') === (string)($class['state_code'] ?? '');
+    $schoolOk = (string)($topic['school_type_key'] ?? '') === (string)($class['school_type_code'] ?? '');
+    $gradeOk = (string)($topic['grade_key'] ?? '') === $classGrade;
+    $subjectOk = (string)($topic['subject_key'] ?? '') === (string)($class['subject_code'] ?? '');
+
+    if (!$stateOk || !$schoolOk || !$gradeOk || !$subjectOk) {
+        $topics = elevaro_teacher_ai_curriculum_topics_for_class($class);
+        $topic = $topics[0] ?? null;
+        if (!$topic) {
+            throw new RuntimeException('Für diese Klasse wurden noch keine passenden Lerninhalte gefunden.');
+        }
+        $topicId = (int)$topic['id'];
+        $subtopicId = null;
+    }
+
+    $subtopic = null;
+    if ($subtopicId) {
+        $sub = $pdo->prepare("SELECT * FROM curriculum_topic_subtopics WHERE id = :id AND curriculum_topic_content_id = :topic_id LIMIT 1");
+        $sub->execute(['id' => $subtopicId, 'topic_id' => $topicId]);
+        $subtopic = $sub->fetch() ?: null;
+    }
+
+    $keywords = json_decode((string)($topic['keywords_json'] ?? '[]'), true);
+    if (!is_array($keywords)) $keywords = [];
+    $aliases = json_decode((string)($topic['aliases_json'] ?? '[]'), true);
+    if (!is_array($aliases)) $aliases = [];
+    $subKeywords = [];
+    $subAliases = [];
+
+    if ($subtopic) {
+        $subKeywords = json_decode((string)($subtopic['keywords_json'] ?? '[]'), true);
+        if (!is_array($subKeywords)) $subKeywords = [];
+        $subAliases = json_decode((string)($subtopic['aliases_json'] ?? '[]'), true);
+        if (!is_array($subAliases)) $subAliases = [];
+    }
+
+    return [
+        'topic' => $topic,
+        'subtopic' => $subtopic,
+        'keywords' => $keywords,
+        'aliases' => $aliases,
+        'subtopic_keywords' => $subKeywords,
+        'subtopic_aliases' => $subAliases,
+    ];
+}
 }
 
 if (!function_exists('elevaro_teacher_ai_curriculum_prompt_block')) {
@@ -1411,21 +1458,37 @@ if (!function_exists('elevaro_teacher_ai_auto_match_curriculum')) {
 
 if (!function_exists('elevaro_teacher_ai_validate_curriculum_mapping_for_class')) {
     function elevaro_teacher_ai_validate_curriculum_mapping_for_class(int $topicId, ?int $subtopicId, array $class): array
-    {
-        if ($topicId <= 0) {
-            return [null, null];
-        }
-
-        try {
-            $ctx = elevaro_teacher_ai_curriculum_context($topicId, $subtopicId ?: null, $class);
-            return [
-                (int)$ctx['topic']['id'],
-                !empty($ctx['subtopic']['id']) ? (int)$ctx['subtopic']['id'] : null,
-            ];
-        } catch (Throwable $e) {
-            return [null, null];
-        }
+{
+    if ($topicId <= 0) {
+        return [null, null];
     }
+
+    $pdo = elevaro_teacher_ai_wizard_db();
+    $stmt = $pdo->prepare("SELECT * FROM curriculum_topics_content WHERE id = :id LIMIT 1");
+    $stmt->execute(['id' => $topicId]);
+    $topic = $stmt->fetch();
+    if (!$topic) {
+        return [null, null];
+    }
+
+    $classGrade = (string)(($class['level_key'] ?? '') ?: ($class['grade'] ?? ''));
+    if ((string)($topic['state_code'] ?? '') !== (string)($class['state_code'] ?? '')
+        || (string)($topic['school_type_key'] ?? '') !== (string)($class['school_type_code'] ?? '')
+        || (string)($topic['grade_key'] ?? '') !== $classGrade
+        || (string)($topic['subject_key'] ?? '') !== (string)($class['subject_code'] ?? '')
+    ) {
+        return [null, null];
+    }
+
+    $validSubtopicId = null;
+    if ($subtopicId) {
+        $sub = $pdo->prepare("SELECT id FROM curriculum_topic_subtopics WHERE id = :id AND curriculum_topic_content_id = :topic_id LIMIT 1");
+        $sub->execute(['id' => $subtopicId, 'topic_id' => $topicId]);
+        $validSubtopicId = $sub->fetchColumn() ? (int)$subtopicId : null;
+    }
+
+    return [(int)$topicId, $validSubtopicId];
+}
 }
 
 
@@ -1463,8 +1526,9 @@ if (!function_exists('elevaro_teacher_ai_confirm_analysis')) {
     try {
         $class = elevaro_teacher_ai_class_for_teacher((int)$draft['class_id'], $teacherId);
     } catch (Throwable $e) {
-        // Wenn der Zugriff bereits über Draft/Session validiert wurde, nutzen wir Klassenmetadaten aus dem Draft-Kontext nur für das Mapping.
-        $class = ['id' => (int)$draft['class_id']];
+        $stmtClass = elevaro_teacher_ai_wizard_db()->prepare("SELECT * FROM teacher_classes WHERE id = :id LIMIT 1");
+        $stmtClass->execute(['id' => (int)$draft['class_id']]);
+        $class = $stmtClass->fetch() ?: ['id' => (int)$draft['class_id']];
     }
 
     [$topicId, $subtopicId] = elevaro_teacher_ai_validate_curriculum_mapping_for_class(
