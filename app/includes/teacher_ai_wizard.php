@@ -1139,6 +1139,12 @@ if (!function_exists('elevaro_teacher_ai_analysis_schema')) {
                 'usable_material_note' => ['type' => 'string'],
                 'material_type' => ['type' => 'string', 'enum' => ['reading_text', 'worksheet', 'vocabulary_list', 'grammar_exercise', 'mixed', 'image_based_task']],
                 'task_intent' => ['type' => 'string', 'enum' => ['quiz_about_content', 'practice_same_skill', 'vocabulary_training', 'grammar_training', 'listening_comprehension']],
+                'content_mode' => ['type' => 'string', 'enum' => ['content_source', 'self_contained_exercises', 'context_dependent_exercises']],
+                'requires_visible_context' => ['type' => 'boolean'],
+                'detected_dependencies' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'exercise_transform' => ['type' => 'boolean'],
+                'detected_skills' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'generation_strategy' => ['type' => 'string', 'enum' => ['content_questions', 'reuse_or_adapt_examples', 'generate_similar_exercises', 'listening_text_questions']],
                 'target_language' => ['type' => 'string'],
                 'content_map' => [
                     'type' => 'array',
@@ -1185,7 +1191,7 @@ if (!function_exists('elevaro_teacher_ai_analysis_schema')) {
                     ],
                 ],
             ],
-            'required' => ['title', 'description', 'mode', 'language', 'source_summary', 'usable_material_note', 'material_type', 'task_intent', 'target_language', 'content_map', 'topics', 'difficulty_progression', 'image_prompt', 'listening_text', 'listening_segments', 'question_plan'],
+            'required' => ['title', 'description', 'mode', 'language', 'source_summary', 'usable_material_note', 'material_type', 'task_intent', 'content_mode', 'requires_visible_context', 'detected_dependencies', 'exercise_transform', 'detected_skills', 'generation_strategy', 'target_language', 'content_map', 'topics', 'difficulty_progression', 'image_prompt', 'listening_text', 'listening_segments', 'question_plan'],
         ];
     }
 }
@@ -1378,6 +1384,60 @@ if (!function_exists('elevaro_teacher_ai_auto_match_curriculum')) {
     }
 }
 
+
+if (!function_exists('elevaro_teacher_ai_confirm_analysis')) {
+    function elevaro_teacher_ai_confirm_analysis(int $draftId, int $teacherId, array $analysisUpdates): array
+    {
+        elevaro_teacher_ai_split_ensure_schema();
+        $draft = elevaro_teacher_ai_load_draft($draftId, $teacherId);
+        $analysis = json_decode((string)($draft['analysis_json'] ?? ''), true);
+        if (!is_array($analysis)) {
+            throw new RuntimeException('Es liegt noch keine Analyse vor.');
+        }
+
+        $allowed = [
+            'material_type', 'task_intent', 'content_mode', 'requires_visible_context',
+            'detected_dependencies', 'exercise_transform', 'detected_skills',
+            'generation_strategy', 'target_language'
+        ];
+
+        foreach ($allowed as $key) {
+            if (array_key_exists($key, $analysisUpdates)) {
+                $analysis[$key] = $analysisUpdates[$key];
+            }
+        }
+
+        if (isset($analysisUpdates['curriculum_topic_content_id'])) {
+            $analysis['curriculum_topic_content_id'] = (int)$analysisUpdates['curriculum_topic_content_id'];
+        }
+        if (isset($analysisUpdates['curriculum_topic_subtopic_id'])) {
+            $analysis['curriculum_topic_subtopic_id'] = (int)$analysisUpdates['curriculum_topic_subtopic_id'];
+        }
+
+        elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts
+            SET analysis_json = :analysis,
+                generation_step = 'questions_1',
+                curriculum_topic_content_id = COALESCE(:topic_id, curriculum_topic_content_id),
+                curriculum_topic_subtopic_id = :subtopic_id
+            WHERE id = :id AND teacher_id = :teacher_id")
+            ->execute([
+                'analysis' => json_encode($analysis, JSON_UNESCAPED_UNICODE),
+                'topic_id' => !empty($analysis['curriculum_topic_content_id']) ? (int)$analysis['curriculum_topic_content_id'] : null,
+                'subtopic_id' => !empty($analysis['curriculum_topic_subtopic_id']) ? (int)$analysis['curriculum_topic_subtopic_id'] : null,
+                'id' => $draftId,
+                'teacher_id' => $teacherId,
+            ]);
+
+        return [
+            'ok' => true,
+            'draft_id' => $draftId,
+            'status' => 'questions_1',
+            'analysis_route' => elevaro_teacher_ai_analysis_route_payload($analysis, (string)($draft['mode'] ?? 'quiz')),
+        ];
+    }
+}
+
+
 if (!function_exists('elevaro_teacher_ai_create_split_draft')) {
     function elevaro_teacher_ai_create_split_draft(int $teacherId, int $classId, string $mode, string $sourceText, string $extraPrompt, array $files, array $options = []): int
     {
@@ -1475,7 +1535,7 @@ if (!function_exists('elevaro_teacher_ai_split_build_analysis_prompt')) {
             "Dateien:\n" . ($fileList ? implode("\n", $fileList) : '[Keine Datei hochgeladen.]') . "\n\n" .
             "Lehrertext / Aufgabenstellung:\n" . ($sourceText !== '' ? $sourceText : '[Kein zusätzlicher Text eingetragen.]') . "\n\n" .
             "Zusatzwunsch des Lehrers:\n" . ($extraPrompt !== '' ? $extraPrompt : '[Keine Zusatzanweisung.]') . "\n\n" .
-            "Aufgabe für diesen Schritt: Erstelle KEINE fertigen Fragen. Analysiere nur die Quelle und entscheide zuerst, welche Art von Material vorliegt.\n" .
+            "Aufgabe für diesen Schritt: Erstelle KEINE fertigen Fragen. Analysiere nur die Quelle und entscheide zuerst, welche Art von Material vorliegt.\n\nKontextbewusste Kernentscheidung:\n- content_mode = content_source: Lernstoff/Aufschrieb/Sachtext. Der Inhalt wird als gelernt vorausgesetzt; erstelle Fragen zum tatsächlichen Stoff.\n- content_mode = self_contained_exercises: Übungen sind ohne Originalblatt lösbar (z. B. Lückensatz, Rechenaufgabe, vollständige Grammatikaufgabe). Beispiele dürfen übernommen oder leicht variiert werden.\n- content_mode = context_dependent_exercises: Aufgaben benötigen Bild, Tabelle, Text, Mindmap, rechte Lösungsspalte oder anderen sichtbaren Kontext. Nicht direkt übernehmen; Kontext einbauen oder ähnliche Aufgaben erzeugen.\n- requires_visible_context ist true, wenn Schüler das Originalmaterial sehen müssten, um die Frage zu lösen.\n- generation_strategy muss dazu passen: content_questions, reuse_or_adapt_examples, generate_similar_exercises oder listening_text_questions.\n\n" .
             "Zielumfang: " . elevaro_teacher_ai_target_question_count($mode) . " Fragen insgesamt. Bei normalen Quizzen 15 Fragen. Bei Listening 5 Fragen mit je einem kurzen Hörabschnitt.\n" .
             "Klassifiziere material_type und task_intent besonders sorgfältig:\n" .
             "- Wenn die Quelle ein Lerninhalt ohne Material ist: material_type = mixed, task_intent = quiz_about_content. Erstelle eine vollständige, lehrplanorientierte Themenabdeckung, keine Materialbeschreibung.\n" .
@@ -1510,6 +1570,24 @@ if (!function_exists('elevaro_teacher_ai_split_build_questions_prompt')) {
             }
         }
         if ($focus === '') $focus = '- Nutze content_map, Analyse und Originalmaterial für diesen Block.\n';
+
+
+        $contentMode = (string)($analysis['content_mode'] ?? '');
+        $generationStrategy = (string)($analysis['generation_strategy'] ?? '');
+        $requiresVisibleContext = !empty($analysis['requires_visible_context']);
+        $contextRules = "\nKONTEXTBEWUSSTE GENERIERUNGSSTRATEGIE:\n";
+        if ($mode === 'listening') {
+            $contextRules .= "- Erstelle einen neuen passenden Hörtext. Material/Lerninhalt liefert Thema, Wortschatz, Niveau und Kontext; Fragen beziehen sich auf den Hörtext.\n";
+        } elseif ($contentMode === 'content_source' || $generationStrategy === 'content_questions') {
+            $contextRules .= "- Der hochgeladene Inhalt ist Lernstoff. Stelle Fragen zum tatsächlichen Inhalt. Der Stoff wird als gelernt vorausgesetzt.\n";
+        } elseif ($contentMode === 'self_contained_exercises' || $generationStrategy === 'reuse_or_adapt_examples') {
+            $contextRules .= "- Die Übungen sind ohne Originalblatt lösbar. Du darfst konkrete Beispiele übernehmen oder leicht variieren, solange die Quizfrage selbst vollständig lösbar ist.\n";
+        } elseif ($contentMode === 'context_dependent_exercises' || $requiresVisibleContext || $generationStrategy === 'generate_similar_exercises') {
+            $contextRules .= "- Aufgaben benötigen nicht sichtbaren Kontext. Übernimm sie NICHT direkt. Baue nötigen Kontext in den Fragetext ein oder erzeuge ähnliche neue Aufgaben.\n";
+            $contextRules .= "- Keine Verweise auf Bild, Tabelle, Arbeitsblatt, Mindmap, rechte Spalte oder Materialstelle.\n";
+        } else {
+            $contextRules .= "- Jede Frage muss entweder aus sich heraus lösbar sein oder auf als gelernt vorausgesetztem Stoff beruhen.\n";
+        }
 
         $listeningRules = '';
         if ($mode === 'listening') {
@@ -1554,7 +1632,7 @@ if (!function_exists('elevaro_teacher_ai_split_build_questions_prompt')) {
             "Block-Fokus:\n{$focus}\n" .
             "Bereits erzeugte Fragen, die NICHT wiederholt werden dürfen:\n" . ($existing ? implode("\n", array_slice($existing, -24)) : '[Noch keine]') . "\n\n" .
             "Lehrertext / Zusatzwunsch als Zusatzkontext:\n" . ($sourceText !== '' ? $sourceText : '[leer]') . "\n" . ($extraPrompt !== '' ? $extraPrompt : '') . "\n" .
-            $worksheetRules . $listeningRules . "\n" .
+            $contextRules . $worksheetRules . $listeningRules . "\n" .
             "Erzeuge exakt {$blockSize} neue Multiple-Choice-Fragen. Jede Frage hat exakt 4 Optionen und genau eine richtige Antwort. " .
             "Alle Fragen müssen aus Originalmaterial, content_map oder Analyse ableitbar sein. Prüfe im Zweifel wieder das direkt angehängte PDF/Bildmaterial. " .
             ($mode === 'listening'
@@ -1721,59 +1799,68 @@ if (!function_exists('elevaro_teacher_ai_split_base_payload')) {
 if (!function_exists('elevaro_teacher_ai_analysis_route_payload')) {
     function elevaro_teacher_ai_analysis_route_payload(array $analysis, string $mode): array
     {
+        $contentMode = (string)($analysis['content_mode'] ?? '');
         $materialType = (string)($analysis['material_type'] ?? '');
-        $taskIntent = (string)($analysis['task_intent'] ?? '');
-        $exerciseTransform = !empty($analysis['exercise_transform'])
-            || in_array($materialType, ['worksheet', 'grammar_exercise', 'vocabulary_list'], true)
-            || in_array($taskIntent, ['practice_same_skill', 'vocabulary_training', 'grammar_training'], true);
+        $skills = array_values(array_filter(array_map('strval', (array)($analysis['detected_skills'] ?? []))));
+        $skillText = $skills ? ('Erkannte Kompetenzen: ' . implode(', ', array_slice($skills, 0, 5))) : 'Ich erkenne die zentralen Kompetenzen.';
 
         if ($mode === 'listening') {
             return [
                 'route' => 'listening',
                 'headline' => 'Listening erkannt',
                 'steps' => [
-                    'Ich erstelle kurze Hörabschnitte.',
-                    'Die Fragen bleiben in Reihenfolge.',
-                    'Jede Frage bezieht sich direkt auf ihren Hörabschnitt.',
+                    'Ich erstelle einen neuen passenden Hörtext.',
+                    'Thema, Wortschatz und Niveau orientieren sich am Material.',
+                    'Die Fragen beziehen sich auf den neu erzeugten Hörtext.',
                 ],
             ];
         }
 
-        if ($exerciseTransform) {
-            $skills = array_values(array_filter(array_map('strval', (array)($analysis['detected_skills'] ?? []))));
-            $skillText = $skills ? ('Erkannte Skills: ' . implode(', ', array_slice($skills, 0, 4))) : 'Ich erkenne die geübten Skills.';
-            return [
-                'route' => 'exercise_transform',
-                'headline' => match ($materialType) {
-                    'vocabulary_list' => 'Vokabeltraining erkannt',
-                    'grammar_exercise' => 'Grammatikübung erkannt',
-                    'worksheet' => 'Arbeitsblatt erkannt',
-                    default => 'Übungsformat erkannt',
-                },
-                'steps' => [
-                    $skillText,
-                    'Ich referenziere nicht auf den Blattinhalt.',
-                    'Stattdessen erstelle ich ähnliche neue Aufgaben.',
-                    'Die Aufgaben bleiben ohne Originalblatt lösbar.',
-                ],
-            ];
-        }
-
-        if (in_array($materialType, ['reading_text', 'mixed'], true) || $taskIntent === 'quiz_about_content') {
+        if ($contentMode === 'content_source') {
             return [
                 'route' => 'content_quiz',
-                'headline' => 'Lerntext erkannt',
+                'headline' => 'Lernstoff erkannt',
                 'steps' => [
-                    'Ich frage den tatsächlichen Inhalt ab.',
-                    'Ich decke die wichtigsten Aussagen ab.',
-                    'Die Fragen bleiben an den Text gebunden.',
+                    'Der Inhalt wird als gelernt vorausgesetzt.',
+                    'Ich stelle Fragen zum tatsächlichen Stoff.',
+                    'Die Fragen bleiben fachlich an diesen Inhalt gebunden.',
+                ],
+            ];
+        }
+
+        if ($contentMode === 'self_contained_exercises') {
+            return [
+                'route' => 'self_contained_exercises',
+                'headline' => 'Selbstlösbare Übung erkannt',
+                'steps' => [
+                    $skillText,
+                    'Die Aufgaben sind ohne Originalblatt lösbar.',
+                    'Ich darf Beispiele übernehmen oder leicht variieren.',
+                ],
+            ];
+        }
+
+        if ($contentMode === 'context_dependent_exercises' || !empty($analysis['requires_visible_context'])) {
+            return [
+                'route' => 'context_dependent_exercises',
+                'headline' => 'Kontextabhängige Aufgabe erkannt',
+                'steps' => [
+                    $skillText,
+                    'Die Aufgaben brauchen Kontext, den Schüler später nicht sehen.',
+                    'Ich baue Kontext ein oder erstelle ähnliche neue Aufgaben.',
+                    'Keine Verweise auf Bilder, Tabellen oder Arbeitsblattstellen.',
                 ],
             ];
         }
 
         return [
             'route' => 'general',
-            'headline' => 'Material ausgewertet',
+            'headline' => match ($materialType) {
+                'worksheet' => 'Arbeitsblatt erkannt',
+                'vocabulary_list' => 'Vokabeltraining erkannt',
+                'grammar_exercise' => 'Grammatikübung erkannt',
+                default => 'Material ausgewertet',
+            },
             'steps' => [
                 'Ich ordne die Quelle didaktisch ein.',
                 'Ich wähle passende Frageformen.',
@@ -1798,6 +1885,23 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
         @set_time_limit(100);
         elevaro_teacher_ai_split_ensure_schema();
         $draft = elevaro_teacher_ai_load_draft($draftId, $teacherId);
+
+        if (($draft['generation_step'] ?? '') === 'analysis_review') {
+            $analysisReview = json_decode((string)($draft['analysis_json'] ?? ''), true);
+            if (is_array($analysisReview)) {
+                return [
+                    'ok' => true,
+                    'done' => false,
+                    'needs_analysis_review' => true,
+                    'draft_id' => $draftId,
+                    'status' => 'analysis_review',
+                    'status_label' => elevaro_teacher_ai_analysis_route_label($analysisReview, (string)($draft['mode'] ?? 'quiz')),
+                    'analysis' => $analysisReview,
+                    'analysis_route' => elevaro_teacher_ai_analysis_route_payload($analysisReview, (string)($draft['mode'] ?? 'quiz')),
+                ];
+            }
+        }
+
 
         if (($draft['status'] ?? '') === 'draft' && !empty($draft['generated_payload_json'])) {
             return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => elevaro_teacher_ai_draft_payload($draft)];
@@ -1830,7 +1934,7 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
                 $system = 'Du bist ein erfahrener Lehrer und Fachdidaktiker. Analysiere Unterrichtsmaterial quellengebunden. Keine Fantasieinhalte. Liefere ausschließlich valides JSON nach Schema.';
                 $result = elevaro_openai_responses_json($system, $content, elevaro_teacher_ai_analysis_schema(), 0.15, 90);
                 $analysis = $result['json'];
-                elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts SET analysis_json = :analysis, generation_step = 'questions_1', source_title = :title, image_prompt = :image_prompt WHERE id = :id AND teacher_id = :teacher_id")
+                elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts SET analysis_json = :analysis, generation_step = 'analysis_review', source_title = :title, image_prompt = :image_prompt WHERE id = :id AND teacher_id = :teacher_id")
                     ->execute([
                         'analysis' => json_encode($analysis, JSON_UNESCAPED_UNICODE),
                         'title' => (string)($analysis['title'] ?? null),
@@ -1842,9 +1946,11 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
                 return [
                     'ok' => true,
                     'done' => false,
+                    'needs_analysis_review' => true,
                     'draft_id' => $draftId,
-                    'status' => 'analysis_done',
+                    'status' => 'analysis_review',
                     'status_label' => $routeLabel,
+                    'analysis' => $analysis,
                     'analysis_route' => elevaro_teacher_ai_analysis_route_payload($analysis, $mode),
                 ];
             }

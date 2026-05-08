@@ -215,6 +215,91 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
     </div>
   </section>
 
+
+  <section class="ai-wizard-panel" data-step="analysis">
+    <div class="ai-analysis-review">
+      <div class="ai-analysis-review-head">
+        <span class="ai-wizard-kicker">🧭 Analyse prüfen</span>
+        <h3>Elevaro hat dein Material didaktisch eingeordnet</h3>
+        <p>Prüfe kurz, ob Materialtyp, Aufgaben-Kontext und Strategie stimmen. Erst danach werden Fragen generiert.</p>
+      </div>
+
+      <div class="ai-analysis-grid">
+        <div class="ai-analysis-card">
+          <label>Materialtyp</label>
+          <select class="form-select" id="aiAnalysisMaterialType">
+            <option value="reading_text">Lerntext / Sachtext</option>
+            <option value="worksheet">Arbeitsblatt</option>
+            <option value="vocabulary_list">Vokabelliste</option>
+            <option value="grammar_exercise">Grammatikübung</option>
+            <option value="mixed">Gemischtes Material</option>
+            <option value="image_based_task">Bild-/Materialaufgabe</option>
+          </select>
+        </div>
+
+        <div class="ai-analysis-card">
+          <label>Aufgaben-Kontext</label>
+          <select class="form-select" id="aiAnalysisContentMode">
+            <option value="content_source">Lernstoff: Fragen zum Inhalt</option>
+            <option value="self_contained_exercises">Selbstlösbare Übung: Beispiele nutzen/variieren</option>
+            <option value="context_dependent_exercises">Kontextabhängig: Kontext einbauen oder ähnliche Aufgaben</option>
+          </select>
+        </div>
+
+        <div class="ai-analysis-card">
+          <label>Generierungsstrategie</label>
+          <select class="form-select" id="aiAnalysisStrategy">
+            <option value="content_questions">Fragen zum tatsächlichen Stoff</option>
+            <option value="reuse_or_adapt_examples">Beispiele übernehmen oder leicht variieren</option>
+            <option value="generate_similar_exercises">Neue ähnliche Aufgaben erzeugen</option>
+            <option value="listening_text_questions">Neuen Hörtext + Verständnisfragen erzeugen</option>
+          </select>
+        </div>
+
+        <div class="ai-analysis-card">
+          <label>Benötigt sichtbaren Kontext?</label>
+          <select class="form-select" id="aiAnalysisRequiresContext">
+            <option value="0">Nein, ohne Originalmaterial lösbar</option>
+            <option value="1">Ja, Kontext wäre sonst nicht sichtbar</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="ai-analysis-summary-card">
+        <strong id="aiAnalysisHeadline">Analyse wird geladen…</strong>
+        <ul id="aiAnalysisSteps"></ul>
+      </div>
+
+      <div class="ai-analysis-edit-grid">
+        <div>
+          <label class="form-label fw-bold">Erkannte Kompetenzen</label>
+          <textarea class="form-control" id="aiAnalysisSkills" rows="3" placeholder="z. B. months, ordinal numbers, dates"></textarea>
+          <div class="form-text">Eine Kompetenz pro Zeile oder kommagetrennt.</div>
+        </div>
+        <div>
+          <label class="form-label fw-bold">Abhängigkeiten / Kontext</label>
+          <textarea class="form-control" id="aiAnalysisDependencies" rows="3" placeholder="z. B. Bild, Tabelle, rechte Lösungsspalte"></textarea>
+          <div class="form-text">Was müsste sichtbar sein, damit die Originalaufgabe lösbar wäre?</div>
+        </div>
+      </div>
+
+      <div class="ai-analysis-learning-box mt-4">
+        <label class="form-label fw-bold">Lerninhalt-Zuordnung</label>
+        <select class="form-select" id="aiAnalysisCurriculumTopic">
+          <option value="">KI-Zuordnung verwenden</option>
+        </select>
+        <select class="form-select mt-2" id="aiAnalysisCurriculumSubtopic">
+          <option value="">Ganzes Thema</option>
+        </select>
+      </div>
+
+      <div class="d-flex justify-content-between gap-2 flex-wrap mt-4">
+        <button class="btn btn-light btn-lg" type="button" data-back-to-step="1">Zurück</button>
+        <button class="btn btn-primary btn-lg" id="aiConfirmAnalysis" type="button">Analyse bestätigen & Fragen erstellen</button>
+      </div>
+    </div>
+  </section>
+
   <section class="ai-wizard-panel" data-step="3">
     <div class="row g-4">
       <div class="col-xl-4">
