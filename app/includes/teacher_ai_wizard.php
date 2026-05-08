@@ -430,47 +430,58 @@ function elevaro_teacher_ai_build_generation_prompt(array $class, string $mode, 
     $level = (string)($class['level_key'] ?? '');
     $school = (string)($class['school_type_code'] ?? '');
     $language = elevaro_teacher_ai_language_for_class($class, $mode);
+    $isCurriculum = !$files && elevaro_teacher_ai_is_curriculum_source_text($sourceText);
+
+    if ($isCurriculum) {
+        return trim("Erstelle ein Schülerquiz für den Elevaro-Klassenraum.\n\n"
+            . "MODUS: Lehrplan-/Lernzielbasierte Generierung ohne hochgeladenes Material.\n\n"
+            . "Klassenkontext:\n"
+            . "- Klasse: {$grade}\n"
+            . "- Schulart/Level: {$school} / {$level}\n"
+            . "- Fach: {$subject}\n"
+            . "- Quizmodus: " . ($mode === 'listening' ? 'Listening + Comprehension' : 'normales Multiple-Choice-Quiz') . "\n"
+            . "- Sprache der sichtbaren Fragen: {$language}\n\n"
+            . "Verbindlicher Lerninhalt:\n{$sourceText}\n\n"
+            . elevaro_teacher_ai_curriculum_hard_rule_block($sourceText) . "\n"
+            . elevaro_teacher_ai_subject_generation_rules($class) . "\n"
+            . "Aufgabe:\n"
+            . "- Erstelle neue Quizfragen ausschließlich zum aktiven Lernziel.\n"
+            . "- Verwende keine Materialanalyse, keine PDF-/Bildregeln und keine Quellenverweise. Es wurde kein Unterrichtsmaterial hochgeladen.\n"
+            . "- Wenn ein Unterthema aktiv ist, darf das breite Eltern-Lernziel nicht zu Vergleichsfragen oder Nebenregionen führen.\n"
+            . "- Harte Lehrerregeln sind Ausschlusskriterien. Inhalte, die dagegen verstoßen, dürfen nicht in Frage, Antwortoptionen oder Erklärung vorkommen.\n"
+            . "- Jede Frage hat exakt 4 Antwortoptionen und genau eine richtige Antwort.\n"
+            . "- Formuliere altersgerecht, klar und motivierend.\n"
+            . "- Erkläre kurz, warum die richtige Antwort stimmt.\n"
+            . "- Erstelle außerdem eine kurze Quizbeschreibung und einen konkreten Bildprompt im Elevaro-CD-Stil: flache freundliche Vektor-Illustration, weiche Formen, klare lebendige Farben, dezente Schatten, keine 3D-Optik, ohne Text, Logos oder Marken.");
+    }
 
     $fileList = [];
     foreach ($files as $file) {
         $fileList[] = '- ' . (string)($file['original_name'] ?? 'Material') . ' (' . (string)($file['mime'] ?? 'Datei') . ')';
     }
 
-    return trim("Erstelle ein Schülerquiz für den Elevaro-Klassenraum.
-
-Klassenkontext:
-- Klasse: {$grade}
-- Schulart/Level: {$school} / {$level}
-- Fach: {$subject}
-- Modus: " . ($mode === 'listening' ? 'Listening + Comprehension' : 'normales Multiple-Choice-Quiz') . "
-- Sprache der Fragen: {$language}
-
-Vom Lehrer hochgeladene Dateien:
-" . ($fileList ? implode("\n", $fileList) : '[Keine Datei hochgeladen – ggf. Lerninhalt als Quelle.]') . "
-
-Zusätzlicher Lehrertext / Aufgabenstellung:
-" . ($sourceText !== '' ? $sourceText : '[Kein zusätzlicher Text eingetragen.]') . "
-
-Zusatzwunsch des Lehrers:
-" . ($extraPrompt !== '' ? $extraPrompt : '[Keine Zusatzanweisung.]') . "
-
-Aufgabe:
-- Analysiere zuerst das direkt bereitgestellte Material. PDFs und Bilder sind die Primärquelle.
-- Berücksichtige bei PDFs auch visuelle Seiteninhalte, Scans, Fotos von Buchseiten, Tabellen und Aufgabenstellungen, soweit lesbar.
-- Erstelle ein fertiges Quiz mit 30 Fragen, davon eher leichte Fragen am Anfang und schwerere später.
-- Jede Frage hat exakt 4 Antwortoptionen.
-- Genau eine Antwort ist richtig.
-- Erkläre knapp, warum die Antwort richtig ist.
-- Strikte Quellenbindung: Jede Frage muss eindeutig aus dem hochgeladenen Material oder dem ausdrücklich eingegebenen Lehrertext ableitbar sein.
-- Schüler sehen das Originalmaterial NICHT. Verweise deshalb niemals auf nicht sichtbare Quellen/Bilder/Arbeitsblätter. Verboten sind Formulierungen wie „im Bild“, „auf dem Arbeitsblatt“, „laut Mindmap“, „in der Tabelle“, „siehe oben“, „wie gezeigt“, „im Material“, „auf der Seite“.
-- Wenn eine Frage ohne Originalbild/Arbeitsblatt nicht lösbar wäre, formuliere alle nötigen Informationen direkt in den Fragetext um oder verwende diese Frage nicht.
-- Bildfragen sind nur erlaubt, wenn ein sichtbares neues Quizbild pro Frage erzeugt und im Quiz angezeigt wird. Solange dieser Fragetyp nicht aktiv ist: keine Bildreferenzen.
-- Der Klassenkontext dient nur zur Anpassung von Niveau und Sprache, nicht als Ersatzquelle für Fakten.
-- Wenn zu wenig Material lesbar ist: Erstelle nur Fragen zu sicher lesbaren Inhalten und erwähne die Einschränkung in der Beschreibung. Erfinde keine Inhalte.
-- Formuliere altersgerecht.
-- Bei Fremdsprachen/Listening: Fragen und Antworten in der Zielsprache.
-- Bei Listening gilt: Erstelle einen neuen kurzen Hörtext bzw. mehrere kurze Hörabschnitte, die thematisch und sprachlich zum Material/Lerninhalt passen. Das Material dient als Vorlage für Thema, Wortschatz, Niveau und Kontext, nicht als Satz-für-Satz-Quelle. Die Fragen prüfen Hörverstehen zum neu erzeugten Hörtext.
-- Erstelle außerdem eine kurze Quizbeschreibung und einen konkreten Bildprompt. Bildprompt-Regeln: ausschließlich Elevaro-CD-Stil, flache freundliche Vektor-Illustration, weiche Formen, klare lebendige Farben, dezente Schatten, keine 3D-Optik, altersgerecht zur Klassenstufe, ohne Text im Bild, ohne Logos/Marken, ohne fotorealistische Personen, ohne gruselige/gewalttätige Motive.");
+    return trim("Erstelle ein Schülerquiz für den Elevaro-Klassenraum.\n\n"
+        . "Klassenkontext:\n"
+        . "- Klasse: {$grade}\n"
+        . "- Schulart/Level: {$school} / {$level}\n"
+        . "- Fach: {$subject}\n"
+        . "- Modus: " . ($mode === 'listening' ? 'Listening + Comprehension' : 'normales Multiple-Choice-Quiz') . "\n"
+        . "- Sprache der Fragen: {$language}\n\n"
+        . "Vom Lehrer hochgeladene Dateien:\n" . ($fileList ? implode("\n", $fileList) : '[Keine Datei hochgeladen – Textquelle verwenden.]') . "\n\n"
+        . "Material/Textquelle:\n" . ($sourceText !== '' ? $sourceText : '[Kein zusätzlicher Text eingetragen.]') . "\n\n"
+        . "Zusatzwunsch des Lehrers:\n" . ($extraPrompt !== '' ? $extraPrompt : '[Keine Zusatzanweisung.]') . "\n\n"
+        . "Aufgabe:\n"
+        . "- Analysiere zuerst das direkt bereitgestellte Material. PDFs und Bilder sind die Primärquelle.\n"
+        . "- Berücksichtige bei PDFs auch visuelle Seiteninhalte, Scans, Fotos von Buchseiten, Tabellen und Aufgabenstellungen, soweit lesbar.\n"
+        . "- Erstelle ein fertiges Quiz mit 30 Fragen, davon eher leichte Fragen am Anfang und schwerere später.\n"
+        . "- Jede Frage hat exakt 4 Antwortoptionen.\n"
+        . "- Genau eine Antwort ist richtig.\n"
+        . "- Erkläre knapp, warum die Antwort richtig ist.\n"
+        . "- Strikte Quellenbindung: Jede Frage muss eindeutig aus dem hochgeladenen Material oder dem ausdrücklich eingegebenen Lehrertext ableitbar sein.\n"
+        . "- Schüler sehen das Originalmaterial NICHT. Verweise deshalb niemals auf nicht sichtbare Quellen/Bilder/Arbeitsblätter.\n"
+        . "- Wenn eine Frage ohne Originalbild/Arbeitsblatt nicht lösbar wäre, formuliere alle nötigen Informationen direkt in den Fragetext um oder verwende diese Frage nicht.\n"
+        . "- Formuliere altersgerecht.\n"
+        . "- Erstelle außerdem eine kurze Quizbeschreibung und einen konkreten Bildprompt im Elevaro-CD-Stil.");
 }
 
 function elevaro_teacher_ai_generate_from_material(array $class, string $mode, string $sourceText, string $extraPrompt, array $files): array
@@ -847,26 +858,7 @@ function elevaro_teacher_ai_load_draft(int $draftId, int $teacherId): array
 function elevaro_teacher_ai_draft_payload(array $draft): array
 {
     $payload = json_decode((string)($draft['generated_payload_json'] ?? ''), true);
-    if (!is_array($payload)) {
-        $payload = [];
-    }
-
-    // Debug-Hilfe für den Lehrer-Wizard: Der verwendete Prompt soll im Review sichtbar sein.
-    // Wird nur im Entwurf/Frontend mitgegeben und beim Speichern/Veröffentlichen wieder ignoriert.
-    $debugPrompt = trim((string)($draft['prompt'] ?? ''));
-    if ($debugPrompt !== '') {
-        $payload['_debug_prompt'] = $debugPrompt;
-        $payload['_debug_meta'] = [
-            'draft_id' => (int)($draft['id'] ?? 0),
-            'mode' => (string)($draft['mode'] ?? ''),
-            'source_kind' => (string)($draft['source_kind'] ?? ''),
-            'generation_step' => (string)($draft['generation_step'] ?? ''),
-            'curriculum_topic_content_id' => isset($draft['curriculum_topic_content_id']) ? (int)$draft['curriculum_topic_content_id'] : 0,
-            'curriculum_topic_subtopic_id' => isset($draft['curriculum_topic_subtopic_id']) ? (int)$draft['curriculum_topic_subtopic_id'] : 0,
-        ];
-    }
-
-    return $payload;
+    return is_array($payload) ? $payload : [];
 }
 
 function elevaro_teacher_ai_save_payload(int $draftId, int $teacherId, array $payload): void
@@ -1408,28 +1400,135 @@ if (!function_exists('elevaro_teacher_ai_curriculum_context')) {
 }
 }
 
+
+if (!function_exists('elevaro_teacher_ai_is_curriculum_source_text')) {
+    function elevaro_teacher_ai_is_curriculum_source_text(string $sourceText): bool
+    {
+        return str_contains($sourceText, 'AKTIVER LERNINHALT')
+            || str_contains($sourceText, 'Quelle: curriculum')
+            || str_contains($sourceText, 'Lerninhalt als verbindliche Quelle:');
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_subject_generation_rules')) {
+    function elevaro_teacher_ai_subject_generation_rules(array $class): string
+    {
+        $subject = mb_strtolower((string)($class['subject_code'] ?? ''), 'UTF-8');
+
+        if (str_contains($subject, 'geo')) {
+            return "Fachspezifische Regeln für Geographie:\n"
+                . "- Stelle räumliche, landschaftliche und einfache begriffliche Zusammenhänge altersgerecht dar.\n"
+                . "- Frage nur geografische Inhalte ab, die direkt zum aktiven Lernziel gehören.\n"
+                . "- Keine Nebenregionen, Nachbarländer, Bundesländer oder Vergleichslandschaften, wenn sie nicht ausdrücklich im aktiven Lernziel oder in harten Lehrerregeln erlaubt sind.\n"
+                . "- Vermeide Detailwissen, das für Klasse 5 zu speziell ist.\n";
+        }
+
+        if (str_contains($subject, 'engl') || str_contains($subject, 'franz') || str_contains($subject, 'span')) {
+            return "Fachspezifische Regeln für Fremdsprachen:\n"
+                . "- Bewahre Zielsprache, Niveau und Übungsmechanik.\n"
+                . "- Füge keine Übersetzungen oder Lösungshinweise hinzu, außer sie sind zur Lösbarkeit nötig oder vom Lehrer gewünscht.\n"
+                . "- Bei Grammatik- und Vokabelaufgaben müssen Distraktoren eindeutig falsch, aber didaktisch plausibel sein.\n";
+        }
+
+        if (str_contains($subject, 'math')) {
+            return "Fachspezifische Regeln für Mathematik:\n"
+                . "- Prüfe Rechenwege, Einheiten und eindeutige Ergebnisse.\n"
+                . "- Distraktoren sollen typische Schülerfehler abbilden, aber nicht ebenfalls korrekt sein.\n";
+        }
+
+        if (str_contains($subject, 'bio') || str_contains($subject, 'natur')) {
+            return "Fachspezifische Regeln für Naturwissenschaften:\n"
+                . "- Fachbegriffe korrekt, aber altersgerecht verwenden.\n"
+                . "- Keine kausalen Vereinfachungen, die fachlich falsch werden.\n";
+        }
+
+        if (str_contains($subject, 'geschichte') || str_contains($subject, 'politik')) {
+            return "Fachspezifische Regeln für Geschichte/Politik:\n"
+                . "- Keine erfundenen Ereignisse, Daten oder Zitate.\n"
+                . "- Vereinfachen, ohne historische oder politische Zusammenhänge zu verfälschen.\n";
+        }
+
+        return "Fachspezifische Regeln:\n- Bleibe eng am aktiven Lernziel.\n- Formuliere altersgerecht und fachlich korrekt.\n";
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_curriculum_hard_rule_block')) {
+    function elevaro_teacher_ai_curriculum_hard_rule_block(string $sourceText): string
+    {
+        $rules = [];
+        if (preg_match('/HARTE LEHRERREGELN:\s*(.*?)(?:\n\n[A-ZÄÖÜ][A-ZÄÖÜ\- ]{3,}:|\z)/su', $sourceText, $m)) {
+            $raw = trim((string)$m[1]);
+            if ($raw !== '' && $raw !== '[Keine Zusatzanweisung.]') {
+                $rules[] = $raw;
+            }
+        }
+
+        $base = "PRIORITÄT DER REGELN:\n"
+            . "1. Harte Lehrerregeln haben Vorrang vor allgemeinen Lernzielen und Keywords.\n"
+            . "2. Wenn ein Unterthema ausgewählt ist, ist ausschließlich dieses Unterthema der aktive Fokus.\n"
+            . "3. Übergeordnete Themen dienen nur zur Einordnung und dürfen keine eigenen Frageinhalte erzwingen.\n";
+
+        if (!$rules) {
+            return $base . "HARTE LEHRERREGELN:\n[Keine zusätzlichen Lehrerregeln.]\n";
+        }
+
+        return $base . "HARTE LEHRERREGELN:\n- " . implode("\n- ", array_map('trim', $rules)) . "\n";
+    }
+}
+
 if (!function_exists('elevaro_teacher_ai_curriculum_prompt_block')) {
     function elevaro_teacher_ai_curriculum_prompt_block(array $context): string
     {
-        $t=$context['topic']; $s=$context['subtopic'];
-        $keywords=array_filter(array_merge((array)$context['keywords'],(array)$context['subtopic_keywords']));
-        $aliases=array_filter(array_merge((array)$context['aliases'],(array)$context['subtopic_aliases']));
-        $lines=[
-            'Lerninhalt als verbindliche Quelle:',
-            '- Bereich: '.(string)($t['domain_title'] ?? ''),
-            '- Thema kurz: '.(string)(($t['title_short'] ?? '') ?: ($t['topic_title'] ?? '')),
-            '- Thema lang: '.(string)($t['title_long'] ?? ''),
-            '- Beschreibung: '.(string)($t['topic_description'] ?? ''),
-            '- Lernziel: '.(string)($t['learning_goal'] ?? ''),
-        ];
-        if ($s) {
-            $lines[]='- Ausgewähltes Unterthema kurz: '.(string)(($s['title_short'] ?? '') ?: ($s['subtopic_title'] ?? ''));
-            $lines[]='- Ausgewähltes Unterthema lang: '.(string)($s['title_long'] ?? '');
-            $lines[]='- Unterthema-Lernziel: '.(string)($s['learning_goal'] ?? '');
+        $t = $context['topic'];
+        $s = $context['subtopic'];
+        $hasSubtopic = is_array($s) && !empty($s);
+
+        // Wenn ein Unterthema gewählt wurde, wird nur dessen Lernziel aktiv genutzt.
+        // Das Eltern-Lernziel bleibt bewusst aus dem aktiven Prompt, damit keine breiten Vergleichsfragen entstehen.
+        $activeTitleShort = $hasSubtopic
+            ? (string)(($s['title_short'] ?? '') ?: ($s['subtopic_title'] ?? ''))
+            : (string)(($t['title_short'] ?? '') ?: ($t['topic_title'] ?? ''));
+        $activeTitleLong = $hasSubtopic
+            ? (string)(($s['title_long'] ?? '') ?: $activeTitleShort)
+            : (string)(($t['title_long'] ?? '') ?: $activeTitleShort);
+        $activeLearningGoal = $hasSubtopic
+            ? (string)($s['learning_goal'] ?? '')
+            : (string)($t['learning_goal'] ?? '');
+        $activeKeywords = $hasSubtopic ? (array)$context['subtopic_keywords'] : (array)$context['keywords'];
+        $activeAliases = $hasSubtopic ? (array)$context['subtopic_aliases'] : (array)$context['aliases'];
+
+        if ($hasSubtopic && !$activeKeywords) {
+            $activeKeywords = array_slice((array)$context['keywords'], 0, 8);
         }
-        if ($keywords) $lines[]='- Keywords: '.implode(', ', array_slice($keywords,0,18));
-        if ($aliases) $lines[]='- Aliasbegriffe: '.implode(', ', array_slice($aliases,0,12));
-        return implode("\n",$lines);
+        if ($hasSubtopic && !$activeAliases) {
+            $activeAliases = array_slice((array)$context['aliases'], 0, 6);
+        }
+
+        $lines = [
+            'AKTIVER LERNINHALT',
+            '- Quelle: curriculum',
+            '- Fokus-Ebene: ' . ($hasSubtopic ? 'Unterthema' : 'Thema'),
+            '- Bereich: ' . (string)($t['domain_title'] ?? ''),
+            '- Übergeordnetes Thema: ' . (string)(($t['title_short'] ?? '') ?: ($t['topic_title'] ?? '')),
+            '- Aktiver Fokus kurz: ' . $activeTitleShort,
+            '- Aktiver Fokus lang: ' . $activeTitleLong,
+            '- Aktives Lernziel: ' . $activeLearningGoal,
+        ];
+
+        if (!$hasSubtopic && !empty($t['topic_description'])) {
+            $lines[] = '- Beschreibung: ' . (string)$t['topic_description'];
+        }
+
+        if ($hasSubtopic) {
+            $lines[] = '- Fokusregel: Das übergeordnete Thema dient nur zur Einordnung. Stelle keine Fragen zu anderen Unterthemen, Landschaften, Regionen oder Vergleichsaspekten, sofern sie nicht ausdrücklich in harten Lehrerregeln erlaubt sind.';
+        }
+
+        $activeKeywords = array_values(array_filter(array_unique(array_map('strval', $activeKeywords))));
+        $activeAliases = array_values(array_filter(array_unique(array_map('strval', $activeAliases))));
+        if ($activeKeywords) $lines[] = '- Relevante Begriffe für den aktiven Fokus: ' . implode(', ', array_slice($activeKeywords, 0, 14));
+        if ($activeAliases) $lines[] = '- Aliasbegriffe zum aktiven Fokus: ' . implode(', ', array_slice($activeAliases, 0, 8));
+
+        return implode("\n", $lines);
     }
 }
 
@@ -1600,15 +1699,24 @@ if (!function_exists('elevaro_teacher_ai_create_split_draft')) {
         if ($sourceKind === 'curriculum') {
             if ($topicId <= 0) throw new RuntimeException('Bitte ein Lerninhalt auswählen.');
             $ctx = elevaro_teacher_ai_curriculum_context($topicId, $subtopicId ?: null, $class);
-            $sourceText = trim($sourceText . "
+            $teacherRules = trim($extraPrompt);
+            $sourceText = trim(elevaro_teacher_ai_curriculum_prompt_block($ctx)
+                . "
 
-" . elevaro_teacher_ai_curriculum_prompt_block($ctx));
-            $extraPrompt = trim($extraPrompt . "
-
-Quelle: Lerninhalt ohne zusätzliches Material. Erstelle ein Quiz auf Basis dieses Lerninhalts, der Langbeschreibung, Lernziele, Keywords und des Klassenkontexts. Keine Quellenverweise im Fragetext.");
+HARTE LEHRERREGELN:
+"
+                . ($teacherRules !== '' ? $teacherRules : '[Keine Zusatzanweisung.]'));
+            $extraPrompt = '';
             $files = [];
         } elseif (!elevaro_teacher_ai_has_readable_material($sourceText, $files)) {
             throw new RuntimeException('Bitte Material hochladen, Text eingeben oder ein Lerninhalt auswählen.');
+        } elseif (trim($extraPrompt) !== '') {
+            // Der asynchrone Generator lädt später nur source_text aus der DB. Deshalb müssen
+            // Lehrerhinweise in die gespeicherte Quelle übernommen werden, aber klar getrennt vom Material.
+            $sourceText = trim($sourceText . "
+
+LEHRER-ZUSATZREGELN:
+" . trim($extraPrompt));
         }
 
         $files = elevaro_teacher_ai_prepare_openai_material_files($files);
@@ -1680,29 +1788,55 @@ if (!function_exists('elevaro_teacher_ai_split_build_analysis_prompt')) {
         $level = (string)($class['level_key'] ?? '');
         $school = (string)($class['school_type_code'] ?? '');
         $language = elevaro_teacher_ai_language_for_class($class, $mode);
+        $isCurriculum = !$files && elevaro_teacher_ai_is_curriculum_source_text($sourceText);
+
+        if ($isCurriculum) {
+            return trim("Plane ein Elevaro-Quiz auf Basis eines ausgewählten Lehrplan-/Lernziels.\n\n"
+                . "Es wurde KEIN Unterrichtsmaterial hochgeladen. Führe daher keine Material-, PDF-, Bild- oder Arbeitsblattanalyse durch.\n\n"
+                . "Klassenkontext:\n"
+                . "- Klasse: {$grade}\n"
+                . "- Schulart/Level: {$school} / {$level}\n"
+                . "- Fach: {$subject}\n"
+                . "- Modus: " . ($mode === 'listening' ? 'Listening + Comprehension' : 'normales Multiple-Choice-Quiz') . "\n"
+                . "- Erwartete Sprache der Fragen: {$language}\n\n"
+                . "Verbindlicher Lerninhalt und Lehrerregeln:\n{$sourceText}\n\n"
+                . elevaro_teacher_ai_curriculum_hard_rule_block($sourceText) . "\n"
+                . elevaro_teacher_ai_subject_generation_rules($class) . "\n"
+                . "Aufgabe der Planung:\n"
+                . "- Erstelle eine kurze, motivierende Quizbeschreibung.\n"
+                . "- Erstelle eine content_map ausschließlich zum aktiven Lernziel.\n"
+                . "- Wenn ein Unterthema aktiv ist: plane keine Fragen zum breiten Eltern-Lernziel und keine Vergleichsfragen zu anderen Unterthemen.\n"
+                . "- Harte Lehrerregeln sind Ausschlusskriterien. Inhalte, die dagegen verstoßen, dürfen nicht in topics, content_map, question_plan oder späteren Fragen auftauchen.\n"
+                . "- Setze material_type = mixed, task_intent = quiz_about_content, content_mode = content_source, requires_visible_context = false, generation_strategy = content_questions.\n"
+                . "- source_summary beschreibt den aktiven Lerninhalt, nicht ein Material. usable_material_note soll kurz sagen, dass ohne Upload aus dem gewählten Lernziel generiert wird.\n"
+                . "- Plane " . elevaro_teacher_ai_target_question_count($mode) . " Fragen insgesamt. Bei normalen Quizzen 15 Fragen in 3 Blöcken à 5 Fragen.\n"
+                . "- Die Blöcke sollen innerhalb des aktiven Fokus sinnvoll ansteigen: leicht, mittel, etwas anspruchsvoller.\n"
+                . "- image_prompt beschreibt ein passendes Elevaro-Quizbild im modernen, freundlichen, spielerisch-edukativen Stil; ohne Text im Bild, ohne Logos, nicht fotorealistisch.\n"
+                . ($mode === 'listening'
+                    ? elevaro_teacher_ai_listening_story_instruction(elevaro_teacher_ai_target_question_count($mode))
+                    : "")
+                . "Liefere ausschließlich valides JSON nach Schema.");
+        }
+
         $fileList = array_map(static fn($file) => '- ' . (string)($file['original_name'] ?? 'Material') . ' (' . (string)($file['mime'] ?? 'Datei') . ')', $files);
 
-        return trim("Analysiere die Quelle für einen Elevaro-KI-Quiz-Wizard. Die Quelle kann hochgeladenes Unterrichtsmaterial oder ein ausgewähltes Lerninhalt sein.\n\n" .
-            "Klassenkontext:\n- Klasse: {$grade}\n- Schulart/Level: {$school} / {$level}\n- Fach: {$subject}\n- Modus: " . ($mode === 'listening' ? 'Listening + Comprehension' : 'normales Multiple-Choice-Quiz') . "\n- Erwartete Sprache der Fragen: {$language}\n\n" .
-            "Dateien:\n" . ($fileList ? implode("\n", $fileList) : '[Keine Datei hochgeladen.]') . "\n\n" .
-            "Lehrertext / Aufgabenstellung:\n" . ($sourceText !== '' ? $sourceText : '[Kein zusätzlicher Text eingetragen.]') . "\n\n" .
-            "Zusatzwunsch des Lehrers:\n" . ($extraPrompt !== '' ? $extraPrompt : '[Keine Zusatzanweisung.]') . "\n\n" .
-            "Aufgabe für diesen Schritt: Erstelle KEINE fertigen Fragen. Analysiere nur die Quelle und entscheide zuerst, welche Art von Material vorliegt.\n\nKontextbewusste Kernentscheidung:\nWichtige Kontextregel für Arbeitsblätter:\n- Wenn eine Aufgabe nur mit einer Hilfsspalte, Übersetzung, Wortbank, Tabelle, Bildunterschrift oder einem Begleittext lösbar ist, markiere content_mode = context_dependent_exercises und requires_visible_context = true.\n- Wenn die Aufgabe übernommen wird, muss dieser Kontext später im Quiz sichtbar in der Frage stehen. Beispiel: 'Deutsch: Unser Konzert ist am fünften Mai. Complete: Our concert is on the ______ of May.'\n- Bei Vokabel-/Übersetzungsübungen ist die deutsche Bedeutung oft notwendiger Kontext und darf/soll in die Quizfrage übernommen werden.\n- content_mode = content_source: Lernstoff/Aufschrieb/Sachtext. Der Inhalt wird als gelernt vorausgesetzt; erstelle Fragen zum tatsächlichen Stoff.\n- content_mode = self_contained_exercises: Übungen sind ohne Originalblatt lösbar (z. B. Lückensatz, Rechenaufgabe, vollständige Grammatikaufgabe). Beispiele dürfen übernommen oder leicht variiert werden.\n- content_mode = context_dependent_exercises: Aufgaben benötigen Bild, Tabelle, Text, Mindmap, rechte Lösungsspalte oder anderen sichtbaren Kontext. Nicht direkt übernehmen; Kontext einbauen oder ähnliche Aufgaben erzeugen.\n- requires_visible_context ist true, wenn Schüler das Originalmaterial sehen müssten, um die Frage zu lösen.\n- generation_strategy muss dazu passen: content_questions, reuse_or_adapt_examples, generate_similar_exercises oder listening_text_questions.\n\n" .
-            "Zielumfang: " . elevaro_teacher_ai_target_question_count($mode) . " Fragen insgesamt. Bei normalen Quizzen 15 Fragen. Bei Listening 5 Fragen mit je einem kurzen Hörabschnitt.\n" .
-            "Klassifiziere material_type und task_intent besonders sorgfältig:\n" .
-            "- Wenn die Quelle ein Lerninhalt ohne Material ist: material_type = mixed, task_intent = quiz_about_content. Erstelle eine vollständige, lehrplanorientierte Themenabdeckung, keine Materialbeschreibung.\n" .
-            "- reading_text + quiz_about_content: Der Inhalt selbst soll verstanden und abgefragt werden.\n" .
-            "- worksheet, grammar_exercise oder vocabulary_list: Das Blatt ist meist Übungsmaterial. Dann darf NICHT zufälliger Beispielsatz-Inhalt abgefragt werden. Stattdessen sollen die geübten Lernziele, Vokabeln, Satzmuster, Grammatikstrukturen oder Kompetenzen trainiert werden.\n" .
-            "- Bei Fremdsprachen-Arbeitsblättern: Übersetze die späteren Fragen nicht automatisch ins Deutsche. Bewahre die Sprache und den Aufgabentyp des Materials, sofern der Lehrer nichts anderes verlangt.\n" .
-            "- Bei Lückentexten: Erkenne, ob es um Vokabeln, Grammatik, Wortpaare, Monate, Ordnungszahlen, Datum, Pronomen o. ä. geht. Frage nicht nach irrelevanten Inhalten aus Beispielsätzen.\n\n" .
-            "Erstelle eine content_map mit den wichtigsten Lernzielen und Frage-Strategien. Diese content_map ist die verbindliche Grundlage für die späteren Fragen und soll die relevanten Inhalte bzw. Kompetenzen möglichst vollständig abdecken.\n" .
-            ($mode === 'listening'
-                ? elevaro_teacher_ai_listening_story_instruction(elevaro_teacher_ai_target_question_count($mode)) . "Erstelle eine Fragenplanung für 5 Abschnitte in fester Reihenfolge. listening_text ist nur eine kurze Gesamtzusammenfassung; die eigentlichen Hörtexte kommen später pro Frage als listening_segment_text.\n"
-                : "Erstelle eine belastbare Fragenplanung für 15 spätere Multiple-Choice-Fragen in 3 Blöcken à 5 Fragen. Verteile die Blöcke über die content_map, damit nichts Wesentliches verloren geht.\n") .
-            "description ist eine kurze, motivierende Quizbeschreibung für Schülerinnen und Schüler, keine Beschreibung der hochgeladenen Quelle.\n" .
-            "image_prompt beschreibt ein passendes Elevaro-Quizbild im bestehenden modernen, freundlichen, spielerisch-edukativen Stil für die Zielgruppe; beschreibe NICHT das PDF, Arbeitsblatt oder Handschriften.\n" .
-            "Der Klassenkontext darf Niveau und Sprache steuern, aber keine Fakten ergänzen. Wenn Inhalte unleserlich sind, benenne das offen.\n" .
-            "Bei Listening: Erstelle keinen langen Sprechertext für das ganze Quiz, sondern nutze listening_segments als Story-/Abschnittsplan. Erzeuge einen neuen, passenden Hörtext ähnlich zum Thema/Wortschatz des Materials oder Lerninhalts; die Fragen beziehen sich auf diesen neuen Hörtext. listening_text darf nur eine kurze Zusammenfassung der Story sein.");
+        return trim("Analysiere die Quelle für einen Elevaro-KI-Quiz-Wizard. Die Quelle ist hochgeladenes Unterrichtsmaterial oder eine Textquelle.\n\n"
+            . "Klassenkontext:\n- Klasse: {$grade}\n- Schulart/Level: {$school} / {$level}\n- Fach: {$subject}\n- Modus: " . ($mode === 'listening' ? 'Listening + Comprehension' : 'normales Multiple-Choice-Quiz') . "\n- Erwartete Sprache der Fragen: {$language}\n\n"
+            . "Dateien:\n" . ($fileList ? implode("\n", $fileList) : '[Keine Datei]') . "\n\n"
+            . "Textquelle / Lehrerhinweise:\n" . ($sourceText !== '' ? $sourceText : '[leer]') . "\n" . ($extraPrompt !== '' ? $extraPrompt : '') . "\n\n"
+            . "Aufgabe:\n"
+            . "- Analysiere das direkt bereitgestellte Material. PDFs/Bilder sind Primärquelle.\n"
+            . "- Klassifiziere material_type, task_intent und content_mode sorgfältig.\n"
+            . "- requires_visible_context ist true, wenn Schüler das Originalmaterial sehen müssten, um die Frage zu lösen.\n"
+            . "- Wenn die Quelle ein Arbeitsblatt, eine Grammatikübung oder Vokabelliste ist: erkenne die geübte Kompetenz und plane passende Übungsfragen, nicht zufällige Inhaltsfragen.\n"
+            . "- Erstelle eine content_map mit den wichtigsten Lernzielen und Frage-Strategien.\n"
+            . ($mode === 'listening'
+                ? elevaro_teacher_ai_listening_story_instruction(elevaro_teacher_ai_target_question_count($mode)) . "Erstelle eine Fragenplanung für 5 Abschnitte in fester Reihenfolge.\n"
+                : "Erstelle eine belastbare Fragenplanung für 15 spätere Multiple-Choice-Fragen in 3 Blöcken à 5 Fragen.\n")
+            . "- description ist eine kurze, motivierende Quizbeschreibung für Schülerinnen und Schüler.\n"
+            . "- image_prompt beschreibt ein passendes Elevaro-Quizbild, nicht das PDF oder Arbeitsblatt.\n"
+            . "- Der Klassenkontext darf Niveau und Sprache steuern, aber keine Fakten ergänzen. Wenn Inhalte unleserlich sind, benenne das offen.\n"
+            . "Liefere ausschließlich valides JSON nach Schema.");
     }
 }
 
@@ -1715,14 +1849,39 @@ if (!function_exists('elevaro_teacher_ai_split_build_questions_prompt')) {
         $materialType = (string)($analysis['material_type'] ?? 'mixed');
         $taskIntent = (string)($analysis['task_intent'] ?? 'quiz_about_content');
         $existing = array_map(static fn($q) => (string)($q['question'] ?? ''), $existingQuestions);
+        $isCurriculum = elevaro_teacher_ai_is_curriculum_source_text($sourceText);
         $focus = '';
         foreach (($analysis['question_plan'] ?? []) as $plan) {
             if ((int)($plan['block'] ?? 0) === $blockIndex + 1) {
                 $focus .= '- Fokus: ' . (string)($plan['focus'] ?? '') . ' | Schwierigkeit: ' . (string)($plan['difficulty'] ?? '') . ' | interne Quelle: ' . (string)($plan['source_reference'] ?? '') . "\n";
             }
         }
-        if ($focus === '') $focus = '- Nutze content_map, Analyse und Originalmaterial für diesen Block.\n';
+        if ($focus === '') $focus = $isCurriculum ? '- Nutze ausschließlich aktives Lernziel und content_map für diesen Block.\n' : '- Nutze content_map, Analyse und Originalmaterial für diesen Block.\n';
 
+        if ($isCurriculum) {
+            $curriculumRules = "\nCURRICULUM-MODUS OHNE MATERIAL:\n"
+                . "- Es gibt kein hochgeladenes Arbeitsblatt, PDF oder Bild. Schreibe keine Material-, Bild-, Tabellen- oder Arbeitsblattverweise.\n"
+                . "- Erzeuge Fragen ausschließlich zum aktiven Lernziel aus dem Lerninhalt.\n"
+                . "- Wenn ein Unterthema aktiv ist, ignoriere breite Eltern-Lernziele als Frageauftrag. Sie dienen nur zur Einordnung.\n"
+                . "- Harte Lehrerregeln sind Ausschlusskriterien. Wenn der Lehrer Vergleiche, Nachbarregionen oder bestimmte Inhalte ausschließt, dürfen diese weder als Frage noch als Option noch in der Erklärung vorkommen.\n"
+                . "- Keine Fragen zu anderen Unterthemen, auch wenn sie in Keywords des Eltern-Themas vorkommen.\n";
+
+            return trim("Erstelle Fragen {$start} bis {$end} für ein Elevaro-Schülerquiz.\n\n"
+                . "Sprache der sichtbaren Fragen: {$language}\n"
+                . "Modus: {$mode}\n"
+                . "Quelle: ausgewählter Lerninhalt / Curriculum, kein Upload-Material\n\n"
+                . "Verbindlicher Lerninhalt und Lehrerregeln:\n{$sourceText}\n\n"
+                . elevaro_teacher_ai_curriculum_hard_rule_block($sourceText) . "\n"
+                . elevaro_teacher_ai_subject_generation_rules($class) . "\n"
+                . "Verbindliche Quizplanung:\n" . json_encode($analysis, JSON_UNESCAPED_UNICODE) . "\n\n"
+                . "Block-Fokus:\n{$focus}\n"
+                . "Bereits erzeugte Fragen, die NICHT wiederholt werden dürfen:\n" . ($existing ? implode("\n", array_slice($existing, -24)) : '[Noch keine]') . "\n"
+                . $curriculumRules . "\n"
+                . "Erzeuge exakt {$blockSize} neue Multiple-Choice-Fragen. Jede Frage hat exakt 4 Optionen und genau eine richtige Antwort. "
+                . "Die Schwierigkeit soll über alle Blöcke sanft ansteigen. "
+                . "Die Fragen müssen fachlich korrekt, altersgerecht und direkt mit dem aktiven Lernziel verbunden sein. "
+                . "source_reference darf intern kurz 'curriculum: aktives Lernziel' o. ä. sein.");
+        }
 
         $contentMode = (string)($analysis['content_mode'] ?? '');
         $generationStrategy = (string)($analysis['generation_strategy'] ?? '');
@@ -1737,7 +1896,7 @@ if (!function_exists('elevaro_teacher_ai_split_build_questions_prompt')) {
             $contextRules .= "- Wenn eine Übersetzung, Wortbank oder Hilfsspalte zur Lösung nötig ist, integriere sie sichtbar in den Fragetext.\n";
         } elseif ($contentMode === 'context_dependent_exercises' || $requiresVisibleContext || $generationStrategy === 'generate_similar_exercises') {
             $contextRules .= "- Aufgaben benötigen nicht sichtbaren Kontext. Übernimm sie nur, wenn du den nötigen Kontext direkt sichtbar in die Quizfrage einbaust; sonst erzeuge ähnliche neue Aufgaben.\n";
-            $contextRules .= "- Bei Hilfs-/Übersetzungsspalten muss die Bedeutung sichtbar in der Frage stehen, z. B. 'Deutsch: Unser Konzert ist am fünften Mai. Complete: Our concert is on the ______ of May.'\n";
+            $contextRules .= "- Bei Hilfs-/Übersetzungsspalten muss die Bedeutung sichtbar in der Frage stehen.\n";
             $contextRules .= "- Keine bloßen Verweise wie 'im Bild', 'rechte Spalte', 'Arbeitsblatt', 'Tabelle', 'siehe oben'. Der Kontext selbst muss ausgeschrieben werden.\n";
         } else {
             $contextRules .= "- Jede Frage muss entweder aus sich heraus lösbar sein oder auf als gelernt vorausgesetztem Stoff beruhen.\n";
@@ -1761,7 +1920,7 @@ if (!function_exists('elevaro_teacher_ai_split_build_questions_prompt')) {
                 . "- Erzeuge exakt eine Frage für Abschnitt {$segmentNumber}.\n"
                 . "- Erzeuge dazu ein Feld listening_segment_text: ein kurzer Hörabschnitt in der Zielsprache.\n"
                 . "- Der Hörabschnitt muss vor der Frage verständlich sein und darf nicht länger als ca. 35–55 Wörter sein.\n"
-                . "- Die Story muss in Reihenfolge funktionieren. Dieser Abschnitt darf sich sinnvoll an vorherige Abschnitte anschließen.\n"
+                . "- Die Story muss in Reihenfolge funktionieren.\n"
                 . "- Frage, Optionen und Erklärung beziehen sich nur auf diesen Hörabschnitt und bleiben in der Zielsprache.\n"
                 . "- Setze listening_segment_title kurz, z. B. 'Abschnitt {$segmentNumber}'.\n"
                 . $segmentPlan . "\n";
@@ -1769,31 +1928,33 @@ if (!function_exists('elevaro_teacher_ai_split_build_questions_prompt')) {
 
         $worksheetRules = '';
         if ($mode !== 'listening' && (in_array($taskIntent, ['practice_same_skill', 'vocabulary_training', 'grammar_training'], true) || in_array($materialType, ['worksheet', 'grammar_exercise', 'vocabulary_list'], true))) {
-            $worksheetRules = "\nSpezialregeln für Arbeitsblätter / Sprachübungen:\n" .
-                "- Erzeuge Übungsfragen zum gleichen Lernziel, nicht Verständnisfragen über zufällige Beispielsatz-Inhalte.\n" .
-                "- Wenn das Material englische Übungen enthält, bleiben Frage, Antwortoptionen und Erklärung grundsätzlich auf Englisch, sofern der Lehrer nichts anderes verlangt.\n" .
-                "- Bei Lückentexten sollen die Schülerinnen und Schüler die passende Ergänzung wählen.\n- Bei zweispaltigen Fremdsprachen-Arbeitsblättern mit deutscher Hilfsspalte/Übersetzung: Die deutsche Bedeutung muss im Fragetext stehen, wenn sie zur Lösung nötig ist.\n- Frage nicht nur 'Our concert is on the ____ of May', wenn die Lösung nur aus der deutschen Übersetzung 'am fünften Mai' hervorgeht. Schreibe dann: 'Deutsch: Unser Konzert ist am fünften Mai. Complete: Our concert is on the ____ of May.'\n" .
-                "- Frage NICHT: 'In welcher Jahreszeit kommen die Blumen heraus?', wenn der Satz nur Vokabelmaterial für 'spring' ist. Frage stattdessen z. B. nach der passenden englischen Vokabel oder Satzergänzung.\n" .
-                "- Erstelle gern neue, gleichartige Beispielsätze, damit nicht nur die Lösungen des Arbeitsblatts abgefragt werden.\n";
+            $worksheetRules = "\nSpezialregeln für Arbeitsblätter / Sprachübungen:\n"
+                . "- Erzeuge Übungsfragen zum gleichen Lernziel, nicht Verständnisfragen über zufällige Beispielsatz-Inhalte.\n"
+                . "- Wenn das Material englische Übungen enthält, bleiben Frage, Antwortoptionen und Erklärung grundsätzlich auf Englisch, sofern der Lehrer nichts anderes verlangt.\n"
+                . "- Bei Lückentexten sollen die Schülerinnen und Schüler die passende Ergänzung wählen.\n"
+                . "- Bei zweispaltigen Fremdsprachen-Arbeitsblättern mit deutscher Hilfsspalte/Übersetzung: Die deutsche Bedeutung muss im Fragetext stehen, wenn sie zur Lösung nötig ist.\n"
+                . "- Frage nicht nur 'Our concert is on the ____ of May', wenn die Lösung nur aus der deutschen Übersetzung 'am fünften Mai' hervorgeht. Schreibe dann: 'Deutsch: Unser Konzert ist am fünften Mai. Complete: Our concert is on the ____ of May.'\n"
+                . "- Frage NICHT nach irrelevanten Inhalten aus Beispielsätzen, wenn nur die Vokabel oder Grammatik trainiert wird.\n"
+                . "- Erstelle gern neue, gleichartige Beispielsätze, damit nicht nur die Lösungen des Arbeitsblatts abgefragt werden.\n";
         }
 
-        return trim("Erstelle Fragen {$start} bis {$end} für ein Elevaro-Schülerquiz.\n\n" .
-            "Sprache der sichtbaren Fragen: {$language}\n" .
-            "Modus: {$mode}\n" .
-            "Materialtyp: {$materialType}\n" .
-            "Aufgabenabsicht: {$taskIntent}\n\n" .
-            "Verbindliche Materialanalyse:\n" . json_encode($analysis, JSON_UNESCAPED_UNICODE) . "\n\n" .
-            "Block-Fokus:\n{$focus}\n" .
-            "Bereits erzeugte Fragen, die NICHT wiederholt werden dürfen:\n" . ($existing ? implode("\n", array_slice($existing, -24)) : '[Noch keine]') . "\n\n" .
-            "Lehrertext / Zusatzwunsch als Zusatzkontext:\n" . ($sourceText !== '' ? $sourceText : '[leer]') . "\n" . ($extraPrompt !== '' ? $extraPrompt : '') . "\n" .
-            $contextRules . $worksheetRules . $listeningRules . "\n" .
-            "Erzeuge exakt {$blockSize} neue Multiple-Choice-Fragen. Jede Frage hat exakt 4 Optionen und genau eine richtige Antwort. " .
-            "Alle Fragen müssen aus Originalmaterial, content_map oder Analyse ableitbar sein. Prüfe im Zweifel wieder das direkt angehängte PDF/Bildmaterial. " .
-            ($mode === 'listening'
+        return trim("Erstelle Fragen {$start} bis {$end} für ein Elevaro-Schülerquiz.\n\n"
+            . "Sprache der sichtbaren Fragen: {$language}\n"
+            . "Modus: {$mode}\n"
+            . "Materialtyp: {$materialType}\n"
+            . "Aufgabenabsicht: {$taskIntent}\n\n"
+            . "Verbindliche Materialanalyse:\n" . json_encode($analysis, JSON_UNESCAPED_UNICODE) . "\n\n"
+            . "Block-Fokus:\n{$focus}"
+            . "Bereits erzeugte Fragen, die NICHT wiederholt werden dürfen:\n" . ($existing ? implode("\n", array_slice($existing, -24)) : '[Noch keine]') . "\n\n"
+            . "Lehrertext / Zusatzwunsch als Zusatzkontext:\n" . ($sourceText !== '' ? $sourceText : '[leer]') . "\n" . ($extraPrompt !== '' ? $extraPrompt : '') . "\n"
+            . $contextRules . $worksheetRules . $listeningRules . "\n"
+            . "Erzeuge exakt {$blockSize} neue Multiple-Choice-Fragen. Jede Frage hat exakt 4 Optionen und genau eine richtige Antwort. "
+            . "Alle Fragen müssen aus Originalmaterial, content_map oder Analyse ableitbar sein. Prüfe im Zweifel wieder das direkt angehängte PDF/Bildmaterial. "
+            . ($mode === 'listening'
                 ? "Die Listening-Fragen sollen in Story-Reihenfolge bleiben und nicht zufällig gemischt werden. "
-                : "Die Schwierigkeit soll über alle 3 Blöcke sanft ansteigen: Block 1 eher leicht, Block 2 mittel, Block 3 etwas anspruchsvoller. ") .
-            "Decke in diesem Block den angegebenen Fokus ab und vermeide Wiederholungen. " .
-            "Wichtig: In Frage, Antwortoptionen und Erklärung dürfen keine Materialverweise stehen wie 'laut Mindmap', 'im Arbeitsblatt', 'auf der Seite', 'in der Quelle', 'im Material' oder ähnliche Formulierungen, weil Schülerinnen und Schüler das Material später nicht sehen. source_reference darf intern knapp bleiben.");
+                : "Die Schwierigkeit soll über alle 3 Blöcke sanft ansteigen: Block 1 eher leicht, Block 2 mittel, Block 3 etwas anspruchsvoller. ")
+            . "Decke in diesem Block den angegebenen Fokus ab und vermeide Wiederholungen. "
+            . "Wichtig: In Frage, Antwortoptionen und Erklärung dürfen keine Materialverweise stehen wie 'laut Mindmap', 'im Arbeitsblatt', 'auf der Seite', 'in der Quelle', 'im Material' oder ähnliche Formulierungen, weil Schülerinnen und Schüler das Material später nicht sehen. source_reference darf intern knapp bleiben.");
     }
 }
 
@@ -2068,6 +2229,7 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
         $mode = (string)($draft['mode'] ?? 'quiz');
         $sourceText = (string)($draft['source_text'] ?? '');
         $extraPrompt = '';
+        $sourceKind = (string)($draft['source_kind'] ?? 'material');
         $files = json_decode((string)($draft['source_files_json'] ?? '[]'), true);
         if (!is_array($files)) $files = [];
         $files = elevaro_teacher_ai_prepare_openai_material_files($files);
@@ -2085,7 +2247,9 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
                 $prompt = elevaro_teacher_ai_split_build_analysis_prompt($class, $mode, $sourceText, $extraPrompt, $files);
                 $content = [['type' => 'input_text', 'text' => $prompt]];
                 $content = array_merge($content, elevaro_teacher_ai_responses_content_for_material($files));
-                $system = 'Du bist ein erfahrener Lehrer und Fachdidaktiker. Analysiere Unterrichtsmaterial quellengebunden. Keine Fantasieinhalte. Liefere ausschließlich valides JSON nach Schema.';
+                $system = ($sourceKind === 'curriculum' || elevaro_teacher_ai_is_curriculum_source_text($sourceText))
+                    ? 'Du bist ein erfahrener Lehrer und Fachdidaktiker. Plane lehrplan- und lernzielgebundene Quizze ohne Materialanalyse. Harte Lehrerregeln sind verbindlich. Liefere ausschließlich valides JSON nach Schema.'
+                    : 'Du bist ein erfahrener Lehrer und Fachdidaktiker. Analysiere Unterrichtsmaterial quellengebunden. Keine Fantasieinhalte. Liefere ausschließlich valides JSON nach Schema.';
                 $result = elevaro_openai_responses_json($system, $content, elevaro_teacher_ai_analysis_schema(), 0.15, 90);
                 $analysis = $result['json'];
                 elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts SET analysis_json = :analysis, generation_step = 'analysis_review', source_title = :title, image_prompt = :image_prompt WHERE id = :id AND teacher_id = :teacher_id")
@@ -2116,7 +2280,9 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
                 $prompt = elevaro_teacher_ai_split_build_questions_prompt($class, $analysis, $blockIndex, $blockSize, $mode, $sourceText, $extraPrompt, $allQuestions);
                 $content = [['type' => 'input_text', 'text' => $prompt]];
                 $content = array_merge($content, elevaro_teacher_ai_responses_content_for_material($files));
-                $system = 'Du bist ein präziser Quizautor. Erzeuge ausschließlich valides JSON. Jede Frage muss quellengebunden aus dem Material ableitbar sein. Keine Wiederholungen.';
+                $system = ($sourceKind === 'curriculum' || elevaro_teacher_ai_is_curriculum_source_text($sourceText))
+                    ? 'Du bist ein präziser fachdidaktischer Quizautor. Erzeuge ausschließlich valides JSON. Jede Frage muss direkt auf das aktive Lernziel einzahlen. Harte Lehrerregeln sind Ausschlusskriterien. Keine Wiederholungen.'
+                    : 'Du bist ein präziser Quizautor. Erzeuge ausschließlich valides JSON. Jede Frage muss quellengebunden aus dem Material ableitbar sein. Keine Wiederholungen.';
                 $result = elevaro_openai_responses_json($system, $content, elevaro_teacher_ai_questions_block_schema(), 0.2, 90);
                 $block = $result['json'];
                 $block['block'] = $blockIndex + 1;
@@ -2145,18 +2311,6 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
             $payload = elevaro_teacher_ai_split_base_payload($analysis, $mode, $checkedQuestions);
             $payload['analysis_route'] = elevaro_teacher_ai_analysis_route_payload($analysis, $mode);
             $payload['plausibility_review'] = $plausibility['review'];
-            $debugPrompt = trim((string)($draft['prompt'] ?? ''));
-            if ($debugPrompt !== '') {
-                $payload['_debug_prompt'] = $debugPrompt;
-                $payload['_debug_meta'] = [
-                    'draft_id' => $draftId,
-                    'mode' => $mode,
-                    'source_kind' => (string)($draft['source_kind'] ?? ''),
-                    'generation_step' => 'done',
-                    'curriculum_topic_content_id' => isset($draft['curriculum_topic_content_id']) ? (int)$draft['curriculum_topic_content_id'] : 0,
-                    'curriculum_topic_subtopic_id' => isset($draft['curriculum_topic_subtopic_id']) ? (int)$draft['curriculum_topic_subtopic_id'] : 0,
-                ];
-            }
             $stmt = elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts
                 SET status = 'draft', generation_step = 'done', generated_payload_json = :payload, source_title = :title, image_prompt = :image_prompt, image_status = 'pending'
                 WHERE id = :id AND teacher_id = :teacher_id");
