@@ -1096,7 +1096,7 @@ if (!function_exists('elevaro_teacher_ai_poll_background_draft')) {
         $draft = elevaro_teacher_ai_load_draft($draftId, $teacherId);
 
         if (($draft['status'] ?? '') === 'draft' && !empty($draft['generated_payload_json'])) {
-            return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => elevaro_teacher_ai_draft_payload($draft)];
+            return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'source_kind' => (string)($draft['source_kind'] ?? 'material'), 'payload' => elevaro_teacher_ai_draft_payload($draft)];
         }
         if (!empty($draft['generation_error'])) {
             throw new RuntimeException((string)$draft['generation_error']);
@@ -1139,7 +1139,7 @@ if (!function_exists('elevaro_teacher_ai_poll_background_draft')) {
             'teacher_id' => $teacherId,
         ]);
 
-        return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => $payload];
+        return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'source_kind' => (string)($draft['source_kind'] ?? 'material'), 'payload' => $payload];
     }
 }
 
@@ -2209,6 +2209,7 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
                     'done' => false,
                     'needs_analysis_review' => true,
                     'draft_id' => $draftId,
+                    'source_kind' => (string)($draft['source_kind'] ?? 'material'),
                     'status' => 'analysis_review',
                     'status_label' => elevaro_teacher_ai_analysis_route_label($analysisReview, (string)($draft['mode'] ?? 'quiz')),
                     'analysis' => $analysisReview,
@@ -2219,7 +2220,7 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
 
 
         if (($draft['status'] ?? '') === 'draft' && !empty($draft['generated_payload_json'])) {
-            return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => elevaro_teacher_ai_draft_payload($draft)];
+            return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'source_kind' => (string)($draft['source_kind'] ?? 'material'), 'payload' => elevaro_teacher_ai_draft_payload($draft)];
         }
         if (($draft['status'] ?? '') === 'failed' && !empty($draft['generation_error'])) {
             throw new RuntimeException((string)$draft['generation_error']);
@@ -2266,6 +2267,7 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
                     'done' => false,
                     'needs_analysis_review' => true,
                     'draft_id' => $draftId,
+                    'source_kind' => (string)($draft['source_kind'] ?? 'material'),
                     'status' => 'analysis_review',
                     'status_label' => $routeLabel,
                     'analysis' => $analysis,
@@ -2297,13 +2299,13 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
                         'teacher_id' => $teacherId,
                     ]);
                 $progress = 25 + (int)round((count($blocks) / max(1, $targetBlocks)) * 62);
-                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'questions_' . count($blocks), 'progress' => $progress, 'status_label' => ($mode === 'listening' ? 'Hörabschnitt ' : 'Fragenblock ') . count($blocks) . '/' . $targetBlocks . ' ist fertig…'];
+                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'source_kind' => (string)($draft['source_kind'] ?? 'material'), 'status' => 'questions_' . count($blocks), 'progress' => $progress, 'status_label' => ($mode === 'listening' ? 'Hörabschnitt ' : 'Fragenblock ') . count($blocks) . '/' . $targetBlocks . ' ist fertig…', 'question_block' => count($blocks), 'question_block_total' => $targetBlocks, 'preview_questions' => array_values(array_slice(array_map(static fn($q) => (string)($q['question'] ?? ''), $allQuestions), -6))];
             }
 
             if (($draft['generation_step'] ?? '') !== 'plausibility') {
                 elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts SET generation_step = 'plausibility' WHERE id = :id AND teacher_id = :teacher_id")
                     ->execute(['id' => $draftId, 'teacher_id' => $teacherId]);
-                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'plausibility', 'progress' => 93, 'status_label' => 'Prüfe fachliche Richtigkeit und Plausibilität…'];
+                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'source_kind' => (string)($draft['source_kind'] ?? 'material'), 'status' => 'plausibility', 'progress' => 93, 'status_label' => 'Prüfe fachliche Richtigkeit und Plausibilität…', 'preview_questions' => array_values(array_slice(array_map(static fn($q) => (string)($q['question'] ?? ''), $allQuestions), -6))];
             }
 
             $plausibility = elevaro_teacher_ai_apply_plausibility_review($analysis, $allQuestions, $mode, $files);
@@ -2321,7 +2323,7 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
                 'id' => $draftId,
                 'teacher_id' => $teacherId,
             ]);
-            return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => $payload];
+            return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'source_kind' => (string)($draft['source_kind'] ?? 'material'), 'payload' => $payload];
         } catch (Throwable $e) {
             elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts SET status = 'failed', generation_error = :error WHERE id = :id AND teacher_id = :teacher_id")
                 ->execute(['error' => $e->getMessage(), 'id' => $draftId, 'teacher_id' => $teacherId]);

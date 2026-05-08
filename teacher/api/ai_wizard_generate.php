@@ -23,7 +23,10 @@ try {
         'vocabulary' => 'Materialziel: Vokabeltraining. Bewahre bei Fremdsprachen die Zielsprache und erstelle passende Vokabel-/Satzergänzungsfragen.',
         'grammar' => 'Materialziel: Grammatiktraining. Trainiere die zugrunde liegende Struktur, z. B. Pronomen, Zeitformen oder Satzbau.',
     ];
-    if (isset($goalHints[$materialGoal])) {
+
+    // Materialziel-Hints sind nur für Upload-/Materialmodus sinnvoll.
+    // Im Curriculum-Modus würden sie den Prompt wieder in Richtung Materialanalyse ziehen.
+    if ($sourceKind !== 'curriculum' && isset($goalHints[$materialGoal])) {
         $extraPrompt = trim($extraPrompt . "
 
 " . $goalHints[$materialGoal]);
@@ -45,6 +48,7 @@ try {
         'pending' => true,
         'draft_id' => $draftId,
         'message' => 'Die KI-Erstellung läuft mehrstufig im Hintergrund.',
+        'source_kind' => $sourceKind === 'curriculum' ? 'curriculum' : 'material',
     ]);
 } catch (Throwable $e) {
     elevaro_teacher_ai_json_response(['ok' => false, 'error' => $e->getMessage()], 400);
