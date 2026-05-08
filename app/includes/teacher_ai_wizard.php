@@ -1085,7 +1085,7 @@ if (!function_exists('elevaro_teacher_ai_poll_background_draft')) {
         $draft = elevaro_teacher_ai_load_draft($draftId, $teacherId);
 
         if (($draft['status'] ?? '') === 'draft' && !empty($draft['generated_payload_json'])) {
-            return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => elevaro_teacher_ai_draft_payload($draft)];
+            return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => elevaro_teacher_ai_draft_payload($draft), 'ticker_items' => elevaro_teacher_ai_generation_ticker_items($draft, json_decode((string)($draft['analysis_json'] ?? ''), true) ?: null, [])];
         }
         if (!empty($draft['generation_error'])) {
             throw new RuntimeException((string)$draft['generation_error']);
@@ -1128,7 +1128,7 @@ if (!function_exists('elevaro_teacher_ai_poll_background_draft')) {
             'teacher_id' => $teacherId,
         ]);
 
-        return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => $payload];
+        return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => $payload, 'ticker_items' => elevaro_teacher_ai_generation_ticker_items($draft, $analysis, $checkedQuestions)];
     }
 }
 
@@ -1414,78 +1414,6 @@ if (!function_exists('elevaro_teacher_ai_curriculum_prompt_block')) {
     }
 }
 
-
-if (!function_exists('elevaro_teacher_ai_prompt_root')) {
-    function elevaro_teacher_ai_prompt_root(): string
-    {
-        return dirname(__DIR__, 2) . '/prompts';
-    }
-}
-
-if (!function_exists('elevaro_teacher_ai_prompt_file')) {
-    function elevaro_teacher_ai_prompt_file(string $relativePath): string
-    {
-        $file = elevaro_teacher_ai_prompt_root() . '/' . ltrim($relativePath, '/');
-        return is_file($file) ? trim((string)file_get_contents($file)) : '';
-    }
-}
-
-if (!function_exists('elevaro_teacher_ai_subject_prompt_key')) {
-    function elevaro_teacher_ai_subject_prompt_key(array $class): string
-    {
-        $raw = strtolower(trim((string)($class['subject_code'] ?? $class['subject'] ?? '')));
-        $map = [
-            'englisch' => 'english', 'english' => 'english', 'en' => 'english',
-            'deutsch' => 'german', 'german' => 'german', 'de' => 'german',
-            'mathematik' => 'math', 'mathe' => 'math', 'math' => 'math', 'ma' => 'math',
-            'geographie' => 'geography', 'geografie' => 'geography', 'erdkunde' => 'geography', 'geo' => 'geography',
-            'biologie' => 'biology', 'bio' => 'biology',
-            'geschichte' => 'history', 'history' => 'history',
-            'gemeinschaftskunde' => 'politics', 'politik' => 'politics', 'politics' => 'politics',
-            'physik' => 'science', 'chemie' => 'science', 'naturwissenschaften' => 'science', 'bnt' => 'science',
-        ];
-        return $map[$raw] ?? preg_replace('/[^a-z0-9_-]+/', '_', $raw ?: 'general');
-    }
-}
-
-if (!function_exists('elevaro_teacher_ai_exercise_prompt_key')) {
-    function elevaro_teacher_ai_exercise_prompt_key(string $mode, array $analysis = []): string
-    {
-        if ($mode === 'listening') return 'listening';
-        $materialType = (string)($analysis['material_type'] ?? '');
-        $taskIntent = (string)($analysis['task_intent'] ?? '');
-        if ($materialType === 'grammar_exercise' || $taskIntent === 'grammar_training') return 'grammar_cloze';
-        if ($materialType === 'vocabulary_list' || $taskIntent === 'vocabulary_training') return 'vocabulary';
-        if (($analysis['content_mode'] ?? '') === 'context_dependent_exercises') return 'context_dependent';
-        return 'multiple_choice';
-    }
-}
-
-if (!function_exists('elevaro_teacher_ai_prompt_library_block')) {
-    function elevaro_teacher_ai_prompt_library_block(array $class, string $sourceKind, string $mode, array $analysis = []): string
-    {
-        $subjectKey = elevaro_teacher_ai_subject_prompt_key($class);
-        $exerciseKey = elevaro_teacher_ai_exercise_prompt_key($mode, $analysis);
-        $parts = array_filter([
-            elevaro_teacher_ai_prompt_file('core/base_generation.md'),
-            elevaro_teacher_ai_prompt_file('modes/' . ($sourceKind === 'curriculum' ? 'curriculum_generation' : 'material_analysis') . '.md'),
-            elevaro_teacher_ai_prompt_file('subjects/' . $subjectKey . '.md') ?: elevaro_teacher_ai_prompt_file('subjects/general.md'),
-            elevaro_teacher_ai_prompt_file('exercise_types/' . $exerciseKey . '.md') ?: elevaro_teacher_ai_prompt_file('exercise_types/multiple_choice.md'),
-            elevaro_teacher_ai_prompt_file('core/quality_check.md'),
-        ]);
-
-        return $parts ? "
-
-PROMPT-BIBLIOTHEK / FACHDIDAKTISCHE REGELN:
-" . implode("
-
----
-
-", $parts) . "
-" : '';
-    }
-}
-
 if (!function_exists('elevaro_teacher_ai_store_curriculum_mapping')) {
     function elevaro_teacher_ai_store_curriculum_mapping(int $quizId, ?int $topicId, ?int $subtopicId, string $matchType='selected', ?float $confidence=null): void
     {
@@ -1726,7 +1654,7 @@ if (!function_exists('elevaro_teacher_ai_listening_story_instruction')) {
 
 
 if (!function_exists('elevaro_teacher_ai_split_build_analysis_prompt')) {
-    function elevaro_teacher_ai_split_build_analysis_prompt(array $class, string $mode, string $sourceText, string $extraPrompt, array $files, string $sourceKind = 'material'): string
+    function elevaro_teacher_ai_split_build_analysis_prompt(array $class, string $mode, string $sourceText, string $extraPrompt, array $files): string
     {
         $subject = elevaro_teacher_ai_subject_label($class['subject_code'] ?? '');
         $grade = (string)($class['grade'] ?? '');
@@ -1734,31 +1662,6 @@ if (!function_exists('elevaro_teacher_ai_split_build_analysis_prompt')) {
         $school = (string)($class['school_type_code'] ?? '');
         $language = elevaro_teacher_ai_language_for_class($class, $mode);
         $fileList = array_map(static fn($file) => '- ' . (string)($file['original_name'] ?? 'Material') . ' (' . (string)($file['mime'] ?? 'Datei') . ')', $files);
-        $libraryRules = elevaro_teacher_ai_prompt_library_block($class, $sourceKind, $mode);
-
-        if ($sourceKind === 'curriculum') {
-            return trim("Erstelle die Planungsanalyse für einen Elevaro-KI-Quiz-Wizard im CURRICULUM-MODUS. Es wurde KEIN Unterrichtsmaterial hochgeladen. Grundlage sind ausschließlich Klassenkontext, ausgewählter Lehrplaninhalt/Lernziele und der Lehrerwunsch.\n\n" .
-                "Klassenkontext:\n- Klasse: {$grade}\n- Schulart/Level: {$school} / {$level}\n- Fach: {$subject}\n- Modus: " . ($mode === 'listening' ? 'Listening + Comprehension' : 'normales Multiple-Choice-Quiz') . "\n- Erwartete Sprache der Fragen: {$language}\n\n" .
-                "Verbindlicher Lehrplan-/Lernzielblock plus benutzerdefinierter Lehrerwunsch:\n" . ($sourceText !== '' ? $sourceText : '[Kein Lerninhalt übergeben.]') . "\n\n" .
-                "Zusatzregeln / Systemkontext:\n" . ($extraPrompt !== '' ? $extraPrompt : '[Keine Zusatzanweisung.]') . "\n" .
-                $libraryRules . "\n" .
-                "Aufgabe für diesen Schritt: Erstelle KEINE fertigen Fragen. Erstelle eine didaktische Planungsanalyse für das spätere Quiz.\n\n" .
-                "Wichtige Regeln für Curriculum-Modus:\n" .
-                "- Behandle den learning_goal aus curriculum_topic_topics bzw. curriculum_topic_subtopics als verbindliches Lernziel.\n" .
-                "- Der benutzerdefinierte Prompt des Lehrers darf Schwerpunkte setzen, darf das Lernziel aber nicht verfälschen.\n" .
-                "- material_type = mixed, task_intent = quiz_about_content, content_mode = content_source, requires_visible_context = false.\n" .
-                "- Keine Formulierungen wie 'im Material', 'im Arbeitsblatt', 'auf der Quelle', weil kein Material hochgeladen wurde.\n" .
-                "- Erzeuge eine content_map aus den Lernzielen, Unterthemen, Keywords und dem Lehrerwunsch.\n" .
-                "- Die spätere Fragenplanung soll lehrplannah, altersgerecht, fachlich korrekt und abwechslungsreich sein.\n" .
-                "- Keine Wikipedia-Zufallsfakten, sondern Fragen, die direkt auf die angegebenen Lernziele einzahlen.\n\n" .
-                "Zielumfang: " . elevaro_teacher_ai_target_question_count($mode) . " Fragen insgesamt. Bei normalen Quizzen 15 Fragen in 3 Blöcken à 5 Fragen. Bei Listening 5 Fragen mit je einem kurzen Hörabschnitt.\n" .
-                ($mode === 'listening'
-                    ? elevaro_teacher_ai_listening_story_instruction(elevaro_teacher_ai_target_question_count($mode)) . "Plane 5 Hörabschnitte passend zum Lernziel. listening_text ist nur eine kurze Gesamtzusammenfassung.\n"
-                    : "Erstelle eine belastbare question_plan für 3 Blöcke: leicht, mittel, anspruchsvoller. Jeder Block soll andere Aspekte der content_map abdecken.\n") .
-                "description ist eine kurze, motivierende Quizbeschreibung für Schülerinnen und Schüler.\n" .
-                "image_prompt beschreibt ein passendes modernes Elevaro-Quizbild zum Thema, nicht ein Arbeitsblatt.\n" .
-                "Liefere ausschließlich valides JSON nach Schema.");
-        }
 
         return trim("Analysiere die Quelle für einen Elevaro-KI-Quiz-Wizard. Die Quelle kann hochgeladenes Unterrichtsmaterial oder ein ausgewähltes Lerninhalt sein.\n\n" .
             "Klassenkontext:\n- Klasse: {$grade}\n- Schulart/Level: {$school} / {$level}\n- Fach: {$subject}\n- Modus: " . ($mode === 'listening' ? 'Listening + Comprehension' : 'normales Multiple-Choice-Quiz') . "\n- Erwartete Sprache der Fragen: {$language}\n\n" .
@@ -1785,7 +1688,7 @@ if (!function_exists('elevaro_teacher_ai_split_build_analysis_prompt')) {
 }
 
 if (!function_exists('elevaro_teacher_ai_split_build_questions_prompt')) {
-    function elevaro_teacher_ai_split_build_questions_prompt(array $class, array $analysis, int $blockIndex, int $blockSize, string $mode, string $sourceText, string $extraPrompt, array $existingQuestions, string $sourceKind = 'material'): string
+    function elevaro_teacher_ai_split_build_questions_prompt(array $class, array $analysis, int $blockIndex, int $blockSize, string $mode, string $sourceText, string $extraPrompt, array $existingQuestions): string
     {
         $start = $blockIndex * $blockSize + 1;
         $end = $start + $blockSize - 1;
@@ -1805,14 +1708,8 @@ if (!function_exists('elevaro_teacher_ai_split_build_questions_prompt')) {
         $contentMode = (string)($analysis['content_mode'] ?? '');
         $generationStrategy = (string)($analysis['generation_strategy'] ?? '');
         $requiresVisibleContext = !empty($analysis['requires_visible_context']);
-        $libraryRules = elevaro_teacher_ai_prompt_library_block($class, $sourceKind, $mode, $analysis);
         $contextRules = "\nKONTEXTBEWUSSTE GENERIERUNGSSTRATEGIE:\n";
-        if ($sourceKind === 'curriculum') {
-            $contextRules .= "- Curriculum-Modus: Es gibt kein hochgeladenes Material. Nutze ausschließlich Klassenkontext, Lernzielblock, content_map, Frageplanung und Lehrerwunsch.\n";
-            $contextRules .= "- Jede Frage muss direkt auf die learning_goals aus Thema/Unterthema oder den Lehrerwunsch einzahlen.\n";
-            $contextRules .= "- Schreibe keine Materialverweise wie 'im Material', 'im Arbeitsblatt', 'in der Quelle'.\n";
-            $contextRules .= "- Erzeuge abwechslungsreiche, lehrplanorientierte Multiple-Choice-Fragen mit plausiblen Distraktoren.\n";
-        } elseif ($mode === 'listening') {
+        if ($mode === 'listening') {
             $contextRules .= "- Erstelle einen neuen passenden Hörtext. Material/Lerninhalt liefert Thema, Wortschatz, Niveau und Kontext; Fragen beziehen sich auf den Hörtext.\n";
         } elseif ($contentMode === 'content_source' || $generationStrategy === 'content_questions') {
             $contextRules .= "- Der hochgeladene Inhalt ist Lernstoff. Stelle Fragen zum tatsächlichen Inhalt. Der Stoff wird als gelernt vorausgesetzt.\n";
@@ -2117,6 +2014,66 @@ if (!function_exists('elevaro_teacher_ai_analysis_route_label')) {
 }
 
 
+
+if (!function_exists('elevaro_teacher_ai_generation_ticker_items')) {
+    function elevaro_teacher_ai_generation_ticker_items(array $draft, ?array $analysis = null, array $questions = []): array
+    {
+        $items = [];
+        $sourceKind = (string)($draft['source_kind'] ?? 'material');
+
+        if ($sourceKind === 'curriculum') {
+            try {
+                $class = elevaro_teacher_ai_class_for_teacher((int)$draft['class_id'], (int)$draft['teacher_id']);
+                $topicId = !empty($draft['curriculum_topic_content_id']) ? (int)$draft['curriculum_topic_content_id'] : 0;
+                $subtopicId = !empty($draft['curriculum_topic_subtopic_id']) ? (int)$draft['curriculum_topic_subtopic_id'] : null;
+                if ($topicId > 0) {
+                    $ctx = elevaro_teacher_ai_curriculum_context($topicId, $subtopicId, $class);
+                    $topic = $ctx['topic'] ?? [];
+                    $subtopic = $ctx['subtopic'] ?? [];
+                    $topicTitle = trim((string)(($topic['title_short'] ?? '') ?: ($topic['topic_title'] ?? '') ?: ($topic['title_long'] ?? '')));
+                    $topicGoal = trim((string)($topic['learning_goal'] ?? ''));
+                    $subTitle = trim((string)(($subtopic['title_short'] ?? '') ?: ($subtopic['subtopic_title'] ?? '') ?: ($subtopic['title_long'] ?? '')));
+                    $subGoal = trim((string)($subtopic['learning_goal'] ?? ''));
+                    if ($topicTitle !== '') $items[] = 'Lerninhalt: ' . $topicTitle;
+                    if ($subTitle !== '') $items[] = 'Unterthema: ' . $subTitle;
+                    if ($subGoal !== '') $items[] = 'Lernziel: ' . mb_substr($subGoal, 0, 140);
+                    elseif ($topicGoal !== '') $items[] = 'Lernziel: ' . mb_substr($topicGoal, 0, 140);
+                    $keywords = array_values(array_filter(array_merge((array)($ctx['keywords'] ?? []), (array)($ctx['subtopic_keywords'] ?? []))));
+                    if ($keywords) $items[] = 'Begriffe im Fokus: ' . implode(', ', array_slice($keywords, 0, 5));
+                }
+            } catch (Throwable $e) {
+                // Ticker darf die Generierung nie blockieren.
+            }
+
+            foreach (($analysis['detected_skills'] ?? []) as $skill) {
+                $skill = trim((string)$skill);
+                if ($skill !== '') $items[] = 'Kompetenz: ' . mb_substr($skill, 0, 120);
+            }
+        } else {
+            if (is_array($analysis)) {
+                $headline = trim((string)($analysis['title'] ?? $analysis['headline'] ?? ''));
+                if ($headline !== '') $items[] = 'Materialfokus: ' . mb_substr($headline, 0, 120);
+                foreach (($analysis['detected_skills'] ?? $analysis['topics'] ?? []) as $skill) {
+                    $skill = trim((string)$skill);
+                    if ($skill !== '') $items[] = 'Erkannt: ' . mb_substr($skill, 0, 120);
+                }
+            }
+        }
+
+        $questionPreviewCount = 0;
+        foreach ($questions as $question) {
+            $text = trim((string)($question['question'] ?? $question['text'] ?? ''));
+            if ($text === '') continue;
+            $items[] = 'Erste Frage: ' . mb_substr($text, 0, 150) . (mb_strlen($text) > 150 ? '…' : '');
+            $questionPreviewCount++;
+            if ($questionPreviewCount >= 3) break;
+        }
+
+        $items = array_values(array_unique(array_filter($items)));
+        return array_slice($items, 0, 8);
+    }
+}
+
 if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
     function elevaro_teacher_ai_poll_split_draft(int $draftId, int $teacherId): array
     {
@@ -2136,6 +2093,7 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
                     'status_label' => elevaro_teacher_ai_analysis_route_label($analysisReview, (string)($draft['mode'] ?? 'quiz')),
                     'analysis' => $analysisReview,
                     'analysis_route' => elevaro_teacher_ai_analysis_route_payload($analysisReview, (string)($draft['mode'] ?? 'quiz')),
+                    'ticker_items' => elevaro_teacher_ai_generation_ticker_items($draft, $analysisReview, []),
                 ];
             }
         }
@@ -2166,7 +2124,7 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
 
         try {
             if (!is_array($analysis)) {
-                $prompt = elevaro_teacher_ai_split_build_analysis_prompt($class, $mode, $sourceText, $extraPrompt, $files, (string)($draft['source_kind'] ?? 'material'));
+                $prompt = elevaro_teacher_ai_split_build_analysis_prompt($class, $mode, $sourceText, $extraPrompt, $files);
                 $content = [['type' => 'input_text', 'text' => $prompt]];
                 $content = array_merge($content, elevaro_teacher_ai_responses_content_for_material($files));
                 $system = 'Du bist ein erfahrener Lehrer und Fachdidaktiker. Analysiere Unterrichtsmaterial quellengebunden. Keine Fantasieinhalte. Liefere ausschließlich valides JSON nach Schema.';
@@ -2190,6 +2148,7 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
                     'status_label' => $routeLabel,
                     'analysis' => $analysis,
                     'analysis_route' => elevaro_teacher_ai_analysis_route_payload($analysis, $mode),
+                    'ticker_items' => elevaro_teacher_ai_generation_ticker_items($draft, $analysis, $allQuestions),
                 ];
             }
 
@@ -2197,7 +2156,7 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
             $targetBlocks = elevaro_teacher_ai_generation_block_count($mode);
             if (count($blocks) < $targetBlocks) {
                 $blockIndex = count($blocks);
-                $prompt = elevaro_teacher_ai_split_build_questions_prompt($class, $analysis, $blockIndex, $blockSize, $mode, $sourceText, $extraPrompt, $allQuestions, (string)($draft['source_kind'] ?? 'material'));
+                $prompt = elevaro_teacher_ai_split_build_questions_prompt($class, $analysis, $blockIndex, $blockSize, $mode, $sourceText, $extraPrompt, $allQuestions);
                 $content = [['type' => 'input_text', 'text' => $prompt]];
                 $content = array_merge($content, elevaro_teacher_ai_responses_content_for_material($files));
                 $system = 'Du bist ein präziser Quizautor. Erzeuge ausschließlich valides JSON. Jede Frage muss quellengebunden aus dem Material ableitbar sein. Keine Wiederholungen.';
@@ -2215,13 +2174,13 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
                         'teacher_id' => $teacherId,
                     ]);
                 $progress = 25 + (int)round((count($blocks) / max(1, $targetBlocks)) * 62);
-                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'questions_' . count($blocks), 'progress' => $progress, 'status_label' => ($mode === 'listening' ? 'Hörabschnitt ' : 'Fragenblock ') . count($blocks) . '/' . $targetBlocks . ' ist fertig…'];
+                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'questions_' . count($blocks), 'progress' => $progress, 'status_label' => ($mode === 'listening' ? 'Hörabschnitt ' : 'Fragenblock ') . count($blocks) . '/' . $targetBlocks . ' ist fertig…', 'ticker_items' => elevaro_teacher_ai_generation_ticker_items($draft, $analysis, $allQuestions)];
             }
 
             if (($draft['generation_step'] ?? '') !== 'plausibility') {
                 elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts SET generation_step = 'plausibility' WHERE id = :id AND teacher_id = :teacher_id")
                     ->execute(['id' => $draftId, 'teacher_id' => $teacherId]);
-                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'plausibility', 'progress' => 93, 'status_label' => 'Prüfe fachliche Richtigkeit und Plausibilität…'];
+                return ['ok' => true, 'done' => false, 'draft_id' => $draftId, 'status' => 'plausibility', 'progress' => 93, 'status_label' => (($draft['source_kind'] ?? 'material') === 'curriculum' ? 'Prüfe Lehrplanbezug, Eindeutigkeit und Niveau…' : 'Prüfe fachliche Richtigkeit und Plausibilität…'), 'ticker_items' => elevaro_teacher_ai_generation_ticker_items($draft, $analysis, $allQuestions)];
             }
 
             $plausibility = elevaro_teacher_ai_apply_plausibility_review($analysis, $allQuestions, $mode, $files);

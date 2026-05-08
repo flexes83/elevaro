@@ -14,15 +14,15 @@ $classId = (int)$class['id'];
 $classLabel = teacher_class_label($class);
 $subjectLabel = elevaro_teacher_ai_subject_label($class['subject_code'] ?? '');
 
-teacher_header('KI-Quiz-Wizard', 'Aus Material oder Lernziel in wenigen Schritten ein Klassenquiz erstellen.');
+teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten ein Klassenquiz erstellen.');
 ?>
 <link href="/assets/css/teacher-ai-wizard.css" rel="stylesheet">
 
-<div class="ai-wizard" data-class-id="<?= (int)$classId ?>" data-subject-label="<?= teacher_h($subjectLabel) ?>">
+<div class="ai-wizard" data-class-id="<?= (int)$classId ?>">
   <div class="ai-wizard-hero">
     <div>
       <span class="ai-wizard-kicker">✨ Neuer Lehrer-Assistent</span>
-      <h2 id="aiWizardHeroTitle">Aus Material wird ein spielbares Quiz</h2>
+      <h2>Aus Material wird ein spielbares Quiz</h2>
       <p>
         Klasse: <strong><?= teacher_h($classLabel) ?></strong> · Fach: <strong><?= teacher_h($subjectLabel) ?></strong>
         <?php if (!empty($class['grade'])): ?> · Klasse <?= (int)$class['grade'] ?><?php endif; ?>
@@ -196,23 +196,20 @@ teacher_header('KI-Quiz-Wizard', 'Aus Material oder Lernziel in wenigen Schritte
       <div class="ai-orbit">
         <span></span><span></span><span></span>
       </div>
-      <h3>Elevaro baut dein Quiz</h3>
-      <p id="aiWizardProgressText">Quelle wird vorbereitet...</p>
-
-      <div class="ai-progress"><i id="aiWizardProgressBar"></i></div>
-
-      <div class="ai-stage-track" id="aiStageTrack" aria-label="KI-Fortschritt">
-        <span class="is-active" data-stage="source">📄 Quelle verstehen</span>
-        <span data-stage="material">🧠 Materialtyp erkennen</span>
-        <span data-stage="strategy">🧩 Strategie wählen</span>
-        <span data-stage="check">✅ Antworten prüfen</span>
+      <h3 id="aiGeneratingTitle">Elevaro baut dein Quiz</h3>
+      <p id="aiWizardProgressText">Lernziel wird interpretiert und didaktisch sortiert...</p>
+      <div class="ai-route-card d-none" id="aiRouteCard">
+        <strong id="aiRouteHeadline">Material wird erkannt</strong>
+        <ul id="aiRouteSteps">
+          <li>Ich analysiere, ob es ein Lerntext oder ein Übungsformat ist.</li>
+        </ul>
       </div>
-
-      <div class="ai-progress-ticker" id="aiProgressTicker" aria-live="polite">
-        <strong id="aiTickerHeadline">Gerade läuft</strong>
-        <div class="ai-ticker-window">
-          <span id="aiTickerText">Ich lese die Quelle und übernehme nur Informationen, die später auch im Quiz sichtbar sind.</span>
-        </div>
+      <div class="ai-progress"><i></i></div>
+      <div class="ai-progress-list">
+        <span data-loading-copy>🎯 Lernziel verstehen</span>
+        <span data-loading-copy>🧠 Kompetenzen ableiten</span>
+        <span data-loading-copy>🧩 Quizstrategie wählen</span>
+        <span data-loading-copy>✅ Antworten prüfen</span>
       </div>
       <div id="aiWizardErrorBox" class="alert alert-danger d-none mt-4 text-start"></div>
     </div>
@@ -220,16 +217,16 @@ teacher_header('KI-Quiz-Wizard', 'Aus Material oder Lernziel in wenigen Schritte
 
 
   <section class="ai-wizard-panel" data-step="analysis">
-    <div class="ai-analysis-review" id="aiAnalysisReviewBox">
+    <div class="ai-analysis-review">
       <div class="ai-analysis-review-head">
-        <span class="ai-wizard-kicker" id="aiAnalysisKicker">🧭 Analyse prüfen</span>
-        <h3 id="aiAnalysisTitle">Elevaro hat dein Material didaktisch eingeordnet</h3>
-        <p id="aiAnalysisIntro">Prüfe kurz, ob Materialtyp, Aufgaben-Kontext und Strategie stimmen. Erst danach werden Fragen generiert.</p>
+        <span class="ai-wizard-kicker" id="aiAnalysisKicker">🧭 Einordnung prüfen</span>
+        <h3 id="aiAnalysisTitle">Elevaro hat deinen Lerninhalt didaktisch eingeordnet</h3>
+        <p id="aiAnalysisIntro">Prüfe kurz, ob Lernziel, Kompetenz-Fokus und Quizstrategie stimmen. Erst danach werden Fragen generiert.</p>
       </div>
 
       <div class="ai-analysis-grid">
-        <div class="ai-analysis-card" data-analysis-card="material-type">
-          <label id="aiAnalysisMaterialTypeLabel">Materialtyp</label>
+        <div class="ai-analysis-card">
+          <label id="aiAnalysisMaterialTypeLabel">Lernbasis</label>
           <select class="form-select" id="aiAnalysisMaterialType">
             <option value="reading_text">Lerntext / Sachtext</option>
             <option value="worksheet">Arbeitsblatt</option>
@@ -240,8 +237,8 @@ teacher_header('KI-Quiz-Wizard', 'Aus Material oder Lernziel in wenigen Schritte
           </select>
         </div>
 
-        <div class="ai-analysis-card" data-analysis-card="content-mode">
-          <label id="aiAnalysisContentModeLabel">Aufgaben-Kontext</label>
+        <div class="ai-analysis-card">
+          <label>Aufgaben-Kontext</label>
           <select class="form-select" id="aiAnalysisContentMode">
             <option value="content_source">Lernstoff: Fragen zum Inhalt</option>
             <option value="self_contained_exercises">Selbstlösbare Übung: Beispiele nutzen/variieren</option>
@@ -249,8 +246,8 @@ teacher_header('KI-Quiz-Wizard', 'Aus Material oder Lernziel in wenigen Schritte
           </select>
         </div>
 
-        <div class="ai-analysis-card" data-analysis-card="strategy">
-          <label id="aiAnalysisStrategyLabel">Generierungsstrategie</label>
+        <div class="ai-analysis-card">
+          <label>Generierungsstrategie</label>
           <select class="form-select" id="aiAnalysisStrategy">
             <option value="content_questions">Fragen zum tatsächlichen Stoff</option>
             <option value="reuse_or_adapt_examples">Beispiele übernehmen oder leicht variieren</option>
@@ -259,8 +256,8 @@ teacher_header('KI-Quiz-Wizard', 'Aus Material oder Lernziel in wenigen Schritte
           </select>
         </div>
 
-        <div class="ai-analysis-card" data-analysis-card="visible-context">
-          <label id="aiAnalysisRequiresContextLabel">Benötigt sichtbaren Kontext?</label>
+        <div class="ai-analysis-card">
+          <label>Benötigt sichtbaren Kontext?</label>
           <select class="form-select" id="aiAnalysisRequiresContext">
             <option value="0">Nein, ohne Originalmaterial lösbar</option>
             <option value="1">Ja, Kontext wäre sonst nicht sichtbar</option>
@@ -275,14 +272,14 @@ teacher_header('KI-Quiz-Wizard', 'Aus Material oder Lernziel in wenigen Schritte
 
       <div class="ai-analysis-edit-grid">
         <div>
-          <label class="form-label fw-bold" id="aiAnalysisSkillsLabel">Erkannte Kompetenzen</label>
+          <label class="form-label fw-bold">Erkannte Kompetenzen</label>
           <textarea class="form-control" id="aiAnalysisSkills" rows="3" placeholder="z. B. months, ordinal numbers, dates"></textarea>
           <div class="form-text">Eine Kompetenz pro Zeile oder kommagetrennt.</div>
         </div>
         <div>
-          <label class="form-label fw-bold" id="aiAnalysisDependenciesLabel">Abhängigkeiten / Kontext</label>
+          <label class="form-label fw-bold">Abhängigkeiten / Kontext</label>
           <textarea class="form-control" id="aiAnalysisDependencies" rows="3" placeholder="z. B. Bild, Tabelle, rechte Lösungsspalte"></textarea>
-          <div class="form-text" id="aiAnalysisDependenciesHelp">Was müsste sichtbar sein, damit die Originalaufgabe lösbar wäre?</div>
+          <div class="form-text">Was müsste sichtbar sein, damit die Originalaufgabe lösbar wäre?</div>
         </div>
       </div>
 
