@@ -885,6 +885,15 @@ function elevaro_teacher_ai_publish_draft(int $draftId, int $teacherId): int
     if (count($payload['questions']) < 1) throw new RuntimeException('Der Entwurf enthält keine Fragen.');
 
     $pdo = elevaro_teacher_ai_wizard_db();
+
+    // WICHTIG: Schema-/Migrationschecks duerfen NICHT innerhalb der Publish-Transaction laufen.
+    // MySQL fuehrt bei CREATE/ALTER TABLE ein implizites COMMIT aus. Danach wirft PDO bei
+    // commit()/rollBack() den Fehler "There is no active transaction".
+    // Deshalb werden alle bekannten defensiven Schema-Checks vor der eigentlichen
+    // Schreib-Transaction ausgefuehrt. Der Aufruf ist dank static guards/idempotenter
+    // ALTER-Checks mehrfach sicher.
+    elevaro_teacher_ai_split_ensure_schema();
+
     $pdo->beginTransaction();
     try {
         $subjectId = null;
@@ -1017,9 +1026,18 @@ function elevaro_teacher_ai_publish_draft(int $draftId, int $teacherId): int
         $pdo->prepare("UPDATE teacher_ai_quiz_drafts SET status = 'published', published_quiz_id = :quiz_id WHERE id = :id")
             ->execute(['quiz_id' => $quizId, 'id' => $draftId]);
 
-        $pdo->commit();
+        if ($pdo->inTransaction()) {
+            $pdo->commit();
+        } else {
+            // Falls ein spaeterer Codepfad doch wieder versehentlich DDL innerhalb der
+            // Transaction ausfuehrt, soll der Publish nicht mit "no active transaction"
+            // abbrechen. Das ist ein Fallback; die eigentliche Ursache vermeiden wir oben.
+            error_log('[Elevaro AI Wizard Publish] Transaction was already closed before commit. Publish continued. Draft ID: ' . $draftId);
+        }
     } catch (Throwable $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         throw $e;
     }
 
