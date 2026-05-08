@@ -121,6 +121,49 @@
 
   const curriculumState = { domains: [], topicMap: new Map() };
 
+  function findCurriculumTopic(topicId) {
+    const id = String(topicId || '');
+    if (!id) return null;
+
+    if (curriculumState.topicMap && curriculumState.topicMap.has(id)) {
+      return curriculumState.topicMap.get(id);
+    }
+
+    for (const domain of (curriculumState.domains || [])) {
+      for (const topic of (domain.topics || [])) {
+        if (String(topic.id) === id) {
+          return topic;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  function curriculumTopicLabel(topic) {
+    if (!topic) return '';
+    return topic.title
+      || topic.title_short
+      || topic.topic_title
+      || topic.title_long
+      || topic.description
+      || topic.name
+      || ('Thema #' + topic.id);
+  }
+
+  function curriculumSubtopicLabel(subtopic) {
+    if (!subtopic) return '';
+    return subtopic.title
+      || subtopic.title_short
+      || subtopic.subtopic_title
+      || subtopic.title_long
+      || subtopic.description
+      || subtopic.name
+      || ('Skill #' + subtopic.id);
+  }
+
+
+
   function escapeHtml(value) {
     return String(value || '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[ch]));
   }
@@ -176,7 +219,7 @@
     if (!sub) return;
     sub.innerHTML = '<option value="">Ganzes Thema verwenden</option>';
     if (topic) {
-      (topic.subtopics || []).forEach(s => { sub.innerHTML += `<option value="${s.id}">${escapeHtml(s.title)}</option>`; });
+      (topic.subtopics || []).forEach(s => { sub.innerHTML += `<option value="${s.id}">${escapeHtml(curriculumSubtopicLabel(s))}</option>`; });
       if (preview) preview.innerHTML = `<strong>${escapeHtml(topic.title)}</strong><br>${escapeHtml(topic.title_long || topic.description || 'Dieses Thema wird als Grundlage für das Quiz verwendet.')}`;
     } else if (preview) {
       preview.textContent = 'Wähle ein Thema aus. Elevaro nutzt Kurz- und Langtitel, Lernziel, Keywords und Klassenkontext als Grundlage.';
@@ -379,7 +422,7 @@
       (domain.topics || []).forEach(topic => {
         const option = document.createElement('option');
         option.value = topic.id;
-        option.textContent = topic.title || topic.title_short || topic.topic_title || topic.title_long || topic.description || topic.name || ('Thema #' + topic.id);
+        option.textContent = curriculumTopicLabel(topic);
         group.appendChild(option);
       });
       topicSelect.appendChild(group);
@@ -398,7 +441,7 @@
     (topic.subtopics || []).forEach(sub => {
       const option = document.createElement('option');
       option.value = sub.id;
-      option.textContent = sub.title_short || sub.subtopic_title || ('Skill #' + sub.id);
+      option.textContent = curriculumSubtopicLabel(sub);
       subtopicSelect.appendChild(option);
     });
     if (selectedSubtopic) subtopicSelect.value = String(selectedSubtopic);
@@ -479,7 +522,7 @@
       (domain.topics || []).forEach(topic => {
         const option = document.createElement('option');
         option.value = topic.id;
-        option.textContent = topic.title || topic.title_short || topic.topic_title || topic.title_long || topic.description || topic.name || ('Thema #' + topic.id);
+        option.textContent = curriculumTopicLabel(topic);
         group.appendChild(option);
       });
       topicSelect.appendChild(group);
@@ -498,7 +541,7 @@
     (topic.subtopics || []).forEach(sub => {
       const option = document.createElement('option');
       option.value = sub.id;
-      option.textContent = sub.title_short || sub.subtopic_title || ('Skill #' + sub.id);
+      option.textContent = curriculumSubtopicLabel(sub);
       subtopicSelect.appendChild(option);
     });
     if (selectedSubtopic) subtopicSelect.value = String(selectedSubtopic);
