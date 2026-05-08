@@ -1,4 +1,7 @@
 <?php
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    @session_start();
+}
 require_once __DIR__ . '/../../app/includes/teacher_ai_wizard.php';
 
 header('Content-Type: application/json; charset=utf-8');

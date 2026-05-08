@@ -829,20 +829,13 @@ function elevaro_teacher_ai_load_draft(int $draftId, int $teacherId): array
         return $draft;
     }
 
-    // Fallback für Patchstände, bei denen teacher_current_user_id()/auth_user()
-    // im API-Kontext eine andere ID liefert als beim Erstellen des Drafts.
-    // Wenn die Klasse zum aktuellen Lehrer gehört, ist der Zugriff okay.
     if ($teacherId > 0 && !empty($draft['class_id'])) {
         try {
             elevaro_teacher_ai_class_for_teacher((int)$draft['class_id'], $teacherId);
             return $draft;
-        } catch (Throwable $e) {
-            // weiter unten wird final entschieden
-        }
+        } catch (Throwable $e) {}
     }
 
-    // Während der aktiven Wizard-Session darf der zuletzt erzeugte Draft fortgeführt werden.
-    // Das verhindert Session-/Auth-Mismatches zwischen Generate, Status und Confirm.
     $sessionDraftId = (int)($_SESSION['elevaro_ai_wizard_active_draft_id'] ?? 0);
     if ($sessionDraftId === $draftId) {
         return $draft;
@@ -1415,6 +1408,27 @@ if (!function_exists('elevaro_teacher_ai_auto_match_curriculum')) {
 }
 
 
+
+if (!function_exists('elevaro_teacher_ai_validate_curriculum_mapping_for_class')) {
+    function elevaro_teacher_ai_validate_curriculum_mapping_for_class(int $topicId, ?int $subtopicId, array $class): array
+    {
+        if ($topicId <= 0) {
+            return [null, null];
+        }
+
+        try {
+            $ctx = elevaro_teacher_ai_curriculum_context($topicId, $subtopicId ?: null, $class);
+            return [
+                (int)$ctx['topic']['id'],
+                !empty($ctx['subtopic']['id']) ? (int)$ctx['subtopic']['id'] : null,
+            ];
+        } catch (Throwable $e) {
+            return [null, null];
+        }
+    }
+}
+
+
 if (!function_exists('elevaro_teacher_ai_confirm_analysis')) {
     function elevaro_teacher_ai_confirm_analysis(int $draftId, int $teacherId, array $analysisUpdates): array
 {
@@ -1446,8 +1460,25 @@ if (!function_exists('elevaro_teacher_ai_confirm_analysis')) {
         $analysis['curriculum_topic_subtopic_id'] = (int)$analysisUpdates['curriculum_topic_subtopic_id'];
     }
 
-    $topicId = !empty($analysis['curriculum_topic_content_id']) ? (int)$analysis['curriculum_topic_content_id'] : null;
-    $subtopicId = !empty($analysis['curriculum_topic_subtopic_id']) ? (int)$analysis['curriculum_topic_subtopic_id'] : null;
+    try {
+        $class = elevaro_teacher_ai_class_for_teacher((int)$draft['class_id'], $teacherId);
+    } catch (Throwable $e) {
+        // Wenn der Zugriff bereits über Draft/Session validiert wurde, nutzen wir Klassenmetadaten aus dem Draft-Kontext nur für das Mapping.
+        $class = ['id' => (int)$draft['class_id']];
+    }
+
+    [$topicId, $subtopicId] = elevaro_teacher_ai_validate_curriculum_mapping_for_class(
+        !empty($analysis['curriculum_topic_content_id']) ? (int)$analysis['curriculum_topic_content_id'] : 0,
+        !empty($analysis['curriculum_topic_subtopic_id']) ? (int)$analysis['curriculum_topic_subtopic_id'] : null,
+        $class
+    );
+
+    if ($topicId === null) {
+        unset($analysis['curriculum_topic_content_id'], $analysis['curriculum_topic_subtopic_id']);
+    } else {
+        $analysis['curriculum_topic_content_id'] = $topicId;
+        $analysis['curriculum_topic_subtopic_id'] = $subtopicId;
+    }
 
     elevaro_teacher_ai_wizard_db()->prepare("UPDATE teacher_ai_quiz_drafts
         SET analysis_json = :analysis,

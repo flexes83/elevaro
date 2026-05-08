@@ -379,7 +379,7 @@
       (domain.topics || []).forEach(topic => {
         const option = document.createElement('option');
         option.value = topic.id;
-        option.textContent = topic.title || topic.title_short || topic.topic_title || topic.name || ('Thema #' + topic.id);
+        option.textContent = topic.title || topic.title_short || topic.topic_title || topic.title_long || topic.description || topic.name || ('Thema #' + topic.id);
         group.appendChild(option);
       });
       topicSelect.appendChild(group);
@@ -453,8 +453,8 @@
       exercise_transform: contentMode !== 'content_source',
       detected_skills: splitListInput($('#aiAnalysisSkills')?.value || ''),
       detected_dependencies: splitListInput($('#aiAnalysisDependencies')?.value || ''),
-      curriculum_topic_content_id: Number($('#aiAnalysisCurriculumTopic')?.value || 0),
-      curriculum_topic_subtopic_id: Number($('#aiAnalysisCurriculumSubtopic')?.value || 0)
+      curriculum_topic_content_id: $('#aiAnalysisCurriculumTopic')?.value ? Number($('#aiAnalysisCurriculumTopic').value) : 0,
+      curriculum_topic_subtopic_id: $('#aiAnalysisCurriculumSubtopic')?.value ? Number($('#aiAnalysisCurriculumSubtopic').value) : 0
     };
   }
 
@@ -479,7 +479,7 @@
       (domain.topics || []).forEach(topic => {
         const option = document.createElement('option');
         option.value = topic.id;
-        option.textContent = topic.title || topic.title_short || topic.topic_title || topic.name || ('Thema #' + topic.id);
+        option.textContent = topic.title || topic.title_short || topic.topic_title || topic.title_long || topic.description || topic.name || ('Thema #' + topic.id);
         group.appendChild(option);
       });
       topicSelect.appendChild(group);
