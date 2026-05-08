@@ -169,7 +169,8 @@
   }
 
   function currentSourceKind() {
-    return $('#aiWizardSourceKind')?.value || 'material';
+    const checked = document.querySelector('input[name="source_kind_choice"]:checked')?.value;
+    return checked || $('#aiWizardSourceKind')?.value || 'material';
   }
 
   function updateStageLabels() {
@@ -182,6 +183,33 @@
       const el = $(`#aiStageTrack [data-stage="${stage}"]`);
       if (el) el.textContent = label;
     });
+  }
+
+
+  function setSelectOptionTexts(selectId, labels) {
+    const select = $(selectId);
+    if (!select) return;
+    Object.entries(labels || {}).forEach(([value, label]) => {
+      const option = select.querySelector(`option[value="${value}"]`);
+      if (option) option.textContent = label;
+    });
+  }
+
+  function updateWizardModeCopy() {
+    const isCurriculum = currentSourceKind() === 'curriculum';
+    const heroTitle = $('#aiWizardHeroTitle');
+    if (heroTitle) heroTitle.textContent = isCurriculum
+      ? 'Aus Lernziel wird ein spielbares Quiz'
+      : 'Aus Material wird ein spielbares Quiz';
+
+    const progressText = $('#aiWizardProgressText');
+    if (progressText && !progressText.dataset.locked) {
+      progressText.textContent = isCurriculum
+        ? 'Lernziel wird gelesen und didaktisch geplant...'
+        : 'Material wird gelesen und didaktisch sortiert...';
+    }
+
+    updateStageLabels();
   }
 
   function updateSourceKind(kind) {
@@ -199,6 +227,7 @@
     }
     updateExtraPromptPlaceholder();
     updateStageLabels();
+    updateWizardModeCopy();
   }
 
   async function loadCurriculumTopics() {
@@ -355,9 +384,10 @@
 
   function showAnalysisRoute(route) {
     if (!route) return;
-    const headline = route.headline || 'Material erkannt';
+    const isCurriculum = currentSourceKind() === 'curriculum';
+    const headline = route.headline || (isCurriculum ? 'Lernziel eingeordnet' : 'Material erkannt');
     const steps = route.steps || [];
-    setTicker(headline, steps.length ? steps : ['Die KI hat Materialtyp und Aufgabenstrategie erkannt.']);
+    setTicker(headline, steps.length ? steps : [isCurriculum ? 'Die KI hat Lernziel, Kompetenz und Quizstrategie eingeordnet.' : 'Die KI hat Materialtyp und Aufgabenstrategie erkannt.']);
   }
 
   function resetAnalysisRoute() {
@@ -441,6 +471,8 @@
     startLoadingCopy();
     try {
       const form = e.currentTarget;
+      const selectedSourceKind = document.querySelector('input[name="source_kind_choice"]:checked')?.value || 'material';
+      updateSourceKind(selectedSourceKind);
       const sourceKind = currentSourceKind();
       if (sourceKind === 'curriculum' && !($('#aiCurriculumTopicSelect')?.value || '')) {
         throw new Error('Bitte ein Lerninhalt auswählen.');
@@ -572,6 +604,35 @@
       depsHelp: 'Was müsste sichtbar sein, damit die Originalaufgabe lösbar wäre?'
     };
 
+    const materialTypeCard = $('[data-analysis-card="material-type"]');
+    if (materialTypeCard) materialTypeCard.classList.toggle('d-none', isCurriculum);
+
+    if (isCurriculum) {
+      setSelectOptionTexts('#aiAnalysisContentMode', {
+        content_source: 'Quiz aus Lernziel / Lehrplaninhalt',
+        self_contained_exercises: 'Übungsfragen zum ausgewählten Skill',
+        context_dependent_exercises: 'Transferfragen zum Lernziel'
+      });
+      setSelectOptionTexts('#aiAnalysisStrategy', {
+        content_questions: 'Lernziel direkt abfragen',
+        reuse_or_adapt_examples: 'Kompetenz abwechslungsreich üben',
+        generate_similar_exercises: 'Neue Aufgaben zum Skill erzeugen',
+        listening_text_questions: 'Hörtext passend zum Lernziel erzeugen'
+      });
+    } else {
+      setSelectOptionTexts('#aiAnalysisContentMode', {
+        content_source: 'Lernstoff: Fragen zum Inhalt',
+        self_contained_exercises: 'Selbstlösbare Übung: Beispiele nutzen/variieren',
+        context_dependent_exercises: 'Kontextabhängig: Kontext einbauen oder ähnliche Aufgaben'
+      });
+      setSelectOptionTexts('#aiAnalysisStrategy', {
+        content_questions: 'Fragen zum tatsächlichen Stoff',
+        reuse_or_adapt_examples: 'Beispiele übernehmen oder leicht variieren',
+        generate_similar_exercises: 'Neue ähnliche Aufgaben erzeugen',
+        listening_text_questions: 'Neuen Hörtext + Verständnisfragen erzeugen'
+      });
+    }
+
     const mapping = {
       aiAnalysisKicker: copy.kicker,
       aiAnalysisTitle: copy.title,
@@ -612,8 +673,8 @@
       headline.textContent = routePayload.headline || 'Analyse prüfen';
       steps.innerHTML = '';
       (routePayload.steps || [
-        'Prüfe, ob die didaktische Einordnung stimmt.',
-        'Danach erstellt Elevaro die Fragen mit dieser Strategie.'
+        currentSourceKind() === 'curriculum' ? 'Prüfe, ob Schwerpunkt und Lernzielbezug stimmen.' : 'Prüfe, ob die didaktische Einordnung stimmt.',
+        currentSourceKind() === 'curriculum' ? 'Danach erstellt Elevaro Fragen passend zu Lehrplan und Zusatzwunsch.' : 'Danach erstellt Elevaro die Fragen mit dieser Strategie.'
       ]).forEach(text => {
         const li = document.createElement('li');
         li.textContent = text;
@@ -984,5 +1045,6 @@
 
 
   updateStageLabels();
+  updateWizardModeCopy();
   startPromptPlaceholderRotation();
 })();

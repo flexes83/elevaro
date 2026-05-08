@@ -14,7 +14,7 @@ $classId = (int)$class['id'];
 $classLabel = teacher_class_label($class);
 $subjectLabel = elevaro_teacher_ai_subject_label($class['subject_code'] ?? '');
 
-teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten ein Klassenquiz erstellen.');
+teacher_header('KI-Quiz-Wizard', 'Aus Material oder Lernziel in wenigen Schritten ein Klassenquiz erstellen.');
 ?>
 <link href="/assets/css/teacher-ai-wizard.css" rel="stylesheet">
 
@@ -22,7 +22,7 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
   <div class="ai-wizard-hero">
     <div>
       <span class="ai-wizard-kicker">✨ Neuer Lehrer-Assistent</span>
-      <h2>Aus Material wird ein spielbares Quiz</h2>
+      <h2 id="aiWizardHeroTitle">Aus Material wird ein spielbares Quiz</h2>
       <p>
         Klasse: <strong><?= teacher_h($classLabel) ?></strong> · Fach: <strong><?= teacher_h($subjectLabel) ?></strong>
         <?php if (!empty($class['grade'])): ?> · Klasse <?= (int)$class['grade'] ?><?php endif; ?>
@@ -197,7 +197,7 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
         <span></span><span></span><span></span>
       </div>
       <h3>Elevaro baut dein Quiz</h3>
-      <p id="aiWizardProgressText">Material wird gelesen und didaktisch sortiert...</p>
+      <p id="aiWizardProgressText">Quelle wird vorbereitet...</p>
 
       <div class="ai-progress"><i id="aiWizardProgressBar"></i></div>
 
