@@ -350,6 +350,23 @@ teacher_header('KI-Quiz-Wizard', 'Aus Unterrichtsmaterial in wenigen Schritten e
           <button class="btn btn-light" id="aiAddQuestion" type="button">+ Frage hinzufügen</button>
         </div>
         <div id="aiQuestionEditor" class="ai-question-editor"></div>
+
+        <div class="ai-custom-question-card mt-4" id="aiCustomQuestionCard">
+          <div class="ai-custom-question-head">
+            <span>➕ Eigene Frage ergänzen</span>
+            <small>Formuliere grob vor – Elevaro macht daraus eine saubere Quizfrage mit 4 Antworten.</small>
+          </div>
+          <textarea class="form-control" id="aiCustomQuestionText" rows="3" placeholder="z. B. Warum ist der Schwarzwald so waldreich? Oder: Was bedeutet ‚deciduous forest‘ auf Deutsch?"></textarea>
+          <div class="ai-custom-question-actions">
+            <button class="btn btn-outline-primary" id="aiCustomQuestionGenerate" type="button">✨ Frage ausarbeiten & Antworten erstellen</button>
+          </div>
+        </div>
+
+        <details class="ai-debug-prompt mt-4 d-none" id="aiPromptDebugBox">
+          <summary>Prompt-Debug anzeigen</summary>
+          <pre id="aiPromptDebugCode"></pre>
+        </details>
+
         <div class="d-flex justify-content-end gap-2 flex-wrap mt-4">
           <button class="btn btn-light btn-lg" type="button" data-back-to-step="1">← Zurück</button>
           <button class="btn btn-primary btn-lg" id="aiSaveReview" type="button">Weiter zur Veröffentlichung</button>

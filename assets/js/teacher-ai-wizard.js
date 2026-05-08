@@ -2,7 +2,7 @@
   const root = document.querySelector('.ai-wizard');
   if (!root) return;
 
-  let state = { draftId: null, payload: null, imagePath: null, analysis: null, analysisRoute: null };
+  let state = { draftId: null, payload: null, imagePath: null, analysis: null, analysisRoute: null, debugPrompt: '' };
   const $ = (sel, ctx = document) => ctx.querySelector(sel);
   const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
 
@@ -401,6 +401,7 @@
       if (res.done) {
         setProgress(100, 'Fertig. Dein Quizentwurf wird geladen…');
         state.payload = res.payload;
+        state.debugPrompt = res.debug_prompt || (res.payload && res.payload._debug_prompt) || state.debugPrompt || '';
         if (res.payload && res.payload.analysis_route) {
           showAnalysisRoute(res.payload.analysis_route);
         }
@@ -447,6 +448,7 @@
         }
       } else {
         state.payload = json.payload;
+        state.debugPrompt = json.debug_prompt || (json.payload && json.payload._debug_prompt) || state.debugPrompt || '';
       }
 
       fillEditor();
@@ -667,6 +669,7 @@
     $('#aiListeningBox').classList.toggle('d-none', p.mode !== 'listening');
     renderPlausibilityReview();
     renderQuestions();
+    renderPromptDebug();
     populateReviewCurriculumSelect();
     updatePublishSummary();
   }
@@ -698,6 +701,20 @@
     return state.payload;
   }
 
+
+  function renderPromptDebug() {
+    const box = $('#aiPromptDebugBox');
+    const code = $('#aiPromptDebugCode');
+    if (!box || !code) return;
+    const prompt = String(state.debugPrompt || (state.payload && state.payload._debug_prompt) || '').trim();
+    if (!prompt) {
+      box.classList.add('d-none');
+      code.textContent = '';
+      return;
+    }
+    box.classList.remove('d-none');
+    code.textContent = prompt;
+  }
 
   function renderPlausibilityReview() {
     const p = state.payload || {};
@@ -797,7 +814,7 @@
       const question = $('.ai-question-text', card).value.trim();
       const btn = $('.ai-suggest-options', card);
       btn.disabled = true; btn.textContent = 'KI denkt...';
-      const res = await apiJson('/teacher/api/ai_wizard_suggest_options.php', { draft_id: Number(state.draftId || 0), question });
+      const res = await apiJson('/teacher/api/ai_wizard_suggest_options.php', { draft_id: Number(state.draftId || 0), question, payload: state.payload || {} });
       const suggestion = res.suggestion || {};
       const opts = suggestion.options || [];
       $$('.ai-option-text', card).forEach((input, i) => { input.value = opts[i] || ''; });
@@ -814,6 +831,50 @@
       btn.disabled = false; btn.textContent = '✨ 4 Antworten vorschlagen';
     }
   }
+
+  async function generateCustomQuestion() {
+    const input = $('#aiCustomQuestionText');
+    const btn = $('#aiCustomQuestionGenerate');
+    if (!input || !btn) return;
+    const question = input.value.trim();
+    if (!question) {
+      toast('Bitte zuerst eine eigene Frage eingeben.');
+      return;
+    }
+
+    try {
+      readPayload();
+      btn.disabled = true;
+      btn.textContent = 'KI formuliert...';
+      const res = await apiJson('/teacher/api/ai_wizard_suggest_options.php', {
+        draft_id: Number(state.draftId || 0),
+        question,
+        refine_question: true,
+        payload: state.payload || {}
+      });
+      const suggestion = res.suggestion || {};
+      const opts = Array.isArray(suggestion.options) ? suggestion.options : ['', '', '', ''];
+      const q = {
+        question: suggestion.question || question,
+        options: opts.slice(0, 4),
+        answer: suggestion.answer || opts[0] || '',
+        explanation: suggestion.explanation || '',
+        difficulty: 0.35
+      };
+      while (q.options.length < 4) q.options.push('');
+      $('#aiQuestionEditor').appendChild(questionCard(q, $$('.ai-question-card').length));
+      renumber();
+      input.value = '';
+      toast('Eigene Frage wurde ergänzt.');
+    } catch (err) {
+      toast(err.message || String(err));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '✨ Frage ausarbeiten & Antworten erstellen';
+    }
+  }
+
+  $('#aiCustomQuestionGenerate')?.addEventListener('click', generateCustomQuestion);
 
   async function saveDraft() {
     const payload = readPayload();

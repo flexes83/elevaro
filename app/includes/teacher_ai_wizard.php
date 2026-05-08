@@ -1085,7 +1085,9 @@ if (!function_exists('elevaro_teacher_ai_poll_background_draft')) {
         $draft = elevaro_teacher_ai_load_draft($draftId, $teacherId);
 
         if (($draft['status'] ?? '') === 'draft' && !empty($draft['generated_payload_json'])) {
-            return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => elevaro_teacher_ai_draft_payload($draft), 'ticker_items' => elevaro_teacher_ai_generation_ticker_items($draft, json_decode((string)($draft['analysis_json'] ?? ''), true) ?: null, [])];
+            $payload = elevaro_teacher_ai_draft_payload($draft);
+            $payload['_debug_prompt'] = (string)($draft['prompt'] ?? '');
+            return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => $payload, 'debug_prompt' => (string)($draft['prompt'] ?? ''), 'ticker_items' => elevaro_teacher_ai_generation_ticker_items($draft, json_decode((string)($draft['analysis_json'] ?? ''), true) ?: null, [])];
         }
         if (!empty($draft['generation_error'])) {
             throw new RuntimeException((string)$draft['generation_error']);
@@ -2100,7 +2102,9 @@ if (!function_exists('elevaro_teacher_ai_poll_split_draft')) {
 
 
         if (($draft['status'] ?? '') === 'draft' && !empty($draft['generated_payload_json'])) {
-            return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => elevaro_teacher_ai_draft_payload($draft)];
+            $payload = elevaro_teacher_ai_draft_payload($draft);
+            $payload['_debug_prompt'] = (string)($draft['prompt'] ?? '');
+            return ['ok' => true, 'done' => true, 'draft_id' => $draftId, 'payload' => $payload, 'debug_prompt' => (string)($draft['prompt'] ?? '')];
         }
         if (($draft['status'] ?? '') === 'failed' && !empty($draft['generation_error'])) {
             throw new RuntimeException((string)$draft['generation_error']);
