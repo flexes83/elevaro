@@ -1834,6 +1834,215 @@ if (!function_exists('elevaro_teacher_ai_sanitize_student_visible_question')) {
     }
 }
 
+
+if (!function_exists('elevaro_teacher_ai_answer_disambiguation_schema')) {
+    function elevaro_teacher_ai_answer_disambiguation_schema(): array
+    {
+        return [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'properties' => [
+                'questions' => [
+                    'type' => 'array',
+                    'minItems' => 1,
+                    'maxItems' => 40,
+                    'items' => [
+                        'type' => 'object',
+                        'additionalProperties' => false,
+                        'properties' => [
+                            'nr' => ['type' => 'integer'],
+                            'question' => ['type' => 'string'],
+                            'options' => [
+                                'type' => 'array',
+                                'minItems' => 4,
+                                'maxItems' => 4,
+                                'items' => ['type' => 'string'],
+                            ],
+                            'answer' => ['type' => 'string'],
+                            'explanation' => ['type' => 'string'],
+                            'difficulty' => ['type' => 'number'],
+                            'source_reference' => ['type' => 'string'],
+                            'listening_segment_text' => ['type' => 'string'],
+                            'listening_segment_title' => ['type' => 'string'],
+                            'changed' => ['type' => 'boolean'],
+                            'reason' => ['type' => 'string'],
+                        ],
+                        'required' => [
+                            'nr',
+                            'question',
+                            'options',
+                            'answer',
+                            'explanation',
+                            'difficulty',
+                            'source_reference',
+                            'listening_segment_text',
+                            'listening_segment_title',
+                            'changed',
+                            'reason',
+                        ],
+                    ],
+                ],
+                'summary' => ['type' => 'string'],
+            ],
+            'required' => ['questions', 'summary'],
+        ];
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_build_answer_disambiguation_prompt')) {
+    function elevaro_teacher_ai_build_answer_disambiguation_prompt(array $analysis, array $questions, string $mode): string
+    {
+        $compactAnalysis = [
+            'title' => $analysis['title'] ?? '',
+            'description' => $analysis['description'] ?? '',
+            'language' => $analysis['language'] ?? '',
+            'material_type' => $analysis['material_type'] ?? '',
+            'task_intent' => $analysis['task_intent'] ?? '',
+            'content_mode' => $analysis['content_mode'] ?? '',
+            'generation_strategy' => $analysis['generation_strategy'] ?? '',
+            'topics' => $analysis['topics'] ?? [],
+            'content_map' => $analysis['content_map'] ?? [],
+        ];
+
+        $compactQuestions = [];
+        foreach ($questions as $idx => $q) {
+            $compactQuestions[] = [
+                'nr' => $idx + 1,
+                'question' => (string)($q['question'] ?? ''),
+                'options' => array_values(array_slice(array_map('strval', (array)($q['options'] ?? [])), 0, 4)),
+                'answer' => (string)($q['answer'] ?? ''),
+                'explanation' => (string)($q['explanation'] ?? ''),
+                'difficulty' => (float)($q['difficulty'] ?? 0.5),
+                'source_reference' => (string)($q['source_reference'] ?? ''),
+                'listening_segment_text' => (string)($q['listening_segment_text'] ?? ''),
+                'listening_segment_title' => (string)($q['listening_segment_title'] ?? ''),
+            ];
+        }
+
+        return trim("Du prüfst Elevaro-Multiple-Choice-Fragen unmittelbar VOR dem Lehrer-Review.
+
+" .
+            "Ziel: Jede Frage muss exakt eine eindeutig richtige Antwort haben.
+
+" .
+            "Regeln:
+" .
+            "- Gib alle Fragen in gleicher Reihenfolge zurück.
+" .
+            "- Jede Frage muss exakt 4 Antwortoptionen haben.
+" .
+            "- Genau eine Option muss eindeutig richtig sein und exakt im Feld answer stehen.
+" .
+            "- Wenn mehrere Optionen je nach Kontext richtig wären, ändere die falschen Optionen so, dass sie eindeutig falsch werden.
+" .
+            "- Die richtige Antwort darf korrigiert werden, wenn sie fachlich, sprachlich oder natürlichkeitsbezogen falsch ist.
+" .
+            "- Die Frage soll möglichst erhalten bleiben. Ändere sie nur, wenn sie sonst mehrdeutig oder nicht lösbar wäre.
+" .
+            "- Die Erklärung muss zur richtigen Antwort passen und darf keine falschen Fach-/Grammatikbegriffe enthalten.
+" .
+            "- Bei Sprachaufgaben: Verwende natürliche, eindeutige Zielsprache. Keine Distraktoren, die ebenfalls grammatikalisch möglich wären.
+" .
+            "- Bei Lückentexten, Vokabel- und Übersetzungsaufgaben: Wenn nötiger Kontext im Material stand, muss dieser in der Frage sichtbar sein.
+" .
+            "- Keine Materialverweise wie 'im Arbeitsblatt', 'laut Material', 'in der Quelle', 'siehe Bild', weil Schüler das Originalmaterial nicht sehen.
+" .
+            "- Erfinde keine neuen Fakten außerhalb der Inhaltslandkarte. Bei Sachfragen lieber Distraktoren eindeutig falsch machen, ohne neue unbelegte Fakten einzuführen.
+" .
+            "- Setze changed=true, wenn du Frage, Optionen, Antwort oder Erklärung geändert hast. reason kurz auf Deutsch.
+
+" .
+            "Modus: {$mode}
+
+" .
+            "Verbindliche Analyse/Inhaltslandkarte:
+" . json_encode($compactAnalysis, JSON_UNESCAPED_UNICODE) . "
+
+" .
+            "Zu bereinigende Fragen:
+" . json_encode($compactQuestions, JSON_UNESCAPED_UNICODE) . "
+
+" .
+            "Liefere ausschließlich JSON nach Schema.");
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_normalize_disambiguated_question')) {
+    function elevaro_teacher_ai_normalize_disambiguated_question(array $original, array $clean): array
+    {
+        $options = array_values(array_filter(array_map(static function ($value): string {
+            return trim((string)$value);
+        }, (array)($clean['options'] ?? [])), static fn(string $value): bool => $value !== ''));
+
+        $options = array_values(array_unique($options));
+        if (count($options) !== 4) {
+            return $original;
+        }
+
+        $answer = trim((string)($clean['answer'] ?? ''));
+        if ($answer === '' || !in_array($answer, $options, true)) {
+            return $original;
+        }
+
+        $question = trim((string)($clean['question'] ?? ''));
+        if ($question === '') {
+            return $original;
+        }
+
+        $merged = array_merge($original, [
+            'question' => $question,
+            'options' => $options,
+            'answer' => $answer,
+            'explanation' => trim((string)($clean['explanation'] ?? ($original['explanation'] ?? ''))),
+            'difficulty' => is_numeric($clean['difficulty'] ?? null) ? (float)$clean['difficulty'] : (float)($original['difficulty'] ?? 0.5),
+            'source_reference' => (string)($clean['source_reference'] ?? ($original['source_reference'] ?? '')),
+            'listening_segment_text' => (string)($clean['listening_segment_text'] ?? ($original['listening_segment_text'] ?? '')),
+            'listening_segment_title' => (string)($clean['listening_segment_title'] ?? ($original['listening_segment_title'] ?? '')),
+            '_quality_checked' => true,
+            '_quality_changed' => !empty($clean['changed']),
+            '_quality_reason' => (string)($clean['reason'] ?? ''),
+        ]);
+
+        return elevaro_teacher_ai_sanitize_student_visible_question($merged);
+    }
+}
+
+if (!function_exists('elevaro_teacher_ai_disambiguate_questions_before_review')) {
+    function elevaro_teacher_ai_disambiguate_questions_before_review(array $analysis, array $questions, string $mode): array
+    {
+        $questions = array_values(array_map('elevaro_teacher_ai_sanitize_student_visible_question', $questions));
+        if (!$questions) {
+            return $questions;
+        }
+
+        try {
+            @set_time_limit(90);
+            $prompt = elevaro_teacher_ai_build_answer_disambiguation_prompt($analysis, $questions, $mode);
+            $result = elevaro_openai_chat_json_flexible([
+                [
+                    'role' => 'system',
+                    'content' => 'Du bist ein strenger Fachdidaktik- und Grammatik-Validator für Schülerquizze. Du reparierst mehrdeutige Multiple-Choice-Fragen vor dem Review und gibst ausschließlich valides JSON zurück.',
+                ],
+                ['role' => 'user', 'content' => $prompt],
+            ], elevaro_teacher_ai_answer_disambiguation_schema(), 0.05, 90);
+
+            $cleaned = $result['json']['questions'] ?? [];
+            if (!is_array($cleaned) || count($cleaned) !== count($questions)) {
+                return $questions;
+            }
+
+            $out = [];
+            foreach ($questions as $idx => $original) {
+                $out[] = elevaro_teacher_ai_normalize_disambiguated_question($original, (array)($cleaned[$idx] ?? []));
+            }
+            return $out;
+        } catch (Throwable $e) {
+            elevaro_teacher_ai_debug_log('answer_disambiguation_failed', ['error' => $e->getMessage()]);
+            return $questions;
+        }
+    }
+}
+
 if (!function_exists('elevaro_teacher_ai_build_plausibility_prompt')) {
     function elevaro_teacher_ai_build_plausibility_prompt(array $analysis, array $questions, string $mode): string
     {
@@ -1871,7 +2080,7 @@ if (!function_exists('elevaro_teacher_ai_build_plausibility_prompt')) {
 if (!function_exists('elevaro_teacher_ai_apply_plausibility_review')) {
     function elevaro_teacher_ai_apply_plausibility_review(array $analysis, array $questions, string $mode, array $files): array
     {
-        $questions = array_map('elevaro_teacher_ai_sanitize_student_visible_question', $questions);
+        $questions = elevaro_teacher_ai_disambiguate_questions_before_review($analysis, $questions, $mode);
 
         $fallbackReview = [
             'overall_status' => 'ok',
