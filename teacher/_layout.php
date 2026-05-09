@@ -27,7 +27,7 @@ function teacher_header(string $title, string $subtitle = ''): void {
     $selected = teacher_selected_class();
     $classId = $selected ? (int)$selected['id'] : 0;
     $current = basename($_SERVER['SCRIPT_NAME']);
-    $isGlobalTeacherPage = in_array($current, ['materials.php'], true);
+    $isGlobalLibraryPage = $current === 'materials.php';
     $displayName = teacher_user_display_name($user);
     $initials = teacher_user_initials($user);
     $roleLabel = auth_role_label((string)auth_effective_role());
@@ -43,6 +43,8 @@ function teacher_header(string $title, string $subtitle = ''): void {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="/admin/assets/admin.css" rel="stylesheet">
   <style>
+    .teacher-global-layout{grid-template-columns:1fr}
+    .teacher-global-layout .admin-main{max-width:1320px;width:100%;margin:0 auto}
     .teacher-top-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
     .teacher-user-dropdown{position:relative}
     .teacher-user-button{display:flex;align-items:center;gap:10px;border:1px solid rgba(23,32,51,.10);background:rgba(255,255,255,.86);box-shadow:0 12px 30px rgba(23,32,51,.08);border-radius:999px;padding:7px 10px 7px 7px;color:#172033;font-weight:850;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
@@ -66,54 +68,13 @@ function teacher_header(string $title, string $subtitle = ''): void {
     .teacher-current-class-label{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:.78rem;font-weight:900;color:#5a4ff3;text-transform:uppercase;letter-spacing:.04em}
     .teacher-current-class-name{display:block;font-weight:950;color:#172033;line-height:1.15;margin-bottom:12px}
     .teacher-class-switch label{font-size:.78rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
-    .teacher-global-shell{min-height:100vh;background:linear-gradient(135deg,#faf9ff 0%,#f4f7ff 52%,#eefcff 100%)}
-    .teacher-global-header{height:70px;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:0 clamp(22px,7vw,120px);background:rgba(255,255,255,.82);border-bottom:1px solid rgba(23,32,51,.06);backdrop-filter:blur(18px);position:sticky;top:0;z-index:30}
-    .teacher-global-brand{font-weight:950;color:#5a4ff3;text-decoration:none;font-size:1.08rem;letter-spacing:-.04em}
-    .teacher-global-main{padding:clamp(26px,5vw,70px) clamp(22px,7vw,120px);max-width:1480px;margin:0 auto;width:100%}
-    .teacher-global-page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:26px}
-    .teacher-global-page-head h1{font-size:clamp(2rem,4vw,4.3rem);line-height:.94;letter-spacing:-.075em;font-weight:950;color:#172033;margin:0}
-    .teacher-global-page-head p{font-size:1.05rem;color:#667085;font-weight:750;margin:.75rem 0 0;max-width:720px}
-    @media(max-width:760px){.teacher-global-header{padding:0 18px}.teacher-global-main{padding:26px 18px}.teacher-global-page-head{align-items:flex-start;flex-direction:column}}
     .invite-code{font-size:1.35rem;letter-spacing:.12em;font-weight:900;background:#172033;color:#fff;border-radius:16px;padding:12px 16px;display:inline-block}
     .qr-placeholder{width:180px;height:180px;border-radius:24px;background:repeating-linear-gradient(45deg,#172033 0 8px,#fff 8px 16px);box-shadow:inset 0 0 0 16px #fff;border:1px solid rgba(23,32,51,.12)}
   </style>
 </head>
 <body>
-<?php if ($isGlobalTeacherPage): ?>
-<div class="teacher-global-shell">
-  <header class="teacher-global-header">
-    <a class="teacher-global-brand" href="/teacher/classes.php">Elevaro</a>
-    <div class="dropdown teacher-user-dropdown">
-      <button class="teacher-user-button" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-        <span class="teacher-user-avatar"><?= teacher_h($initials) ?></span>
-        <span class="teacher-user-meta d-none d-sm-flex">
-          <strong><?= teacher_h($displayName) ?></strong>
-          <span><?= teacher_h($roleLabel) ?></span>
-        </span>
-        <span class="text-muted small">⌄</span>
-      </button>
-      <ul class="dropdown-menu dropdown-menu-end teacher-user-menu">
-        <li class="dropdown-header">
-          <strong><?= teacher_h($displayName) ?></strong>
-          <span><?= teacher_h($roleLabel) ?> · Lehreraccount</span>
-        </li>
-        <li><a class="dropdown-item" href="classes.php">🏫 Meine Klassen</a></li>
-        <li><a class="dropdown-item" href="materials.php">🗂️ Meine Quizzes + Materialien</a></li>
-        <li><a class="dropdown-item" href="/account.php">👤 Mein Konto</a></li>
-        <li><hr class="dropdown-divider"></li>
-        <li><a class="dropdown-item text-danger" href="/logout.php">↪ Logout</a></li>
-      </ul>
-    </div>
-  </header>
-  <main class="teacher-global-main">
-    <header class="teacher-global-page-head">
-      <div>
-        <h1><?= teacher_h($title) ?></h1>
-        <?php if ($subtitle): ?><p><?= teacher_h($subtitle) ?></p><?php endif; ?>
-      </div>
-    </header>
-<?php else: ?>
-<div class="admin-layout">
+<div class="admin-layout<?= $isGlobalLibraryPage ? ' teacher-global-layout' : '' ?>">
+  <?php if (!$isGlobalLibraryPage): ?>
   <aside class="admin-sidebar">
     <a class="admin-brand" href="/teacher/index.php">Elevaro</a>
 
@@ -159,6 +120,7 @@ function teacher_header(string $title, string $subtitle = ''): void {
 
 
   </aside>
+  <?php endif; ?>
 
   <main class="admin-main">
     <header class="admin-page-head">
@@ -167,7 +129,7 @@ function teacher_header(string $title, string $subtitle = ''): void {
         <?php if ($subtitle): ?><p><?= teacher_h($subtitle) ?></p><?php endif; ?>
       </div>
       <div class="teacher-top-actions">
-        <?php if ($classId): ?><a class="btn btn-outline-primary" href="/classroom.php?class_id=<?= (int)$classId ?>">🚪 Klassenraum betreten</a><?php endif; ?>
+        <?php if (!$isGlobalLibraryPage && $classId): ?><a class="btn btn-outline-primary" href="/classroom.php?class_id=<?= (int)$classId ?>">🚪 Klassenraum betreten</a><?php endif; ?>
 
         <div class="dropdown teacher-user-dropdown">
           <button class="teacher-user-button" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -192,7 +154,6 @@ function teacher_header(string $title, string $subtitle = ''): void {
         </div>
       </div>
     </header>
-<?php endif; ?>
 <?php }
 
 function teacher_footer(): void { ?>
