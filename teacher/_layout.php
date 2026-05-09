@@ -27,7 +27,6 @@ function teacher_header(string $title, string $subtitle = ''): void {
     $selected = teacher_selected_class();
     $classId = $selected ? (int)$selected['id'] : 0;
     $current = basename($_SERVER['SCRIPT_NAME']);
-    $isGlobalLibraryArea = in_array($current, ['materials.php', 'worksheet_editor.php', 'listening_wizard.php'], true);
     $displayName = teacher_user_display_name($user);
     $initials = teacher_user_initials($user);
     $roleLabel = auth_role_label((string)auth_effective_role());
@@ -44,8 +43,6 @@ function teacher_header(string $title, string $subtitle = ''): void {
   <link href="/admin/assets/admin.css" rel="stylesheet">
   <style>
     .teacher-top-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
-    .teacher-global-library-layout{grid-template-columns:1fr}
-    .teacher-global-library-layout .admin-main{max-width:1280px;width:100%;margin:0 auto}
     .teacher-user-dropdown{position:relative}
     .teacher-user-button{display:flex;align-items:center;gap:10px;border:1px solid rgba(23,32,51,.10);background:rgba(255,255,255,.86);box-shadow:0 12px 30px rgba(23,32,51,.08);border-radius:999px;padding:7px 10px 7px 7px;color:#172033;font-weight:850;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
     .teacher-user-button:hover,.teacher-user-button:focus{transform:translateY(-1px);box-shadow:0 16px 38px rgba(23,32,51,.12);border-color:rgba(90,79,243,.25)}
@@ -73,8 +70,7 @@ function teacher_header(string $title, string $subtitle = ''): void {
   </style>
 </head>
 <body>
-<div class="admin-layout <?= $isGlobalLibraryArea ? 'teacher-global-library-layout' : '' ?>">
-  <?php if (!$isGlobalLibraryArea): ?>
+<div class="admin-layout">
   <aside class="admin-sidebar">
     <a class="admin-brand" href="/teacher/index.php">Elevaro</a>
 
@@ -120,7 +116,6 @@ function teacher_header(string $title, string $subtitle = ''): void {
 
 
   </aside>
-  <?php endif; ?>
 
   <main class="admin-main">
     <header class="admin-page-head">
@@ -129,7 +124,7 @@ function teacher_header(string $title, string $subtitle = ''): void {
         <?php if ($subtitle): ?><p><?= teacher_h($subtitle) ?></p><?php endif; ?>
       </div>
       <div class="teacher-top-actions">
-        <?php if (!$isGlobalLibraryArea && $classId): ?><a class="btn btn-outline-primary" href="/classroom.php?class_id=<?= (int)$classId ?>">🚪 Klassenraum betreten</a><?php endif; ?>
+        <?php if ($classId): ?><a class="btn btn-outline-primary" href="/classroom.php?class_id=<?= (int)$classId ?>">🚪 Klassenraum betreten</a><?php endif; ?>
 
         <div class="dropdown teacher-user-dropdown">
           <button class="teacher-user-button" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -146,7 +141,7 @@ function teacher_header(string $title, string $subtitle = ''): void {
               <span><?= teacher_h($roleLabel) ?> · Lehreraccount</span>
             </li>
             <li><a class="dropdown-item" href="classes.php">🏫 Meine Klassen</a></li>
-            <li><a class="dropdown-item" href="materials.php">🗂️ Bibliothek</a></li>
+            <li><a class="dropdown-item" href="materials.php">🗂️ Meine Bibliothek</a></li>
             <li><a class="dropdown-item" href="/account.php">👤 Mein Konto</a></li>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item text-danger" href="/logout.php">↪ Logout</a></li>

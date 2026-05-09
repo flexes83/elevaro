@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/../app/includes/teacher_ai_wizard.php';
+require_once __DIR__ . '/library_units.php';
 
 $class = teacher_selected_class();
 if (!$class) {
@@ -14,24 +15,28 @@ $classId = (int)$class['id'];
 $classLabel = teacher_class_label($class);
 $subjectLabel = elevaro_teacher_ai_subject_label($class['subject_code'] ?? '');
 $unitId = (int)($_GET['unit_id'] ?? 0);
-$unit = null;
-if ($unitId > 0) {
-    $unitStmt = teacher_db()->prepare("SELECT * FROM teacher_units WHERE id = :id AND teacher_id = :teacher_id LIMIT 1");
-    $unitStmt->execute(['id' => $unitId, 'teacher_id' => teacher_current_user_id()]);
-    $unit = $unitStmt->fetch() ?: null;
-}
+$libraryUnit = $unitId ? teacher_library_unit_by_id($unitId) : null;
+$contentType = (string)($_GET['content_type'] ?? 'quiz');
 
-teacher_header('KI-Quiz-Wizard', 'Aus Material oder Lernziel in wenigen Schritten ein Klassenquiz erstellen.');
+teacher_header('KI-Quiz-Wizard', $libraryUnit ? 'Neuen Inhalt für die Unit „' . (string)$libraryUnit['title'] . '“ erstellen.' : 'Aus Material oder Lernziel in wenigen Schritten ein Klassenquiz erstellen.');
 ?>
 <link href="/assets/css/teacher-ai-wizard.css" rel="stylesheet">
 
-<div class="ai-wizard" data-class-id="<?= (int)$classId ?>" data-subject-label="<?= teacher_h($subjectLabel) ?>">
+<div class="ai-wizard" data-class-id="<?= (int)$classId ?>" data-subject-label="<?= teacher_h($subjectLabel) ?>" data-unit-id="<?= (int)$unitId ?>" data-content-type="<?= teacher_h($contentType) ?>">
   <div class="ai-wizard-hero">
     <div>
       <span class="ai-wizard-kicker">✨ Neuer Lehrer-Assistent</span>
-      <h2 id="aiWizardHeroTitle"><?= $unit ? 'Inhalt für Unit erstellen' : 'Aus Material wird ein spielbares Quiz' ?></h2>
+      <h2 id="aiWizardHeroTitle">Aus Material wird ein spielbares Quiz</h2>
+      <?php if ($libraryUnit): ?>
+        <div class="alert alert-light border rounded-4 mt-3 mb-0">
+          <strong>Unit-Kontext:</strong> <?= teacher_h((string)$libraryUnit['title']) ?>
+          <?php if (!empty($libraryUnit['curriculum_topic_label'])): ?> · <?= teacher_h((string)$libraryUnit['curriculum_topic_label']) ?><?php endif; ?>
+          <?php if (!empty($libraryUnit['curriculum_subtopic_label'])): ?> / <?= teacher_h((string)$libraryUnit['curriculum_subtopic_label']) ?><?php endif; ?>
+          <br><small>Fach, Klasse und Lerninhalt sind durch diese Unit bereits vorgegeben. Du kannst daraus jetzt ein weiteres Format erzeugen.</small>
+        </div>
+      <?php endif; ?>
       <p>
-        <?php if ($unit): ?>Unit: <strong><?= teacher_h($unit['title']) ?></strong> · <?php endif; ?>Klasse: <strong><?= teacher_h($classLabel) ?></strong> · Fach: <strong><?= teacher_h($subjectLabel) ?></strong>
+        Klasse: <strong><?= teacher_h($classLabel) ?></strong> · Fach: <strong><?= teacher_h($subjectLabel) ?></strong>
         <?php if (!empty($class['grade'])): ?> · Klasse <?= (int)$class['grade'] ?><?php endif; ?>
       </p>
     </div>
@@ -48,13 +53,9 @@ teacher_header('KI-Quiz-Wizard', 'Aus Material oder Lernziel in wenigen Schritte
   <section class="ai-wizard-panel is-active" data-step="1">
     <form id="aiWizardSourceForm" enctype="multipart/form-data">
       <input type="hidden" name="class_id" value="<?= (int)$classId ?>">
-      <?php if ($unit): ?><input type="hidden" name="unit_id" value="<?= (int)$unit['id'] ?>"><?php endif; ?>
+      <input type="hidden" name="unit_id" value="<?= (int)$unitId ?>">
+      <input type="hidden" name="content_type" value="<?= teacher_h($contentType) ?>">
       <input type="hidden" name="source_kind" id="aiWizardSourceKind" value="material">
-      <?php if ($unit): ?>
-        <div class="alert alert-primary d-flex align-items-start gap-2" style="border-radius:22px">
-          <span>✨</span><div><strong>Du erstellst Inhalte für die Unit „<?= teacher_h($unit['title']) ?>“.</strong><br><span class="small">Nach dem Speichern bleibt das Material dauerhaft in deiner Bibliothek und kann mehreren Klassen zugeordnet werden.</span></div>
-        </div>
-      <?php endif; ?>
 
       <div class="ai-step-one-layout">
         <div class="ai-step-card">
