@@ -1,35 +1,12 @@
 <?php
 require_once __DIR__ . '/_bootstrap.php';
 
-function teacher_user_display_name(?array $user = null): string
-{
-    $user = $user ?: auth_user();
-    return trim((string)(($user['display_name'] ?? '') ?: ($user['username'] ?? '') ?: ($user['email'] ?? 'Lehrkraft')));
-}
-
-function teacher_user_initials(?array $user = null): string
-{
-    $name = teacher_user_display_name($user);
-    if ($name === '') {
-        return '?';
-    }
-
-    $parts = preg_split('/\s+/', $name) ?: [];
-    $first = mb_substr($parts[0] ?? '?', 0, 1, 'UTF-8');
-    $second = count($parts) > 1 ? mb_substr(end($parts), 0, 1, 'UTF-8') : '';
-
-    return mb_strtoupper($first . $second, 'UTF-8');
-}
-
 function teacher_header(string $title, string $subtitle = ''): void {
     $user = auth_user();
     $classes = teacher_classes();
     $selected = teacher_selected_class();
     $classId = $selected ? (int)$selected['id'] : 0;
     $current = basename($_SERVER['SCRIPT_NAME']);
-    $displayName = teacher_user_display_name($user);
-    $initials = teacher_user_initials($user);
-    $roleLabel = auth_role_label((string)auth_effective_role());
     $withClass = static function (string $file) use ($classId): string {
         return $classId ? $file . '?class_id=' . $classId : $file;
     };
@@ -42,25 +19,6 @@ function teacher_header(string $title, string $subtitle = ''): void {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="/admin/assets/admin.css" rel="stylesheet">
   <style>
-    .teacher-top-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
-    .teacher-user-dropdown{position:relative}
-    .teacher-user-button{display:flex;align-items:center;gap:10px;border:1px solid rgba(23,32,51,.10);background:rgba(255,255,255,.86);box-shadow:0 12px 30px rgba(23,32,51,.08);border-radius:999px;padding:7px 10px 7px 7px;color:#172033;font-weight:850;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
-    .teacher-user-button:hover,.teacher-user-button:focus{transform:translateY(-1px);box-shadow:0 16px 38px rgba(23,32,51,.12);border-color:rgba(90,79,243,.25)}
-    .teacher-user-avatar{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#5a4ff3,#8b7cff);color:#fff;font-size:.82rem;font-weight:950;letter-spacing:-.03em;box-shadow:inset 0 0 0 1px rgba(255,255,255,.28)}
-    .teacher-user-meta{display:flex;flex-direction:column;align-items:flex-start;line-height:1.05;max-width:190px}
-    .teacher-user-meta strong{font-size:.9rem;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .teacher-user-meta span{font-size:.72rem;color:#6c7482;font-weight:750;margin-top:3px}
-    .teacher-user-menu{border:0;border-radius:22px;padding:8px;min-width:260px;box-shadow:0 24px 60px rgba(23,32,51,.16)}
-    .teacher-user-menu .dropdown-header{padding:12px 12px 10px;color:#172033}
-    .teacher-user-menu .dropdown-header strong{display:block;font-size:.95rem;line-height:1.2}
-    .teacher-user-menu .dropdown-header span{display:block;margin-top:2px;color:#6c7482;font-size:.78rem;font-weight:750}
-    .teacher-user-menu .dropdown-item{border-radius:14px;padding:10px 12px;font-weight:800;color:#172033;display:flex;align-items:center;gap:10px}
-    .teacher-user-menu .dropdown-item:hover{background:#f3f1ff;color:#4037c9}
-    .teacher-user-menu .dropdown-divider{margin:8px 4px}
-    .teacher-sidebar-user{display:flex;align-items:center;gap:10px}
-    .teacher-sidebar-user .teacher-user-avatar{width:34px;height:34px;font-size:.78rem;box-shadow:none}
-    .teacher-sidebar-user strong{display:block;line-height:1.15}
-    .teacher-sidebar-user span{display:block;color:rgba(255,255,255,.72);font-size:.76rem;font-weight:750;margin-top:2px}
     .teacher-class-switch{margin:0 0 18px;padding:16px;border-radius:22px;background:linear-gradient(135deg,rgba(90,79,243,.12),rgba(139,124,255,.08));border:1px solid rgba(90,79,243,.18)}
     .teacher-current-class-label{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:.78rem;font-weight:900;color:#5a4ff3;text-transform:uppercase;letter-spacing:.04em}
     .teacher-current-class-name{display:block;font-weight:950;color:#172033;line-height:1.15;margin-bottom:12px}
@@ -97,7 +55,8 @@ function teacher_header(string $title, string $subtitle = ''): void {
       <a class="<?= teacher_active('index.php') ?>" href="<?= teacher_h($withClass('index.php')) ?>">🏠 Dashboard</a>
       <a class="<?= teacher_active('contents.php') ?>" href="<?= teacher_h($withClass('contents.php')) ?>">📚 Lerninhalte</a>
       <a class="<?= teacher_active('students.php') ?>" href="<?= teacher_h($withClass('students.php')) ?>">👧 Schüler</a>
-      <a class="<?= teacher_active('quizzes.php') ?>" href="<?= teacher_h($withClass('quizzes.php')) ?>">📝 Quizzes</a>
+      <a class="<?= teacher_active('quizzes.php') ?>" href="<?= teacher_h($withClass('quizzes.php')) ?>">📝 Klassen-Quizzes</a>
+      <a class="<?= teacher_active('materials.php') ?>" href="materials.php">🗂️ Meine Quizzes + Materialien</a>
       <a class="<?= teacher_active('ai_wizard.php') ?>" href="<?= teacher_h($withClass('ai_wizard.php')) ?>">✨ KI-Wizard</a>
       <a class="<?= teacher_active('live.php') ?>" href="<?= teacher_h($withClass('live.php')) ?>">⚡ Live Quizz</a>
       <a class="<?= teacher_active('settings.php') ?>" href="<?= teacher_h($withClass('settings.php')) ?>">⚙️ Einstellungen</a>
@@ -105,13 +64,11 @@ function teacher_header(string $title, string $subtitle = ''): void {
     </nav>
 
     <div class="admin-role-box mt-4">
-      <div class="teacher-sidebar-user">
-        <span class="teacher-user-avatar"><?= teacher_h($initials) ?></span>
-        <div>
-          <strong><?= teacher_h($displayName) ?></strong>
-          <span><?= teacher_h($roleLabel) ?> · kostenpflichtig</span>
-        </div>
+      <div class="admin-role-user">
+        <strong><?= teacher_h($user['display_name'] ?: $user['username'] ?: $user['email']) ?></strong>
+        <span><?= teacher_h(auth_role_label((string)auth_effective_role())) ?> · kostenpflichtig</span>
       </div>
+      <a class="admin-logout" href="/logout.php">Logout</a>
     </div>
 
 
@@ -123,30 +80,9 @@ function teacher_header(string $title, string $subtitle = ''): void {
         <h1><?= teacher_h($title) ?></h1>
         <?php if ($subtitle): ?><p><?= teacher_h($subtitle) ?></p><?php endif; ?>
       </div>
-      <div class="teacher-top-actions">
+      <div class="d-flex gap-2 flex-wrap">
         <?php if ($classId): ?><a class="btn btn-outline-primary" href="/classroom.php?class_id=<?= (int)$classId ?>">🚪 Klassenraum betreten</a><?php endif; ?>
-
-        <div class="dropdown teacher-user-dropdown">
-          <button class="teacher-user-button" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-            <span class="teacher-user-avatar"><?= teacher_h($initials) ?></span>
-            <span class="teacher-user-meta d-none d-sm-flex">
-              <strong><?= teacher_h($displayName) ?></strong>
-              <span><?= teacher_h($roleLabel) ?></span>
-            </span>
-            <span class="text-muted small">⌄</span>
-          </button>
-          <ul class="dropdown-menu dropdown-menu-end teacher-user-menu">
-            <li class="dropdown-header">
-              <strong><?= teacher_h($displayName) ?></strong>
-              <span><?= teacher_h($roleLabel) ?> · Lehreraccount</span>
-            </li>
-            <li><a class="dropdown-item" href="classes.php">🏫 Meine Klassen</a></li>
-            <li><a class="dropdown-item" href="<?= teacher_h($withClass('quizzes.php')) ?>">📝 Meine Quizzes + Materialien</a></li>
-            <li><a class="dropdown-item" href="/account.php">👤 Mein Konto</a></li>
-            <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item text-danger" href="/logout.php">↪ Logout</a></li>
-          </ul>
-        </div>
+        <a class="btn btn-primary" href="classes.php">🏫 Klassen verwalten</a>
       </div>
     </header>
 <?php }
