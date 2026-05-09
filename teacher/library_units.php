@@ -48,6 +48,38 @@ function teacher_library_is_foreign_language(?string $subjectCode, ?string $subj
     return false;
 }
 
+function teacher_library_column_exists(PDO $pdo, string $table, string $column): bool
+{
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table AND COLUMN_NAME = :column");
+    $stmt->execute(['table' => $table, 'column' => $column]);
+    return (int)$stmt->fetchColumn() > 0;
+}
+
+function teacher_library_index_exists(PDO $pdo, string $table, string $index): bool
+{
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table AND INDEX_NAME = :idx");
+    $stmt->execute(['table' => $table, 'idx' => $index]);
+    return (int)$stmt->fetchColumn() > 0;
+}
+
+function teacher_library_add_column(PDO $pdo, string $table, string $column, string $definition): void
+{
+    if (!teacher_library_column_exists($pdo, $table, $column)) {
+        $pdo->exec("ALTER TABLE `{$table}` ADD COLUMN {$definition}");
+    }
+}
+
+function teacher_library_add_index(PDO $pdo, string $table, string $index, string $definition): void
+{
+    if (!teacher_library_index_exists($pdo, $table, $index)) {
+        try {
+            $pdo->exec("ALTER TABLE `{$table}` ADD {$definition}");
+        } catch (Throwable $e) {
+            error_log('ELEVARO teacher library index migration failed: ' . $table . '.' . $index . ' - ' . $e->getMessage());
+        }
+    }
+}
+
 function teacher_library_ensure_schema(): void
 {
     static $done = false;
@@ -58,7 +90,7 @@ function teacher_library_ensure_schema(): void
     $pdo->exec("CREATE TABLE IF NOT EXISTS teacher_units (
         id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         teacher_id INT UNSIGNED NOT NULL,
-        unit_key VARCHAR(191) NOT NULL,
+        unit_key VARCHAR(191) NULL,
         title VARCHAR(220) NOT NULL,
         description TEXT NULL,
         subject_code VARCHAR(64) NULL,
@@ -70,10 +102,34 @@ function teacher_library_ensure_schema(): void
         curriculum_subtopic_label VARCHAR(220) NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        UNIQUE KEY uniq_teacher_unit_key (teacher_id, unit_key),
         KEY idx_teacher_units_teacher (teacher_id),
         KEY idx_teacher_units_curriculum (curriculum_topic_content_id, curriculum_topic_subtopic_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    // Existing installations may already have teacher_units from an earlier patch.
+    // Bring that table forward without assuming a fresh schema.
+    teacher_library_add_column($pdo, 'teacher_units', 'teacher_id', '`teacher_id` INT UNSIGNED NOT NULL DEFAULT 0 AFTER `id`');
+    teacher_library_add_column($pdo, 'teacher_units', 'unit_key', '`unit_key` VARCHAR(191) NULL AFTER `teacher_id`');
+    teacher_library_add_column($pdo, 'teacher_units', 'title', '`title` VARCHAR(220) NOT NULL DEFAULT \'Unbenannte Unit\' AFTER `unit_key`');
+    teacher_library_add_column($pdo, 'teacher_units', 'description', '`description` TEXT NULL AFTER `title`');
+    teacher_library_add_column($pdo, 'teacher_units', 'subject_code', '`subject_code` VARCHAR(64) NULL AFTER `description`');
+    teacher_library_add_column($pdo, 'teacher_units', 'subject_label', '`subject_label` VARCHAR(160) NULL AFTER `subject_code`');
+    teacher_library_add_column($pdo, 'teacher_units', 'grade', '`grade` VARCHAR(64) NULL AFTER `subject_label`');
+    teacher_library_add_column($pdo, 'teacher_units', 'curriculum_topic_content_id', '`curriculum_topic_content_id` INT UNSIGNED NULL AFTER `grade`');
+    teacher_library_add_column($pdo, 'teacher_units', 'curriculum_topic_subtopic_id', '`curriculum_topic_subtopic_id` INT UNSIGNED NULL AFTER `curriculum_topic_content_id`');
+    teacher_library_add_column($pdo, 'teacher_units', 'curriculum_topic_label', '`curriculum_topic_label` VARCHAR(220) NULL AFTER `curriculum_topic_subtopic_id`');
+    teacher_library_add_column($pdo, 'teacher_units', 'curriculum_subtopic_label', '`curriculum_subtopic_label` VARCHAR(220) NULL AFTER `curriculum_topic_label`');
+    teacher_library_add_column($pdo, 'teacher_units', 'created_at', '`created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+    teacher_library_add_column($pdo, 'teacher_units', 'updated_at', '`updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
+
+    // Give legacy rows a deterministic unit_key before adding the unique key.
+    if (teacher_library_column_exists($pdo, 'teacher_units', 'unit_key')) {
+        $pdo->exec("UPDATE teacher_units SET unit_key = CONCAT('legacy:', teacher_id, ':', id) WHERE unit_key IS NULL OR unit_key = ''");
+    }
+
+    teacher_library_add_index($pdo, 'teacher_units', 'uniq_teacher_unit_key', 'UNIQUE KEY `uniq_teacher_unit_key` (`teacher_id`, `unit_key`)');
+    teacher_library_add_index($pdo, 'teacher_units', 'idx_teacher_units_teacher', 'KEY `idx_teacher_units_teacher` (`teacher_id`)');
+    teacher_library_add_index($pdo, 'teacher_units', 'idx_teacher_units_curriculum', 'KEY `idx_teacher_units_curriculum` (`curriculum_topic_content_id`, `curriculum_topic_subtopic_id`)');
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS teacher_unit_items (
         id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -85,11 +141,22 @@ function teacher_library_ensure_schema(): void
         title VARCHAR(220) NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        UNIQUE KEY uniq_unit_quiz (unit_id, item_type, quiz_id),
-        UNIQUE KEY uniq_unit_custom_quiz (unit_id, item_type, custom_quiz_id),
         KEY idx_teacher_unit_items_unit (unit_id),
         KEY idx_teacher_unit_items_teacher (teacher_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    teacher_library_add_column($pdo, 'teacher_unit_items', 'unit_id', '`unit_id` INT UNSIGNED NOT NULL DEFAULT 0 AFTER `id`');
+    teacher_library_add_column($pdo, 'teacher_unit_items', 'teacher_id', '`teacher_id` INT UNSIGNED NOT NULL DEFAULT 0 AFTER `unit_id`');
+    teacher_library_add_column($pdo, 'teacher_unit_items', 'item_type', '`item_type` VARCHAR(32) NOT NULL DEFAULT \'quiz\' AFTER `teacher_id`');
+    teacher_library_add_column($pdo, 'teacher_unit_items', 'quiz_id', '`quiz_id` INT UNSIGNED NULL AFTER `item_type`');
+    teacher_library_add_column($pdo, 'teacher_unit_items', 'custom_quiz_id', '`custom_quiz_id` INT UNSIGNED NULL AFTER `quiz_id`');
+    teacher_library_add_column($pdo, 'teacher_unit_items', 'title', '`title` VARCHAR(220) NOT NULL DEFAULT \'Unbenannter Inhalt\' AFTER `custom_quiz_id`');
+    teacher_library_add_column($pdo, 'teacher_unit_items', 'created_at', '`created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+    teacher_library_add_column($pdo, 'teacher_unit_items', 'updated_at', '`updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
+    teacher_library_add_index($pdo, 'teacher_unit_items', 'uniq_unit_quiz', 'UNIQUE KEY `uniq_unit_quiz` (`unit_id`, `item_type`, `quiz_id`)');
+    teacher_library_add_index($pdo, 'teacher_unit_items', 'uniq_unit_custom_quiz', 'UNIQUE KEY `uniq_unit_custom_quiz` (`unit_id`, `item_type`, `custom_quiz_id`)');
+    teacher_library_add_index($pdo, 'teacher_unit_items', 'idx_teacher_unit_items_unit', 'KEY `idx_teacher_unit_items_unit` (`unit_id`)');
+    teacher_library_add_index($pdo, 'teacher_unit_items', 'idx_teacher_unit_items_teacher', 'KEY `idx_teacher_unit_items_teacher` (`teacher_id`)');
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS teacher_unit_class_links (
         unit_id INT UNSIGNED NOT NULL,
@@ -99,6 +166,12 @@ function teacher_library_ensure_schema(): void
         PRIMARY KEY (unit_id, class_id),
         KEY idx_unit_class_teacher (teacher_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    teacher_library_add_column($pdo, 'teacher_unit_class_links', 'unit_id', '`unit_id` INT UNSIGNED NOT NULL DEFAULT 0 FIRST');
+    teacher_library_add_column($pdo, 'teacher_unit_class_links', 'class_id', '`class_id` INT UNSIGNED NOT NULL DEFAULT 0 AFTER `unit_id`');
+    teacher_library_add_column($pdo, 'teacher_unit_class_links', 'teacher_id', '`teacher_id` INT UNSIGNED NOT NULL DEFAULT 0 AFTER `class_id`');
+    teacher_library_add_column($pdo, 'teacher_unit_class_links', 'created_at', '`created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+    teacher_library_add_index($pdo, 'teacher_unit_class_links', 'idx_unit_class_teacher', 'KEY `idx_unit_class_teacher` (`teacher_id`)');
 }
 
 function teacher_library_item_type(array $row): string
