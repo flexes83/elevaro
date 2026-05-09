@@ -382,7 +382,7 @@ function teacher_library_share_item_from_ref(string $ref): ?array
         ];
     }
 
-    $stmt = $pdo->prepare('SELECT q.id, q.quiz_key, q.title, q.description, q.image_path, q.theme_emoji, q.listening_mode, COUNT(qq.id) AS question_count FROM quizzes q LEFT JOIN quiz_questions qq ON qq.quiz_id = q.id WHERE q.id = :id GROUP BY q.id LIMIT 1');
+    $stmt = $pdo->prepare('SELECT q.id, q.quiz_key, q.title, q.description, q.image_path, q.theme_emoji, q.listening_mode, COUNT(qq.id) AS question_count FROM quizzes q LEFT JOIN questions qq ON qq.quiz_id = q.id WHERE q.id = :id GROUP BY q.id LIMIT 1');
     $stmt->execute(['id' => $parsed['id']]);
     $row = $stmt->fetch();
     if (!$row) return null;

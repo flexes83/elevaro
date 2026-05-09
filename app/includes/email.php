@@ -266,6 +266,25 @@ function elevaro_mail_unit_share_html(array $unit, array $selectedItems, string 
     ]);
     $meta = elevaro_mail_escape(implode(' · ', $metaParts));
 
+    $coverPath = trim((string)($unit['image_path'] ?? ''));
+    if ($coverPath === '') {
+        foreach ($selectedItems as $item) {
+            $candidate = trim((string)($item['image_path'] ?? ''));
+            if ($candidate !== '') { $coverPath = $candidate; break; }
+        }
+    }
+    $coverUrl = '';
+    if ($coverPath !== '') {
+        if (preg_match('~^https?://~i', $coverPath)) {
+            $coverUrl = $coverPath;
+        } else {
+            $coverUrl = rtrim(elevaro_base_url(), '/') . '/' . ltrim($coverPath, '/');
+        }
+    }
+    $coverHtml = $coverUrl !== ''
+        ? '<div style="height:190px;background-image:url(' . elevaro_mail_escape($coverUrl) . ');background-size:cover;background-position:center;border-radius:22px;margin:-2px -2px 18px;overflow:hidden;"></div>'
+        : '<div style="height:8px;background:linear-gradient(90deg,#5a4ff3,#8b7cff,#22d3ee);border-radius:999px;margin:0 0 18px;"></div>';
+
     $preview = '';
     foreach ($selectedItems as $item) {
         $type = (string)($item['type'] ?? $item['item_type'] ?? 'quiz');
@@ -293,6 +312,7 @@ function elevaro_mail_unit_share_html(array $unit, array $selectedItems, string 
 
     $body = '<p style="margin:0 0 18px;color:#172033;"><strong>' . elevaro_mail_escape($senderName) . '</strong> hat folgende Inhalte mit dir geteilt:</p>'
         . '<div style="border:1px solid #e6e2ff;background:linear-gradient(135deg,#f7f6ff,#ffffff);border-radius:24px;padding:20px;margin:14px 0 20px;">'
+        . $coverHtml
         . '<div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#5a4ff3;font-weight:950;margin-bottom:8px;">Geteilte Unit</div>'
         . '<div style="font-size:27px;line-height:1.07;color:#172033;font-weight:950;letter-spacing:-.04em;margin-bottom:8px;">' . $unitTitle . '</div>'
         . ($meta !== '' ? '<div style="color:#667085;font-weight:800;margin-bottom:14px;">' . $meta . '</div>' : '')

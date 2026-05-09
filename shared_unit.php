@@ -24,7 +24,7 @@ function shared_item_from_ref(PDO $pdo, string $ref): ?array
         return ['type' => 'worksheet', 'title' => (string)$row['title'], 'description' => (string)($row['description'] ?? ''), 'url' => '/teacher/material_pdf.php?custom_quiz_id=' . (int)$row['id']];
     }
 
-    $stmt = $pdo->prepare('SELECT q.id, q.quiz_key, q.title, q.description, q.image_path, q.theme_emoji, q.listening_mode, COUNT(qq.id) AS question_count FROM quizzes q LEFT JOIN quiz_questions qq ON qq.quiz_id = q.id WHERE q.id = :id GROUP BY q.id LIMIT 1');
+    $stmt = $pdo->prepare('SELECT q.id, q.quiz_key, q.title, q.description, q.image_path, q.theme_emoji, q.listening_mode, COUNT(qq.id) AS question_count FROM quizzes q LEFT JOIN questions qq ON qq.quiz_id = q.id WHERE q.id = :id GROUP BY q.id LIMIT 1');
     $stmt->execute(['id' => $id]);
     $row = $stmt->fetch();
     if (!$row) return null;
@@ -107,7 +107,7 @@ foreach ($items as $item) {
     <div class="alert alert-danger rounded-4"><?= shared_h($error) ?></div>
   <?php else: ?>
     <section class="hero">
-      <div class="hero-cover" <?= $cover !== '' ? 'style="background-image:url(' . shared_h($cover) . ')"' : '' ?>><div class="hero-symbol"><?= shared_h($emoji) ?></div></div>
+      <div class="hero-cover" <?= $cover !== '' ? 'style="background-image:url(' . shared_h(shared_abs($cover)) . ')"' : '' ?>><div class="hero-symbol"><?= shared_h($emoji) ?></div></div>
       <div class="hero-body">
         <div class="kicker">Geteilte Unit</div>
         <h1><?= shared_h((string)($unit['title'] ?? 'Unit')) ?></h1>
