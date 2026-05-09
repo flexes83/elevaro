@@ -119,8 +119,14 @@ function elevaro_frontend_header(string $variant = 'light', array $options = [])
                 <span><?= auth_h(auth_role_label((string)$effectiveRole)) ?></span>
               </li>
 
-              <li><a class="dropdown-item" href="/account.php">Mein Konto</a></li>
-              <li><a class="dropdown-item" href="<?= auth_h(elevaro_frontend_dashboard_url($user)) ?>">Dashboard</a></li>
+              <?php if ($effectiveRole === 'lehrer'): ?>
+                <li><a class="dropdown-item" href="/teacher/classes.php">🏫 Meine Klassen</a></li>
+                <li><a class="dropdown-item" href="/teacher/materials.php">🗂️ Meine Quizzes + Materialien</a></li>
+                <li><a class="dropdown-item" href="/account.php">👤 Mein Konto</a></li>
+              <?php else: ?>
+                <li><a class="dropdown-item" href="/account.php">Mein Konto</a></li>
+                <li><a class="dropdown-item" href="<?= auth_h(elevaro_frontend_dashboard_url($user)) ?>">Dashboard</a></li>
+              <?php endif; ?>
 
               <?php if ($realRole === 'admin'): ?>
                 <li><a class="dropdown-item" href="/admin/index.php">Admin</a></li>
