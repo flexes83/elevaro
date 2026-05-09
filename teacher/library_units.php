@@ -331,11 +331,24 @@ function teacher_library_ensure_share_schema(): void
         recipient_email VARCHAR(190) NOT NULL,
         token VARCHAR(96) NOT NULL,
         item_refs_json TEXT NULL,
+        guest_expires_at DATETIME NULL,
+        expires_at DATETIME NULL,
+        accepted_by_user_id INT UNSIGNED NULL,
+        accepted_at DATETIME NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE KEY uniq_colleague_share_token (token),
         KEY idx_colleague_share_teacher (teacher_id),
-        KEY idx_colleague_share_unit (unit_id)
+        KEY idx_colleague_share_unit (unit_id),
+        KEY idx_colleague_share_recipient (recipient_email),
+        KEY idx_colleague_share_accepted (accepted_by_user_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    teacher_library_add_column($pdo, 'teacher_unit_colleague_shares', 'guest_expires_at', '`guest_expires_at` DATETIME NULL AFTER `item_refs_json`');
+    teacher_library_add_column($pdo, 'teacher_unit_colleague_shares', 'expires_at', '`expires_at` DATETIME NULL AFTER `guest_expires_at`');
+    teacher_library_add_column($pdo, 'teacher_unit_colleague_shares', 'accepted_by_user_id', '`accepted_by_user_id` INT UNSIGNED NULL AFTER `expires_at`');
+    teacher_library_add_column($pdo, 'teacher_unit_colleague_shares', 'accepted_at', '`accepted_at` DATETIME NULL AFTER `accepted_by_user_id`');
+    teacher_library_add_index($pdo, 'teacher_unit_colleague_shares', 'idx_colleague_share_recipient', 'KEY `idx_colleague_share_recipient` (`recipient_email`)');
+    teacher_library_add_index($pdo, 'teacher_unit_colleague_shares', 'idx_colleague_share_accepted', 'KEY `idx_colleague_share_accepted` (`accepted_by_user_id`)');
 }
 
 function teacher_library_parse_item_ref(string $ref): ?array
@@ -347,36 +360,162 @@ function teacher_library_parse_item_ref(string $ref): ?array
     return ['type' => $m[1], 'id' => (int)$m[2], 'ref' => $m[1] . ':' . (int)$m[2]];
 }
 
+function teacher_library_share_item_from_ref(string $ref): ?array
+{
+    $parsed = teacher_library_parse_item_ref($ref);
+    if (!$parsed) return null;
+    $pdo = teacher_db();
+
+    if ($parsed['type'] === 'worksheet') {
+        $stmt = $pdo->prepare('SELECT id, title, description FROM teacher_custom_quizzes WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $parsed['id']]);
+        $row = $stmt->fetch();
+        if (!$row) return null;
+        return [
+            'ref' => $parsed['ref'],
+            'type' => 'worksheet',
+            'id' => (int)$row['id'],
+            'title' => (string)$row['title'],
+            'description' => (string)($row['description'] ?? ''),
+            'question_count' => 0,
+            'url' => '/teacher/material_pdf.php?custom_quiz_id=' . (int)$row['id'],
+        ];
+    }
+
+    $stmt = $pdo->prepare('SELECT q.id, q.quiz_key, q.title, q.description, q.image_path, q.theme_emoji, q.listening_mode, COUNT(qq.id) AS question_count FROM quizzes q LEFT JOIN quiz_questions qq ON qq.quiz_id = q.id WHERE q.id = :id GROUP BY q.id LIMIT 1');
+    $stmt->execute(['id' => $parsed['id']]);
+    $row = $stmt->fetch();
+    if (!$row) return null;
+    $type = ((int)($row['listening_mode'] ?? 0) === 1 || $parsed['type'] === 'listening') ? 'listening' : 'quiz';
+    return [
+        'ref' => $type . ':' . (int)$row['id'],
+        'type' => $type,
+        'id' => (int)$row['id'],
+        'title' => (string)$row['title'],
+        'description' => (string)($row['description'] ?? ''),
+        'question_count' => (int)($row['question_count'] ?? 0),
+        'image_path' => (string)($row['image_path'] ?? ''),
+        'emoji' => (string)($row['theme_emoji'] ?? ''),
+        'url' => !empty($row['quiz_key']) ? '/quiz.php?key=' . urlencode((string)$row['quiz_key']) : '',
+    ];
+}
+
+function teacher_library_share_items_from_json(?string $json): array
+{
+    $refs = json_decode((string)$json, true);
+    $refs = is_array($refs) ? $refs : [];
+    $items = [];
+    foreach ($refs as $ref) {
+        $item = teacher_library_share_item_from_ref((string)$ref);
+        if ($item) $items[] = $item;
+    }
+    return $items;
+}
+
+function teacher_library_share_public_url(string $token): string
+{
+    return teacher_library_absolute_url('/shared_unit.php?token=' . urlencode($token));
+}
+
+function teacher_library_share_is_guest_expired(array $share): bool
+{
+    $guestExpires = trim((string)($share['guest_expires_at'] ?? ''));
+    return $guestExpires !== '' && strtotime($guestExpires) !== false && strtotime($guestExpires) < time();
+}
+
+function teacher_library_shared_units_for_user(int $userId, string $email): array
+{
+    teacher_library_ensure_share_schema();
+    $email = trim(mb_strtolower($email, 'UTF-8'));
+    if ($email === '' && $userId <= 0) return [];
+
+    $stmt = teacher_db()->prepare("SELECT s.*, u.title, u.description, u.subject_code, u.subject_label, u.grade, u.curriculum_topic_label, u.curriculum_subtopic_label, au.display_name AS owner_name, au.email AS owner_email
+        FROM teacher_unit_colleague_shares s
+        JOIN teacher_units u ON u.id = s.unit_id
+        LEFT JOIN auth_users au ON au.id = s.teacher_id
+        WHERE (LOWER(s.recipient_email) = :email OR s.accepted_by_user_id = :user_id)
+        ORDER BY COALESCE(s.accepted_at, s.created_at) DESC");
+    $stmt->execute(['email' => $email, 'user_id' => $userId]);
+    $rows = $stmt->fetchAll();
+
+    $units = [];
+    foreach ($rows as $row) {
+        $items = teacher_library_share_items_from_json((string)($row['item_refs_json'] ?? '[]'));
+        $image = '';
+        $emoji = '🧩';
+        foreach ($items as $item) {
+            if ($image === '' && !empty($item['image_path'])) $image = (string)$item['image_path'];
+            if ($emoji === '🧩' && !empty($item['emoji'])) $emoji = (string)$item['emoji'];
+        }
+        $units[] = [
+            'id' => (int)$row['unit_id'],
+            'share_id' => (int)$row['id'],
+            'share_token' => (string)$row['token'],
+            'title' => (string)$row['title'],
+            'description' => (string)($row['description'] ?? ''),
+            'subject_code' => (string)($row['subject_code'] ?? ''),
+            'subject_label' => teacher_library_subject_label((string)($row['subject_code'] ?? ''), (string)($row['subject_label'] ?? '')),
+            'grade' => (string)($row['grade'] ?? ''),
+            'topic_label' => (string)($row['curriculum_topic_label'] ?? ''),
+            'subtopic_label' => (string)($row['curriculum_subtopic_label'] ?? ''),
+            'owner_name' => (string)(($row['owner_name'] ?? '') ?: ($row['owner_email'] ?? 'Kolleg:in')),
+            'items' => $items,
+            'image_path' => $image,
+            'emoji' => $emoji,
+            'updated_at' => (string)($row['created_at'] ?? ''),
+            'is_shared' => true,
+        ];
+    }
+    return $units;
+}
+
+function teacher_library_accept_share_for_user(string $token, int $userId): bool
+{
+    teacher_library_ensure_share_schema();
+    if ($token === '' || $userId <= 0) return false;
+    $stmt = teacher_db()->prepare('UPDATE teacher_unit_colleague_shares SET accepted_by_user_id = :user_id, accepted_at = COALESCE(accepted_at, CURRENT_TIMESTAMP) WHERE token = :token LIMIT 1');
+    $stmt->execute(['user_id' => $userId, 'token' => $token]);
+    return $stmt->rowCount() > 0;
+}
+
 function teacher_library_unit_share_mail_html(array $unit, array $selectedItems, string $buttonUrl): string
 {
     require_once __DIR__ . '/../app/includes/email.php';
 
+    $sender = auth_user();
+    $senderName = trim((string)(($sender['display_name'] ?? '') ?: ($sender['username'] ?? '') ?: 'Eine Lehrkraft'));
     $title = htmlspecialchars((string)($unit['title'] ?? 'Elevaro-Unit'), ENT_QUOTES, 'UTF-8');
     $subject = htmlspecialchars((string)($unit['subject_label'] ?? ''), ENT_QUOTES, 'UTF-8');
     $grade = htmlspecialchars((string)($unit['grade'] ?? ''), ENT_QUOTES, 'UTF-8');
     $topic = htmlspecialchars((string)(($unit['curriculum_subtopic_label'] ?? '') ?: ($unit['curriculum_topic_label'] ?? '')), ENT_QUOTES, 'UTF-8');
+    $meta = trim($subject . ($grade !== '' ? ' · Klasse ' . $grade : '') . ($topic !== '' ? ' · ' . $topic : ''));
+
     $preview = '';
     foreach ($selectedItems as $item) {
-        $preview .= '<li style="margin:6px 0;"><strong>' . htmlspecialchars(teacher_library_type_icon((string)$item['type']) . ' ' . (string)$item['title'], ENT_QUOTES, 'UTF-8') . '</strong></li>';
+        $preview .= '<div style="display:flex;gap:10px;align-items:center;background:#ffffff;border:1px solid #eceafe;border-radius:14px;padding:10px 12px;margin:8px 0;">'
+            . '<div style="width:34px;height:34px;border-radius:12px;background:#f3f1ff;display:flex;align-items:center;justify-content:center;">' . htmlspecialchars(teacher_library_type_icon((string)$item['type']), ENT_QUOTES, 'UTF-8') . '</div>'
+            . '<div><div style="font-weight:900;color:#172033;line-height:1.2;">' . htmlspecialchars((string)$item['title'], ENT_QUOTES, 'UTF-8') . '</div>'
+            . '<div style="font-size:12px;color:#64748b;font-weight:700;">' . htmlspecialchars(teacher_library_type_label((string)$item['type']), ENT_QUOTES, 'UTF-8') . '</div></div></div>';
     }
     if ($preview === '') {
-        $preview = '<li>Alle Inhalte dieser Unit</li>';
+        $preview = '<p style="color:#64748b;margin:0;">Alle freigegebenen Inhalte dieser Unit.</p>';
     }
 
-    $body = '<div style="border:1px solid #eceafe;background:#fafaff;border-radius:18px;padding:18px;margin:14px 0 18px;">'
-        . '<div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#5a4ff3;font-weight:800;margin-bottom:8px;">Geteilte Unit</div>'
-        . '<div style="font-size:24px;line-height:1.1;color:#172033;font-weight:900;margin-bottom:8px;">' . $title . '</div>'
-        . '<div style="color:#6c7482;font-weight:700;">' . trim($subject . ($grade !== '' ? ' · Klasse ' . $grade : '') . ($topic !== '' ? ' · ' . $topic : '')) . '</div>'
-        . '<ul style="padding-left:18px;margin:16px 0 0;color:#172033;">' . $preview . '</ul>'
+    $body = '<p style="font-size:16px;line-height:1.5;margin:0 0 18px;color:#172033;"><strong>' . htmlspecialchars($senderName, ENT_QUOTES, 'UTF-8') . '</strong> hat folgende Elevaro-Inhalte mit dir geteilt:</p>'
+        . '<div style="border:1px solid #e6e2ff;background:linear-gradient(135deg,#f7f6ff,#ffffff);border-radius:22px;padding:20px;margin:14px 0 20px;">'
+        . '<div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#5a4ff3;font-weight:900;margin-bottom:8px;">Geteilte Unit</div>'
+        . '<div style="font-size:26px;line-height:1.1;color:#172033;font-weight:950;margin-bottom:8px;">' . $title . '</div>'
+        . '<div style="color:#64748b;font-weight:750;margin-bottom:14px;">' . htmlspecialchars($meta, ENT_QUOTES, 'UTF-8') . '</div>'
+        . $preview
         . '</div>'
-        . '<p>Eine Kollegin oder ein Kollege hat Elevaro-Inhalte mit dir geteilt. Du kannst dir die Unit ansehen und die Inhalte für deinen Unterricht übernehmen.</p>';
+        . '<p style="color:#64748b;line-height:1.5;margin:0;">Du kannst die Inhalte 24 Stunden ohne Registrierung ansehen. Mit einem kostenlosen Elevaro-Account speicherst du die Freigabe dauerhaft in deiner Bibliothek.</p>';
 
-    return elevaro_mail_layout('Elevaro-Unit geteilt', $body, 'Inhalt anzeigen', $buttonUrl);
+    return elevaro_mail_layout('Elevaro-Unit geteilt', $body, 'Inhalte anzeigen', $buttonUrl);
 }
 
 function teacher_library_send_unit_share_mail(string $to, array $unit, array $selectedItems, string $buttonUrl): bool
 {
     require_once __DIR__ . '/../app/includes/email.php';
-    $subject = 'Elevaro-Unit geteilt: ' . (string)($unit['title'] ?? 'Unterrichtsmaterial');
+    $subject = 'Elevaro-Inhalte geteilt: ' . (string)($unit['title'] ?? 'Unterrichtsmaterial');
     return elevaro_send_mail($to, $subject, teacher_library_unit_share_mail_html($unit, $selectedItems, $buttonUrl));
 }
