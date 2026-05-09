@@ -106,6 +106,13 @@ $listeningMode = !empty($quiz['listening_mode']);
 $listeningText = trim((string)($quiz['listening_text'] ?? ''));
 $listeningAudioPath = trim((string)($quiz['listening_audio_path'] ?? ''));
 $hasListeningAudio = $listeningMode && $listeningAudioPath !== '';
+
+$classroomQuizHighscores = [];
+$classroomOverallHighscores = [];
+if ($classroomMode && $classroomClass && $classroomHasQuiz) {
+    $classroomQuizHighscores = classroom_highscores((int)$classroomClass['id'], (int)$quiz['id'], 8);
+    $classroomOverallHighscores = classroom_highscores((int)$classroomClass['id'], null, 5);
+}
 ?>
 <!DOCTYPE html>
 <html lang="de">
@@ -233,11 +240,80 @@ $hasListeningAudio = $listeningMode && $listeningAudioPath !== '';
         </div>
       </div>
 
-      <div id="introExtras" class="quiz-highscore-placeholder">
-        <div>
-          <strong>Highscores</strong>
-          <span>Kommt später: Klassenranglisten, Bestzeiten und Serien.</span>
-        </div>
+      <div id="introExtras" class="quiz-highscore-panel">
+        <?php if ($classroomMode): ?>
+          <div class="quiz-highscore-card quiz-highscore-card-main">
+            <div class="quiz-highscore-head">
+              <div>
+                <span class="quiz-highscore-kicker">🏆 Highscore</span>
+                <h3>Bestenliste für dieses Quiz</h3>
+              </div>
+              <?php if ($classroomQuizHighscores): ?>
+                <span class="quiz-highscore-count"><?= count($classroomQuizHighscores) ?> Einträge</span>
+              <?php endif; ?>
+            </div>
+
+            <?php if ($classroomQuizHighscores): ?>
+              <ol class="quiz-highscore-list">
+                <?php foreach ($classroomQuizHighscores as $index => $row): ?>
+                  <li class="quiz-highscore-row <?= $index < 3 ? 'is-top' : '' ?>">
+                    <div class="quiz-highscore-rank"><?= $index + 1 ?></div>
+                    <div class="quiz-highscore-avatar avatar-bubble <?= qh($row['avatar_type'] ?? 'emoji') ?> <?= qh($row['avatar_gradient'] ?? 'grad-1') ?>"><?= qh($row['avatar_emoji'] ?? '🙂') ?></div>
+                    <div class="quiz-highscore-person">
+                      <strong><?= qh($row['display_name']) ?></strong>
+                      <span><?= (int)$row['best_correct'] ?> richtig · <?= qh((string)round((float)$row['best_percent'])) ?>% · <?= (int)$row['rounds'] ?> Runde<?= (int)$row['rounds'] === 1 ? '' : 'n' ?></span>
+                    </div>
+                    <div class="quiz-highscore-points">
+                      <strong><?= (int)$row['best_points'] ?></strong>
+                      <span>Punkte</span>
+                    </div>
+                  </li>
+                <?php endforeach; ?>
+              </ol>
+            <?php else: ?>
+              <div class="quiz-highscore-empty">
+                <strong>Noch keine Ergebnisse</strong>
+                <span>Starte das Quiz und hol dir den ersten Platz in deiner Klasse.</span>
+              </div>
+            <?php endif; ?>
+          </div>
+
+          <div class="quiz-highscore-card quiz-highscore-card-side">
+            <div class="quiz-highscore-head compact">
+              <div>
+                <span class="quiz-highscore-kicker">⭐ Klasse</span>
+                <h3>Top der Klasse</h3>
+              </div>
+            </div>
+
+            <?php if ($classroomOverallHighscores): ?>
+              <ol class="quiz-highscore-mini-list">
+                <?php foreach ($classroomOverallHighscores as $index => $row): ?>
+                  <li>
+                    <span class="quiz-highscore-mini-rank"><?= $index + 1 ?></span>
+                    <span class="quiz-highscore-mini-name"><?= qh($row['display_name']) ?></span>
+                    <strong><?= (int)$row['best_points'] ?></strong>
+                  </li>
+                <?php endforeach; ?>
+              </ol>
+            <?php else: ?>
+              <p class="quiz-highscore-mini-empty">Noch keine Klassen-Highscores.</p>
+            <?php endif; ?>
+          </div>
+        <?php else: ?>
+          <div class="quiz-highscore-card quiz-highscore-card-main">
+            <div class="quiz-highscore-head">
+              <div>
+                <span class="quiz-highscore-kicker">🏆 Highscores</span>
+                <h3>Klassenranglisten</h3>
+              </div>
+            </div>
+            <div class="quiz-highscore-empty">
+              <strong>Highscores erscheinen im Klassenraum</strong>
+              <span>Wenn deine Lehrkraft das Quiz einer Klasse zuweist, sehen Schülerinnen und Schüler hier ihre Bestenliste.</span>
+            </div>
+          </div>
+        <?php endif; ?>
       </div>
 
       <div id="quizCard" class="quiz-card d-none">
