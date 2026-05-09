@@ -482,40 +482,23 @@ function teacher_library_unit_share_mail_html(array $unit, array $selectedItems,
 {
     require_once __DIR__ . '/../app/includes/email.php';
 
-    $sender = auth_user();
-    $senderName = trim((string)(($sender['display_name'] ?? '') ?: ($sender['username'] ?? '') ?: 'Eine Lehrkraft'));
-    $title = htmlspecialchars((string)($unit['title'] ?? 'Elevaro-Unit'), ENT_QUOTES, 'UTF-8');
-    $subject = htmlspecialchars((string)($unit['subject_label'] ?? ''), ENT_QUOTES, 'UTF-8');
-    $grade = htmlspecialchars((string)($unit['grade'] ?? ''), ENT_QUOTES, 'UTF-8');
-    $topic = htmlspecialchars((string)(($unit['curriculum_subtopic_label'] ?? '') ?: ($unit['curriculum_topic_label'] ?? '')), ENT_QUOTES, 'UTF-8');
-    $meta = trim($subject . ($grade !== '' ? ' · Klasse ' . $grade : '') . ($topic !== '' ? ' · ' . $topic : ''));
+    $sender = function_exists('auth_user') ? auth_user() : null;
+    $senderName = trim((string)(($sender['display_name'] ?? '') ?: ($sender['username'] ?? '') ?: ($sender['email'] ?? '') ?: 'Eine Lehrkraft'));
 
-    $preview = '';
-    foreach ($selectedItems as $item) {
-        $preview .= '<div style="display:flex;gap:10px;align-items:center;background:#ffffff;border:1px solid #eceafe;border-radius:14px;padding:10px 12px;margin:8px 0;">'
-            . '<div style="width:34px;height:34px;border-radius:12px;background:#f3f1ff;display:flex;align-items:center;justify-content:center;">' . htmlspecialchars(teacher_library_type_icon((string)$item['type']), ENT_QUOTES, 'UTF-8') . '</div>'
-            . '<div><div style="font-weight:900;color:#172033;line-height:1.2;">' . htmlspecialchars((string)$item['title'], ENT_QUOTES, 'UTF-8') . '</div>'
-            . '<div style="font-size:12px;color:#64748b;font-weight:700;">' . htmlspecialchars(teacher_library_type_label((string)$item['type']), ENT_QUOTES, 'UTF-8') . '</div></div></div>';
-    }
-    if ($preview === '') {
-        $preview = '<p style="color:#64748b;margin:0;">Alle freigegebenen Inhalte dieser Unit.</p>';
-    }
-
-    $body = '<p style="font-size:16px;line-height:1.5;margin:0 0 18px;color:#172033;"><strong>' . htmlspecialchars($senderName, ENT_QUOTES, 'UTF-8') . '</strong> hat folgende Elevaro-Inhalte mit dir geteilt:</p>'
-        . '<div style="border:1px solid #e6e2ff;background:linear-gradient(135deg,#f7f6ff,#ffffff);border-radius:22px;padding:20px;margin:14px 0 20px;">'
-        . '<div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#5a4ff3;font-weight:900;margin-bottom:8px;">Geteilte Unit</div>'
-        . '<div style="font-size:26px;line-height:1.1;color:#172033;font-weight:950;margin-bottom:8px;">' . $title . '</div>'
-        . '<div style="color:#64748b;font-weight:750;margin-bottom:14px;">' . htmlspecialchars($meta, ENT_QUOTES, 'UTF-8') . '</div>'
-        . $preview
-        . '</div>'
-        . '<p style="color:#64748b;line-height:1.5;margin:0;">Du kannst die Inhalte 24 Stunden ohne Registrierung ansehen. Mit einem kostenlosen Elevaro-Account speicherst du die Freigabe dauerhaft in deiner Bibliothek.</p>';
-
-    return elevaro_mail_layout('Elevaro-Unit geteilt', $body, 'Inhalte anzeigen', $buttonUrl);
+    return elevaro_mail_unit_share_html($unit, $selectedItems, $buttonUrl, [
+        'sender_name' => $senderName,
+    ]);
 }
 
 function teacher_library_send_unit_share_mail(string $to, array $unit, array $selectedItems, string $buttonUrl): bool
 {
     require_once __DIR__ . '/../app/includes/email.php';
-    $subject = 'Elevaro-Inhalte geteilt: ' . (string)($unit['title'] ?? 'Unterrichtsmaterial');
+
+    $subject = 'Elevaro-Inhalte von ';
+    $sender = function_exists('auth_user') ? auth_user() : null;
+    $senderName = trim((string)(($sender['display_name'] ?? '') ?: ($sender['username'] ?? '') ?: 'einer Lehrkraft'));
+    $unitTitle = trim((string)($unit['title'] ?? 'Unterrichtsmaterial'));
+    $subject .= $senderName . ': ' . $unitTitle;
+
     return elevaro_send_mail($to, $subject, teacher_library_unit_share_mail_html($unit, $selectedItems, $buttonUrl));
 }
