@@ -21,7 +21,7 @@ function teacher_user_initials(?array $user = null): string
     return mb_strtoupper($first . $second, 'UTF-8');
 }
 
-function teacher_header(string $title, string $subtitle = ''): void {
+function teacher_header(string $title, string $subtitle = '', array $options = []): void {
     $user = auth_user();
     $classes = teacher_classes();
     $selected = teacher_selected_class();
@@ -29,6 +29,9 @@ function teacher_header(string $title, string $subtitle = ''): void {
     $current = basename($_SERVER['SCRIPT_NAME']);
     $displayName = teacher_user_display_name($user);
     $initials = teacher_user_initials($user);
+    $isGlobalPage = (bool)($options['global_page'] ?? false);
+    $isGlobalLibraryPage = $isGlobalPage || $current === 'materials.php';
+    $showClassSidebar = !$isGlobalLibraryPage;
     $roleLabel = auth_role_label((string)auth_effective_role());
     $withClass = static function (string $file) use ($classId): string {
         return $classId ? $file . '?class_id=' . $classId : $file;
@@ -67,10 +70,15 @@ function teacher_header(string $title, string $subtitle = ''): void {
     .teacher-class-switch label{font-size:.78rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
     .invite-code{font-size:1.35rem;letter-spacing:.12em;font-weight:900;background:#172033;color:#fff;border-radius:16px;padding:12px 16px;display:inline-block}
     .qr-placeholder{width:180px;height:180px;border-radius:24px;background:repeating-linear-gradient(45deg,#172033 0 8px,#fff 8px 16px);box-shadow:inset 0 0 0 16px #fff;border:1px solid rgba(23,32,51,.12)}
+    .teacher-global-layout{grid-template-columns:minmax(0,1fr)}
+    .teacher-global-layout .admin-main{width:100%;max-width:1360px;margin:0 auto}
+    .teacher-global-brand{display:inline-flex;align-items:center;gap:10px;color:var(--ev);font-weight:950;font-size:1.05rem;letter-spacing:-.03em;text-decoration:none;margin-bottom:10px}
+    .teacher-global-brand span{width:30px;height:30px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#5a4ff3,#8b7cff);color:#fff;font-size:.9rem;box-shadow:0 10px 26px rgba(90,79,243,.22)}
   </style>
 </head>
 <body>
-<div class="admin-layout">
+<div class="admin-layout <?= $showClassSidebar ? '' : 'teacher-global-layout' ?>">
+  <?php if ($showClassSidebar): ?>
   <aside class="admin-sidebar">
     <a class="admin-brand" href="/teacher/index.php">Elevaro</a>
 
@@ -116,15 +124,19 @@ function teacher_header(string $title, string $subtitle = ''): void {
 
 
   </aside>
+  <?php endif; ?>
 
   <main class="admin-main">
+    <?php if (!$showClassSidebar): ?>
+      <a class="teacher-global-brand" href="/teacher/index.php"><span>E</span> Elevaro Lehrer</a>
+    <?php endif; ?>
     <header class="admin-page-head">
       <div>
         <h1><?= teacher_h($title) ?></h1>
         <?php if ($subtitle): ?><p><?= teacher_h($subtitle) ?></p><?php endif; ?>
       </div>
       <div class="teacher-top-actions">
-        <?php if ($classId): ?><a class="btn btn-outline-primary" href="/classroom.php?class_id=<?= (int)$classId ?>">🚪 Klassenraum betreten</a><?php endif; ?>
+        <?php if ($classId && !$isGlobalLibraryPage): ?><a class="btn btn-outline-primary" href="/classroom.php?class_id=<?= (int)$classId ?>">🚪 Klassenraum betreten</a><?php endif; ?>
 
         <div class="dropdown teacher-user-dropdown">
           <button class="teacher-user-button" type="button" data-bs-toggle="dropdown" aria-expanded="false">
