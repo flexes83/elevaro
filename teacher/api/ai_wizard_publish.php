@@ -58,6 +58,56 @@ function elevaro_teacher_ai_publish_column_exists_safe(string $table, string $co
     return (int)$stmt->fetchColumn() > 0;
 }
 
+
+function elevaro_teacher_ai_publish_link_unit_asset(int $teacherId, int $quizId, array $draft, array $payload): void
+{
+    $unitId = (int)($draft['teacher_unit_id'] ?? 0);
+    if ($unitId <= 0) return;
+
+    $pdo = elevaro_teacher_ai_wizard_db();
+    $pdo->exec("CREATE TABLE IF NOT EXISTS teacher_unit_assets (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        unit_id INT UNSIGNED NOT NULL,
+        teacher_id INT UNSIGNED NOT NULL,
+        asset_type ENUM('quiz','listening_quiz','worksheet','listening_comprehension','reading_comprehension') NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        quiz_id INT UNSIGNED NULL,
+        custom_quiz_id INT UNSIGNED NULL,
+        pdf_path VARCHAR(500) NULL,
+        audio_path VARCHAR(500) NULL,
+        transcript MEDIUMTEXT NULL,
+        status VARCHAR(32) NOT NULL DEFAULT 'draft',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        KEY idx_teacher_unit_assets_unit (unit_id),
+        KEY idx_teacher_unit_assets_teacher (teacher_id),
+        KEY idx_teacher_unit_assets_type (asset_type)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    $check = $pdo->prepare("SELECT id FROM teacher_units WHERE id = :unit_id AND teacher_id = :teacher_id LIMIT 1");
+    $check->execute(['unit_id' => $unitId, 'teacher_id' => $teacherId]);
+    if (!$check->fetchColumn()) return;
+
+    $mode = (string)($draft['mode'] ?? 'quiz');
+    $assetType = $mode === 'listening' ? 'listening_quiz' : 'quiz';
+    $title = trim((string)($payload['title'] ?? $draft['source_title'] ?? 'KI-Quiz'));
+    if ($title === '') $title = 'KI-Quiz';
+
+    $existing = $pdo->prepare("SELECT id FROM teacher_unit_assets WHERE teacher_id = :teacher_id AND unit_id = :unit_id AND quiz_id = :quiz_id LIMIT 1");
+    $existing->execute(['teacher_id' => $teacherId, 'unit_id' => $unitId, 'quiz_id' => $quizId]);
+    if ($existing->fetchColumn()) return;
+
+    $stmt = $pdo->prepare("INSERT INTO teacher_unit_assets (unit_id, teacher_id, asset_type, title, quiz_id, status)
+        VALUES (:unit_id, :teacher_id, :asset_type, :title, :quiz_id, 'published')");
+    $stmt->execute([
+        'unit_id' => $unitId,
+        'teacher_id' => $teacherId,
+        'asset_type' => $assetType,
+        'title' => $title,
+        'quiz_id' => $quizId,
+    ]);
+}
+
 function elevaro_teacher_ai_publish_finalize_quiz(int $quizId, array $draft, array $payload): void
 {
     $pdo = elevaro_teacher_ai_wizard_db();
@@ -154,6 +204,7 @@ try {
     $payload = elevaro_teacher_ai_draft_payload($draft);
 
     elevaro_teacher_ai_publish_finalize_quiz($quizId, $draft, $payload);
+    elevaro_teacher_ai_publish_link_unit_asset($teacherId, $quizId, $draft, $payload);
 
     $__elevaroAiPublishResponded = true;
     while (ob_get_level() > 0) {

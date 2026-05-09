@@ -16,6 +16,7 @@ try {
     $sourceKind = (string)($_POST['source_kind'] ?? 'material');
     $curriculumTopicId = (int)($_POST['curriculum_topic_content_id'] ?? 0);
     $curriculumSubtopicId = (int)($_POST['curriculum_topic_subtopic_id'] ?? 0);
+    $unitId = (int)($_POST['unit_id'] ?? 0);
     $goalHints = [
         'auto' => 'Materialziel: KI entscheidet anhand des Materials, ob Inhalte abgefragt oder ähnliche Übungen erstellt werden sollen.',
         'content' => 'Materialziel: Inhalte verstehen und abfragen. Erstelle Fragen zum fachlichen Inhalt, nicht nur zum Aufgabenformat.',
@@ -41,6 +42,7 @@ try {
         'source_kind' => $sourceKind === 'curriculum' ? 'curriculum' : 'material',
         'curriculum_topic_content_id' => $curriculumTopicId,
         'curriculum_topic_subtopic_id' => $curriculumSubtopicId,
+        'unit_id' => $unitId,
     ]);
 
     elevaro_teacher_ai_json_response([

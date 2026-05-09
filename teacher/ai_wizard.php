@@ -13,6 +13,13 @@ if (!$class) {
 $classId = (int)$class['id'];
 $classLabel = teacher_class_label($class);
 $subjectLabel = elevaro_teacher_ai_subject_label($class['subject_code'] ?? '');
+$unitId = (int)($_GET['unit_id'] ?? 0);
+$unit = null;
+if ($unitId > 0) {
+    $unitStmt = teacher_db()->prepare("SELECT * FROM teacher_units WHERE id = :id AND teacher_id = :teacher_id LIMIT 1");
+    $unitStmt->execute(['id' => $unitId, 'teacher_id' => teacher_current_user_id()]);
+    $unit = $unitStmt->fetch() ?: null;
+}
 
 teacher_header('KI-Quiz-Wizard', 'Aus Material oder Lernziel in wenigen Schritten ein Klassenquiz erstellen.');
 ?>
@@ -22,9 +29,9 @@ teacher_header('KI-Quiz-Wizard', 'Aus Material oder Lernziel in wenigen Schritte
   <div class="ai-wizard-hero">
     <div>
       <span class="ai-wizard-kicker">✨ Neuer Lehrer-Assistent</span>
-      <h2 id="aiWizardHeroTitle">Aus Material wird ein spielbares Quiz</h2>
+      <h2 id="aiWizardHeroTitle"><?= $unit ? 'Inhalt für Unit erstellen' : 'Aus Material wird ein spielbares Quiz' ?></h2>
       <p>
-        Klasse: <strong><?= teacher_h($classLabel) ?></strong> · Fach: <strong><?= teacher_h($subjectLabel) ?></strong>
+        <?php if ($unit): ?>Unit: <strong><?= teacher_h($unit['title']) ?></strong> · <?php endif; ?>Klasse: <strong><?= teacher_h($classLabel) ?></strong> · Fach: <strong><?= teacher_h($subjectLabel) ?></strong>
         <?php if (!empty($class['grade'])): ?> · Klasse <?= (int)$class['grade'] ?><?php endif; ?>
       </p>
     </div>
@@ -41,7 +48,13 @@ teacher_header('KI-Quiz-Wizard', 'Aus Material oder Lernziel in wenigen Schritte
   <section class="ai-wizard-panel is-active" data-step="1">
     <form id="aiWizardSourceForm" enctype="multipart/form-data">
       <input type="hidden" name="class_id" value="<?= (int)$classId ?>">
+      <?php if ($unit): ?><input type="hidden" name="unit_id" value="<?= (int)$unit['id'] ?>"><?php endif; ?>
       <input type="hidden" name="source_kind" id="aiWizardSourceKind" value="material">
+      <?php if ($unit): ?>
+        <div class="alert alert-primary d-flex align-items-start gap-2" style="border-radius:22px">
+          <span>✨</span><div><strong>Du erstellst Inhalte für die Unit „<?= teacher_h($unit['title']) ?>“.</strong><br><span class="small">Nach dem Speichern bleibt das Material dauerhaft in deiner Bibliothek und kann mehreren Klassen zugeordnet werden.</span></div>
+        </div>
+      <?php endif; ?>
 
       <div class="ai-step-one-layout">
         <div class="ai-step-card">

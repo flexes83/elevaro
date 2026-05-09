@@ -1290,6 +1290,7 @@ if (!function_exists('elevaro_teacher_ai_split_ensure_schema')) {
         elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'question_blocks_json', "question_blocks_json LONGTEXT NULL AFTER analysis_json");
         elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'generation_error', "generation_error TEXT NULL AFTER question_blocks_json");
         elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'source_kind', "source_kind VARCHAR(40) NOT NULL DEFAULT 'material' AFTER mode");
+        elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'teacher_unit_id', "teacher_unit_id INT UNSIGNED NULL AFTER source_kind");
         elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'curriculum_topic_content_id', "curriculum_topic_content_id INT UNSIGNED NULL AFTER source_kind");
         elevaro_teacher_ai_wizard_add_column_if_missing('teacher_ai_quiz_drafts', 'curriculum_topic_subtopic_id', "curriculum_topic_subtopic_id INT UNSIGNED NULL AFTER curriculum_topic_content_id");
         elevaro_teacher_ai_wizard_db()->exec("CREATE TABLE IF NOT EXISTS quiz_curriculum_topics (
@@ -1712,6 +1713,7 @@ if (!function_exists('elevaro_teacher_ai_create_split_draft')) {
         $sourceKind = (string)($options['source_kind'] ?? 'material');
         $topicId = isset($options['curriculum_topic_content_id']) ? (int)$options['curriculum_topic_content_id'] : 0;
         $subtopicId = isset($options['curriculum_topic_subtopic_id']) ? (int)$options['curriculum_topic_subtopic_id'] : 0;
+        $unitId = isset($options['unit_id']) ? (int)$options['unit_id'] : 0;
         $class = elevaro_teacher_ai_class_for_teacher($classId, $teacherId);
 
         if ($sourceKind === 'curriculum') {
@@ -1742,13 +1744,14 @@ LEHRER-ZUSATZREGELN:
 
         $pdo = elevaro_teacher_ai_wizard_db();
         $stmt = $pdo->prepare("INSERT INTO teacher_ai_quiz_drafts
-            (teacher_id, class_id, mode, source_kind, curriculum_topic_content_id, curriculum_topic_subtopic_id, status, generation_step, source_title, source_text, source_files_json, prompt, generated_payload_json, image_prompt, image_status)
-            VALUES (:teacher_id, :class_id, :mode, :source_kind, :curriculum_topic_content_id, :curriculum_topic_subtopic_id, 'generating', 'analysis', NULL, :source_text, :source_files_json, :prompt, NULL, NULL, 'none')");
+            (teacher_id, class_id, mode, source_kind, teacher_unit_id, curriculum_topic_content_id, curriculum_topic_subtopic_id, status, generation_step, source_title, source_text, source_files_json, prompt, generated_payload_json, image_prompt, image_status)
+            VALUES (:teacher_id, :class_id, :mode, :source_kind, :teacher_unit_id, :curriculum_topic_content_id, :curriculum_topic_subtopic_id, 'generating', 'analysis', NULL, :source_text, :source_files_json, :prompt, NULL, NULL, 'none')");
         $stmt->execute([
             'teacher_id' => $teacherId,
             'class_id' => $classId,
             'mode' => $mode,
             'source_kind' => $sourceKind,
+            'teacher_unit_id' => $unitId ?: null,
             'curriculum_topic_content_id' => $topicId ?: null,
             'curriculum_topic_subtopic_id' => $subtopicId ?: null,
             'source_text' => $sourceText,
