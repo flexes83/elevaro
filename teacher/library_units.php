@@ -295,3 +295,88 @@ function teacher_library_unit_by_id(int $unitId): ?array
     $unit = $stmt->fetch();
     return $unit ?: null;
 }
+
+function teacher_library_absolute_url(string $path): string
+{
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'https';
+    $host = $_SERVER['HTTP_HOST'] ?? 'elevaro.app';
+    if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+        return $path;
+    }
+    return $scheme . '://' . $host . '/' . ltrim($path, '/');
+}
+
+function teacher_library_ensure_share_schema(): void
+{
+    teacher_library_ensure_schema();
+    $pdo = teacher_db();
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS teacher_unit_item_class_links (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        unit_id INT UNSIGNED NOT NULL,
+        class_id INT UNSIGNED NOT NULL,
+        teacher_id INT UNSIGNED NOT NULL,
+        item_type VARCHAR(32) NOT NULL,
+        item_ref_id INT UNSIGNED NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_unit_item_class (unit_id, class_id, item_type, item_ref_id),
+        KEY idx_unit_item_class_teacher (teacher_id),
+        KEY idx_unit_item_class_class (class_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS teacher_unit_colleague_shares (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        unit_id INT UNSIGNED NOT NULL,
+        teacher_id INT UNSIGNED NOT NULL,
+        recipient_email VARCHAR(190) NOT NULL,
+        token VARCHAR(96) NOT NULL,
+        item_refs_json TEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_colleague_share_token (token),
+        KEY idx_colleague_share_teacher (teacher_id),
+        KEY idx_colleague_share_unit (unit_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+}
+
+function teacher_library_parse_item_ref(string $ref): ?array
+{
+    $ref = trim($ref);
+    if (!preg_match('/^(quiz|worksheet|listening|reading):(\d+)$/', $ref, $m)) {
+        return null;
+    }
+    return ['type' => $m[1], 'id' => (int)$m[2], 'ref' => $m[1] . ':' . (int)$m[2]];
+}
+
+function teacher_library_unit_share_mail_html(array $unit, array $selectedItems, string $buttonUrl): string
+{
+    require_once __DIR__ . '/../app/includes/email.php';
+
+    $title = htmlspecialchars((string)($unit['title'] ?? 'Elevaro-Unit'), ENT_QUOTES, 'UTF-8');
+    $subject = htmlspecialchars((string)($unit['subject_label'] ?? ''), ENT_QUOTES, 'UTF-8');
+    $grade = htmlspecialchars((string)($unit['grade'] ?? ''), ENT_QUOTES, 'UTF-8');
+    $topic = htmlspecialchars((string)(($unit['curriculum_subtopic_label'] ?? '') ?: ($unit['curriculum_topic_label'] ?? '')), ENT_QUOTES, 'UTF-8');
+    $preview = '';
+    foreach ($selectedItems as $item) {
+        $preview .= '<li style="margin:6px 0;"><strong>' . htmlspecialchars(teacher_library_type_icon((string)$item['type']) . ' ' . (string)$item['title'], ENT_QUOTES, 'UTF-8') . '</strong></li>';
+    }
+    if ($preview === '') {
+        $preview = '<li>Alle Inhalte dieser Unit</li>';
+    }
+
+    $body = '<div style="border:1px solid #eceafe;background:#fafaff;border-radius:18px;padding:18px;margin:14px 0 18px;">'
+        . '<div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#5a4ff3;font-weight:800;margin-bottom:8px;">Geteilte Unit</div>'
+        . '<div style="font-size:24px;line-height:1.1;color:#172033;font-weight:900;margin-bottom:8px;">' . $title . '</div>'
+        . '<div style="color:#6c7482;font-weight:700;">' . trim($subject . ($grade !== '' ? ' · Klasse ' . $grade : '') . ($topic !== '' ? ' · ' . $topic : '')) . '</div>'
+        . '<ul style="padding-left:18px;margin:16px 0 0;color:#172033;">' . $preview . '</ul>'
+        . '</div>'
+        . '<p>Eine Kollegin oder ein Kollege hat Elevaro-Inhalte mit dir geteilt. Du kannst dir die Unit ansehen und die Inhalte für deinen Unterricht übernehmen.</p>';
+
+    return elevaro_mail_layout('Elevaro-Unit geteilt', $body, 'Inhalt anzeigen', $buttonUrl);
+}
+
+function teacher_library_send_unit_share_mail(string $to, array $unit, array $selectedItems, string $buttonUrl): bool
+{
+    require_once __DIR__ . '/../app/includes/email.php';
+    $subject = 'Elevaro-Unit geteilt: ' . (string)($unit['title'] ?? 'Unterrichtsmaterial');
+    return elevaro_send_mail($to, $subject, teacher_library_unit_share_mail_html($unit, $selectedItems, $buttonUrl));
+}
